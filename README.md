@@ -1,58 +1,183 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+<div align="center">
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+# 🏎️ Instrument Cluster Simulator
 
-## About Laravel
+**Drive a car's dashboard in your browser** — analog needles, a live dyno, and a
+synthesised engine you can hear spool, rev, and blow off boost.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Each car is a single hand-built HTML file. Laravel gives it a garage, an upload
+door, and a memory.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)
+![PHP](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind-4-38BDF8?logo=tailwindcss&logoColor=white)
+![Web Audio](https://img.shields.io/badge/Web%20Audio-synthesised-e8402a)
+![SQLite](https://img.shields.io/badge/SQLite-default-003B57?logo=sqlite&logoColor=white)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+</div>
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 🔎 What is this?
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+A working car **instrument cluster** — tachometer, speedo, boost gauge, coolant
+temp, fuel, HP/torque dials — that reacts to a throttle slider and a gearbox in
+real time. There's no engine audio sample anywhere: the exhaust drone, turbo
+whistle, intake whoosh and gear whine are all **generated live** with the Web
+Audio API from the current rpm, boost and load.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+The Laravel side is deliberately thin. It lists the cars, lets you upload new
+ones, serves each car's raw HTML into an `<iframe>`, and remembers where you left
+each one — odometer, fuel, engine wear, drive mode, and every sound-mixer slider.
 
-## Agentic Development
+<div align="center">
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+| Garage | Cluster | Upload |
+|:--:|:--:|:--:|
+| Pick a car, hit **Start Engine** | Drive it, tune it, log a dyno pull | Drop in your own HTML cluster |
 
-```bash
-composer require laravel/boost --dev
+</div>
 
-php artisan boost:install
+---
+
+## ✨ Features
+
+### 🎛️ The simulation (lives in each car's HTML)
+
+| | Feature |
+|---|---|
+| 🌀 **Live turbo model** | Boost pressure builds against real turbo lag — sustain >50% throttle and watch it come on song. Quad-turbo on the 550D (2 low-pressure always spooled + 2 high-pressure), single on the 320D. |
+| 🔊 **Fully synthesised engine** | Firing pulses at the real per-cylinder rate (an I6 *buzzes*, an I4 *chugs*), plus separate layers for combustion rasp, intake, exhaust drone, valvetrain, turbo whistle and ZF 8HP gear whine. |
+| 💥 **Blow-off valve** | Lift off boost suddenly and you get the *pssht*. |
+| 📈 **Endless live dyno** | Drive however you like — the power/torque curve logs itself into rpm bins and draws against a reference curve. Colour-coded per gear. |
+| ⚙️ **6 engine maps** | Map 1–6 rescale power, redline, gauge sweeps and fuel burn. Bigger tunes genuinely drink more and spin the tach to 12k. |
+| 🔥 **Engine wear & heat-soak** | Bounce off the limiter or hold it past redline and `engine_wear_pct` climbs — and it *sticks* until repaired. |
+| 🚦 **Automatic gearbox** | P/R/N/D with load-aware upshifts, kickdown, coast-downshifts and short-shift behaviour that changes with throttle. |
+| ⛽ **Fuel & refuelling** | Consumption is modelled from real BSFC numbers; the tank drains as you drive and fills on a ramp when you hit Refuel. |
+| 🥶 **Cold-start** | Down on power until coolant hits operating temp; the starter cranks, catches, flares, and settles to idle. |
+
+### 🎚️ Engine sound mixer (shared, injected into every car)
+
+A floating panel — bottom-right of any cluster — with a slider per audio layer
+(Master, Combustion Rasp, Sub-Bass, Turbo, Intake, Exhaust, Gear Whine, Wind…).
+Drag a slider and it applies to the live audio graph *and* debounce-saves to the
+server. Reopen the car days later and your mix is exactly where you left it.
+
+### 🖥️ The Laravel wrapper
+
+| | Feature |
+|---|---|
+| 🗂️ **Garage menu** | Auto-listed from the DB, click-to-select, **Start Engine** |
+| ⬆️ **Upload flow** | Add a car by uploading its `.html` (≤5 MB), with name + subtitle. Slugs auto-generate and de-duplicate. |
+| 💉 **State injection** | `/car/{slug}/raw` reads the car file off storage and injects `window.__CAR_STATE__` (saved values + CSRF) plus the shared scripts before `</head>` — the car HTML never touches Blade. |
+| 💾 **Autosave** | Every car flushes state on a 10s interval and on `pagehide`; the parent nav links also force a save before unloading the iframe. |
+| 🎯 **Sensible persistence** | Every state column is nullable — `null` means "use the car's own built-in default", so a fresh car and a driven car load cleanly. |
+
+---
+
+## 🧭 How a car loads
+
+```mermaid
+flowchart LR
+    A["GET /car/{slug}"] --> B["car-show.blade<br/>&lt;iframe&gt;"]
+    B --> C["GET /car/{slug}/raw"]
+    C --> D["read HTML from<br/>public storage disk"]
+    D --> E["inject window.__CAR_STATE__<br/>+ car-api.js + car-mixer.js"]
+    E --> F["car runs:<br/>gauges · physics · Web Audio"]
+    F -->|"CarAPI.save() every 10s"| G["POST /car/{slug}/state"]
+    F -->|"mixer slider (debounced)"| H["POST /car/{slug}/engine-mix"]
+    G --> I[("cars table")]
+    H --> I
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+---
 
-## Contributing
+## 🛣️ Routes
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Method | URI | Name | Does |
+|--------|-----|------|------|
+| `GET` | `/` | `menu` | Garage grid |
+| `GET` | `/upload` | `car.create` | Upload form |
+| `POST` | `/upload` | `car.store` | Store file + create `Car` |
+| `GET` | `/car/{slug}` | `car.show` | Iframe shell |
+| `GET` | `/car/{slug}/raw` | `car.raw` | Car HTML with state injected |
+| `POST` | `/car/{slug}/state` | `car.state.save` | Save odometer / fuel / wear / map |
+| `POST` | `/car/{slug}/engine-mix` | `car.enginemix.save` | Save sound-mixer trims |
 
-## Code of Conduct
+---
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## 🗃️ Data model
 
-## Security Vulnerabilities
+One table — `cars`:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Column | Type | Notes |
+|--------|------|-------|
+| `name` / `slug` / `subtitle` | string | `slug` is the route key, auto-derived & de-duped |
+| `file_path` | string | path on the `public` storage disk |
+| `odometer` | decimal | km — `null` until first save |
+| `fuel_level` | decimal | 0–1 fraction |
+| `engine_wear_pct` | decimal | 0–100, persists until repaired |
+| `engine_map` | tinyint | 1–6 |
+| `engine_mix` | json | `{ layerId: 0..1 }` sound-mixer trims |
 
-## License
+---
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## 🚀 Quick start
+
+```sh
+git clone <this-repo> && cd sim-app
+composer install && npm install
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite
+php artisan migrate --seed     # seeds BMW 550D, BMW 320D, Proton Iriz
+php artisan storage:link       # serve uploaded car files
+composer dev                   # server + vite + queue + logs
+```
+
+Open <http://localhost:8000>, pick a car, **Start Engine**, and floor it.
+
+> [!TIP]
+> Engine audio needs a user gesture — click **Start Engine / Ignition** inside
+> the cluster before you expect sound.
+
+---
+
+## 🔧 Add your own car
+
+A car is just an HTML file. To get state + the sound mixer, have your script:
+
+1. Read saved values from `window.__CAR_STATE__`
+   (`odometer`, `fuelLevel`, `wearPct`, `engineMap`, `engineMix`).
+2. Persist by calling `window.CarAPI.save({ odometer, fuel_level, engine_wear_pct, engine_map })`.
+3. Register audio layers once your Web Audio graph is built:
+
+```js
+window.EngineMixer.register({
+  title: 'My Engine',
+  layers: [
+    { id: 'master', label: 'Master',   value: 1,    set: f => masterGain.gain.value = f },
+    { id: 'rasp',   label: 'Rasp',     value: 0.47, set: f => raspGain.gain.value = f * 0.6 },
+  ],
+});
+```
+
+Then upload it at `/upload`. That's the whole contract.
+
+---
+
+## 🧱 Stack
+
+- **Laravel 13** · PHP 8.3+ · single controller (`CarSimController`)
+- **SQLite** by default
+- **Vite + Tailwind 4** for the wrapper UI — no frontend framework
+- Cars stored on the `public` storage disk
+- Shared browser scripts in `public/js/` (`car-api.js`, `car-mixer.js`)
+
+## ✅ Tests
+
+```sh
+composer test
+```
+
+Currently the Laravel skeleton example tests only.
