@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Proton Iriz Instrument Cluster</title>
+<style>
+  :root{
+    --bg:#000;
+    --face:#0a0a0a;
+    --white:#f4f6f8;
+    --dim:#8a8f96;
+    --red:#e8402a;
+    --blue:#4fa8ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; height:100%; background:#000;
+    display:flex; align-items:center; justify-content:center;
+    font-family:"Segoe UI", ui-sans-serif, system-ui, Arial, sans-serif;
+    overflow:auto;
+  }
+  .rig{ width:100%; max-width:900px; padding:20px 16px; margin:0 auto; }
+  .cluster{
+    position:relative;
+    background: radial-gradient(120% 160% at 50% -10%, #101010 0%, #000 65%);
+    border-radius:28px; padding:30px 30px 20px;
+    border:1px solid #2a1210;
+    box-shadow: 0 30px 70px -30px rgba(0,0,0,.9), 0 0 40px -18px rgba(232,64,42,.35);
+  }
+  .dials{ display:grid; grid-template-columns:1.3fr 0.7fr 1.3fr; align-items:center; }
+  svg{ display:block; width:100%; height:auto; overflow:visible; }
+  .needle{ transform-origin:160px 160px; filter: drop-shadow(0 0 5px rgba(232,64,42,.75)); }
+  .maj{ font-size:15px; fill:var(--white); font-weight:600; font-family:Arial, sans-serif; }
+  .unit{ font-size:11px; fill:var(--dim); letter-spacing:.06em; }
+
+  .center-col{ display:flex; flex-direction:column; align-items:center; gap:8px; padding:0 6px; }
+  .lcd{
+    width:100%; max-width:170px;
+    background:#03070b; border:1px solid #0f2432; border-radius:10px;
+    padding:16px 12px; text-align:center;
+    font-family:"Courier New", monospace;
+  }
+  .gear-badge{
+    width:38px; height:38px; border-radius:50%; margin:0 auto 12px;
+    background: radial-gradient(circle at 35% 30%, #6fc0ff, #1c69d4 65%, #0d3868);
+    color:#fff; font-weight:800; font-size:1.15rem; font-family:Arial, sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 0 12px rgba(79,168,255,.65);
+  }
+  .lcd-label{ font-size:.5rem; letter-spacing:.16em; color:#4a6a7c; margin-bottom:2px; text-transform:uppercase; }
+  .lcd-val{ font-size:.95rem; font-weight:700; color:var(--white); text-shadow:0 0 8px rgba(244,246,248,.35); }
+  .lcd-row{ margin-top:12px; }
+  .led-bar-label{ font-size:11px; fill:var(--white); font-weight:700; font-family:Arial, sans-serif; }
+
+  .controls{
+    margin-top:20px; padding:14px 16px;
+    background:#0c0c0c; border:1px solid #2a1210; border-radius:14px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:14px 22px;
+  }
+  .ctrl-group{ display:flex; flex-direction:column; gap:6px; min-width:150px; flex:1; }
+  .ctrl-group label{ font-size:.6rem; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); display:flex; justify-content:space-between; }
+  input[type=range]{ -webkit-appearance:none; width:100%; height:4px; border-radius:3px; background: linear-gradient(90deg, var(--red) var(--pct,0%), #262626 var(--pct,0%)); }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--white); border:3px solid var(--red); cursor:pointer; margin-top:-6px; }
+  .btn-group{ display:flex; gap:8px; }
+  button{ font-family:inherit; font-size:.64rem; letter-spacing:.12em; text-transform:uppercase; font-weight:700; padding:9px 13px; border-radius:9px; border:1px solid #262626; background:#131313; color:var(--dim); cursor:pointer; transition:.2s; }
+  button:hover{ color:var(--white); border-color:var(--red); box-shadow:0 0 10px -3px rgba(232,64,42,.6); }
+  button.power.active{ color:#04140f; background:#33d17a; border-color:#33d17a; }
+  button.mute.active{ color:#100a00; background:var(--red); border-color:var(--red); }
+  button.gear-btn.active{ color:#100a00; background:var(--red); border-color:var(--red); }
+  button.brake-btn{ background:#2a1414; border-color:var(--red); color:#ff9a92; }
+  button:active{ transform:scale(.96); }
+  .hint{ text-align:center; font-size:.66rem; color:var(--dim); margin-top:12px; }
+</style>
+</head>
+<body>
+<div class="rig">
+  <div class="cluster">
+    <div class="dials">
+
+      <!-- TACHOMETER with coolant temp LED bar -->
+      <div class="dial-wrap">
+        <svg viewBox="0 0 320 320" id="tach-svg">
+          <defs>
+            <radialGradient id="faceGrad" cx="50%" cy="38%" r="75%">
+              <stop offset="0%" stop-color="#161616"/>
+              <stop offset="100%" stop-color="#050505"/>
+            </radialGradient>
+          </defs>
+          <circle cx="160" cy="160" r="150" fill="none" stroke="var(--red)" stroke-width="5"/>
+          <circle cx="160" cy="160" r="141" fill="url(#faceGrad)"/>
+          <g id="tach-ticks"></g>
+          <g id="tach-redline"></g>
+          <text x="160" y="118" text-anchor="middle" class="unit">x1000 r/min</text>
+          <g class="needle" id="tach-needle">
+            <line x1="160" y1="160" x2="160" y2="46" stroke="var(--red)" stroke-width="3.2" stroke-linecap="round"/>
+            <line x1="160" y1="160" x2="160" y2="196" stroke="var(--red)" stroke-width="3.2" stroke-linecap="round"/>
+          </g>
+          <circle cx="160" cy="160" r="9" fill="#2c2c2c" stroke="#666" stroke-width="1.4"/>
+          <!-- coolant temp LED bar -->
+          <text x="118" y="234" text-anchor="middle" class="led-bar-label">C</text>
+          <text x="202" y="234" text-anchor="middle" class="led-bar-label">H</text>
+          <g id="coolant-led-bar"></g>
+          <path id="coolant-cold-icon" d="M158 250c2 3 5 6 5 9a5 5 0 0 1-10 0c0-3 3-6 5-9z" fill="none" stroke="#7a3a34" stroke-width="1.4"/>
+        </svg>
+      </div>
+
+      <!-- CENTER -->
+      <div class="center-col">
+        <div class="lcd">
+          <div class="gear-badge" id="gear-badge">P</div>
+          <div class="lcd-row">
+            <div class="lcd-label">Odo</div>
+            <div class="lcd-val" id="odo-txt">49559 km</div>
+          </div>
+          <div class="lcd-row">
+            <div class="lcd-label">Avg Consumption</div>
+            <div class="lcd-val" id="avg-txt">0.0 L/100km</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPEEDOMETER with fuel level LED bar -->
+      <div class="dial-wrap">
+        <svg viewBox="0 0 320 320" id="speed-svg">
+          <circle cx="160" cy="160" r="150" fill="none" stroke="var(--red)" stroke-width="5"/>
+          <circle cx="160" cy="160" r="141" fill="url(#faceGrad)"/>
+          <g id="speed-ticks"></g>
+          <text x="160" y="118" text-anchor="middle" class="unit">km/h</text>
+          <g class="needle" id="speed-needle">
+            <line x1="160" y1="160" x2="160" y2="46" stroke="var(--red)" stroke-width="3.2" stroke-linecap="round"/>
+            <line x1="160" y1="160" x2="160" y2="196" stroke="var(--red)" stroke-width="3.2" stroke-linecap="round"/>
+          </g>
+          <circle cx="160" cy="160" r="9" fill="#2c2c2c" stroke="#666" stroke-width="1.4"/>
+          <!-- fuel level LED bar -->
+          <text x="118" y="234" text-anchor="middle" class="led-bar-label">E</text>
+          <text x="202" y="234" text-anchor="middle" class="led-bar-label">F</text>
+          <g id="fuel-led-bar"></g>
+          <text x="160" y="256" text-anchor="middle" style="font-size:13px;">&#9981;</text>
+        </svg>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>Throttle <span id="throttle-val">0%</span></label>
+      <input type="range" id="throttle" min="0" max="100" value="0">
+    </div>
+    <div class="btn-group">
+      <button class="power" id="power-btn">Ignition</button>
+      <button class="mute" id="mute-btn">Sound On</button>
+      <button class="power" id="refuel-btn">Refuel</button>
+    </div>
+    <div class="btn-group">
+      <button class="gear-btn" id="gear-p-btn">P</button>
+      <button class="gear-btn" id="gear-r-btn">R</button>
+      <button class="gear-btn" id="gear-n-btn">N</button>
+      <button class="gear-btn active" id="gear-d-btn">D</button>
+      <button class="brake-btn" id="brake-btn">Brake</button>
+    </div>
+  </div>
+  <div class="hint">Proton Iriz 1.6 Premium (CVT) &middot; stock 107&nbsp;hp / 150&nbsp;Nm &middot; W/S or the pedals to drive, P/R/N/D to select gear.</div>
+</div>
+
+<script>
+(function(){
+  const NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs){ const e = document.createElementNS(NS, tag); for(const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function polar(cx,cy,r,deg){ const rad=(deg-90)*Math.PI/180; return [cx+r*Math.cos(rad), cy+r*Math.sin(rad)]; }
+  function arcPath(cx,cy,r,a0,a1){
+    const [x0,y0]=polar(cx,cy,r,a0), [x1,y1]=polar(cx,cy,r,a1);
+    const large = Math.abs(a1-a0) > 180 ? 1:0;
+    return `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`;
+  }
+  const START = -130, END = 130; // 260-deg sweep, 0/min lower-left, max lower-right, gap at bottom
+  function angleFor(v, min, max){ return START + ((v-min)/(max-min)) * (END-START); }
+
+  /* ---------------- SPEEDOMETER (0-220) ---------------- */
+  const SPD_MIN=0, SPD_MAX=220;
+  const speedTicks = document.getElementById('speed-ticks');
+  (function buildSpeedoTicks(){
+    for(let v=SPD_MIN; v<=SPD_MAX; v+=20){
+      const a = angleFor(v,SPD_MIN,SPD_MAX);
+      const [x1,y1]=polar(160,160,132,a), [x2,y2]=polar(160,160,114,a);
+      speedTicks.appendChild(el('line',{x1,y1,x2,y2,stroke:'#f4f6f8','stroke-width':2.6}));
+      const [tx,ty]=polar(160,160,98,a);
+      const t = el('text',{x:tx,y:ty+6,class:'maj','text-anchor':'middle'}); t.textContent=v;
+      speedTicks.appendChild(t);
+      for(let av=v+4; av<v+20 && av<=SPD_MAX; av+=4){
+        const aa=angleFor(av,SPD_MIN,SPD_MAX);
+        const [mx1,my1]=polar(160,160,132,aa), [mx2,my2]=polar(160,160,125,aa);
+        speedTicks.appendChild(el('line',{x1:mx1,y1:my1,x2:mx2,y2:my2,stroke:'#8a8f96','stroke-width':1}));
+      }
+    }
+  })();
+  const speedNeedle = document.getElementById('speed-needle');
+
+  /* ---------------- TACHOMETER (0-8 x1000, 1.6 NA redline ~6.3) ---------------- */
+  const TACH_MIN=0, TACH_MAX=8;
+  const REDLINE=6.3;
+  const tachTicks = document.getElementById('tach-ticks');
+  const tachRedline = document.getElementById('tach-redline');
+  (function buildTachTicks(){
+    tachRedline.appendChild(el('path',{d:arcPath(160,160,132,angleFor(REDLINE,TACH_MIN,TACH_MAX),angleFor(TACH_MAX,TACH_MIN,TACH_MAX)), stroke:'var(--red)','stroke-width':4, fill:'none', opacity:'0.85'}));
+    for(let v=TACH_MIN; v<=TACH_MAX; v+=1){
+      const a = angleFor(v,TACH_MIN,TACH_MAX);
+      const [x1,y1]=polar(160,160,132,a), [x2,y2]=polar(160,160,114,a);
+      tachTicks.appendChild(el('line',{x1,y1,x2,y2,stroke: v>=REDLINE?'var(--red)':'#f4f6f8','stroke-width':2.6}));
+      const [tx,ty]=polar(160,160,98,a);
+      const t = el('text',{x:tx,y:ty+6,class:'maj','text-anchor':'middle'}); t.textContent=v;
+      if(v>=REDLINE) t.setAttribute('fill','var(--red)');
+      tachTicks.appendChild(t);
+      for(let av=v+0.2; av<v+1 && av<=TACH_MAX; av+=0.2){
+        const aa=angleFor(av,TACH_MIN,TACH_MAX);
+        const [mx1,my1]=polar(160,160,132,aa), [mx2,my2]=polar(160,160,125,aa);
+        tachTicks.appendChild(el('line',{x1:mx1,y1:my1,x2:mx2,y2:my2,stroke:'#8a8f96','stroke-width':1}));
+      }
+    }
+  })();
+  const tachNeedle = document.getElementById('tach-needle');
+
+  /* ---------------- LED bar sub-gauges (coolant temp / fuel level) ----------------
+     Sit in the bottom gap left by the main dial's 260-deg sweep, on their own pivot. */
+  const SUBGAP_CX=160, SUBGAP_CY=198, SUBGAP_START=130, SUBGAP_END=230;
+  function subGapAngle(frac){ return SUBGAP_END - frac*(SUBGAP_END-SUBGAP_START); }
+  const LED_SEG_COUNT = 10;
+  function buildLedBar(container){
+    const segs = [];
+    for(let i=0;i<LED_SEG_COUNT;i++){
+      const frac = i/(LED_SEG_COUNT-1);
+      const a = subGapAngle(frac);
+      const [x1,y1]=polar(SUBGAP_CX,SUBGAP_CY,99,a), [x2,y2]=polar(SUBGAP_CX,SUBGAP_CY,93,a);
+      const seg = el('line',{x1,y1,x2,y2,stroke:'#3a1c18','stroke-width':9,'stroke-linecap':'butt'});
+      container.appendChild(seg);
+      segs.push(seg);
+    }
+    return segs;
+  }
+  function setLedBar(segs, frac, hotColor){
+    const lit = Math.round(Math.max(0,Math.min(1,frac)) * segs.length);
+    segs.forEach((seg,i)=>{
+      const on = i < lit;
+      const isHot = hotColor && i === segs.length-1 && on;
+      const color = isHot ? hotColor : (on ? '#f4f6f8' : '#3a1c18');
+      seg.setAttribute('stroke', color);
+      seg.style.filter = on ? `drop-shadow(0 0 4px ${isHot?hotColor:'rgba(244,246,248,.8)'})` : 'none';
+    });
+  }
+  const coolantLedSegs = buildLedBar(document.getElementById('coolant-led-bar'));
+  const fuelLedSegs = buildLedBar(document.getElementById('fuel-led-bar'));
+  const coolantColdIcon = document.getElementById('coolant-cold-icon');
+
+  /* ================= SOUND ENGINE (1.6L NA petrol inline-4) ================= */
+  let actx=null, masterGain, soundOn=true;
+  let subOsc, growlOsc, engineFilter, engineGain, rasp, raspGain, raspFilter, raspShaper, idleLFO, idleLFOGain;
+  let fireLFO, fireLFOScale, pulseGain, wobbleLFO;
+  let harmOsc1, harmOsc2, harmFilter, harmShaper, harmPulseGain, harmFireLFOScale, harmGain;
+  let valveNoiseSrc, valveFilter, valveShaper, valvePulse, valveLFO, valveLFOScale, valveGain;
+  let cvtOsc1, cvtOsc2, cvtFilter, cvtGain;
+  let windNoiseSrc, windFilter, windGain;
+  let intakeNoiseSrc, intakeFilter, intakeGain, intakeTrim;
+  let exhaustOsc, exhaustFilter, exhaustGain, exhaustTrim;
+  let raspTrim, subTrim, growlTrim, harmTrim, valveTrim, cvtTrim, windTrim;
+  let simRpm = 0;
+
+  // ---- sound layer mixer: live per-layer trim gains (0-1). Read the on-screen % values back to me
+  // to describe a target petrol sound. 'master' scales MASTER_BASE; the rest are straight multipliers. ----
+  const MASTER_BASE = 0.6;
+  const layerVol = { master:1, rasp:0.47, subbass:0.87, growl:1, valve:0.05, harm:0, cvt:0.16, wind:0, intake:1, exhaust:1 };
+
+  function makeDistortionCurve(amount){
+    const n = 2048;
+    const curve = new Float32Array(n);
+    const norm = Math.tanh(amount) || 1;
+    for(let i=0;i<n;i++){
+      const x = (i/(n-1))*2-1;
+      curve[i] = Math.tanh(amount*x)/norm;
+    }
+    return curve;
+  }
+
+  function initAudio(){
+    if(actx) return;
+    actx = new (window.AudioContext||window.webkitAudioContext)();
+    masterGain = actx.createGain(); masterGain.gain.value = soundOn ? MASTER_BASE*layerVol.master : 0;
+    masterGain.connect(actx.destination);
+
+    // combustion noise: broadband, filtered noise reads as "mechanical" rather than "synth"
+    const bufSize = actx.sampleRate*2;
+    const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<bufSize;i++) data[i] = Math.random()*2-1;
+    rasp = actx.createBufferSource(); rasp.buffer = buf; rasp.loop = true;
+
+    raspFilter = actx.createBiquadFilter(); raspFilter.type='bandpass'; raspFilter.frequency.value=220; raspFilter.Q.value=0.9;
+    raspShaper = actx.createWaveShaper(); raspShaper.curve = makeDistortionCurve(0.22); raspShaper.oversample='2x'; // barely any clipping - this layer is now just background air/mechanical texture, not the engine's voice
+
+    pulseGain = actx.createGain(); pulseGain.gain.value = 0.55;
+    fireLFO = actx.createOscillator(); fireLFO.type='sawtooth'; fireLFO.frequency.value=13.3;
+    fireLFOScale = actx.createGain(); fireLFOScale.gain.value = 0.09; // shallow firing pulses - minimal chuff
+    fireLFO.connect(fireLFOScale).connect(pulseGain.gain);
+    fireLFO.start();
+
+    raspGain = actx.createGain(); raspGain.gain.value = 0.0001;
+    raspTrim = actx.createGain(); raspTrim.gain.value = layerVol.rasp;
+    rasp.connect(raspFilter).connect(raspShaper).connect(pulseGain).connect(raspGain).connect(raspTrim).connect(masterGain);
+    rasp.start();
+
+    engineFilter = actx.createBiquadFilter(); engineFilter.type='lowpass'; engineFilter.frequency.value=120; engineFilter.Q.value=0.5;
+    engineGain = actx.createGain(); engineGain.gain.value = 0.0001;
+    engineFilter.connect(engineGain).connect(masterGain);
+
+    subOsc = actx.createOscillator(); subOsc.type='sine'; subOsc.frequency.value=75;
+    subTrim = actx.createGain(); subTrim.gain.value = layerVol.subbass;
+    subOsc.connect(subTrim).connect(engineFilter);
+    subOsc.start();
+
+    growlOsc = actx.createOscillator(); growlOsc.type='sawtooth'; growlOsc.frequency.value=80;
+    const growlGain = actx.createGain(); growlGain.gain.value=0.14;
+    growlTrim = actx.createGain(); growlTrim.gain.value = layerVol.growl;
+    growlOsc.connect(growlGain).connect(growlTrim).connect(engineFilter);
+    growlOsc.start();
+
+    wobbleLFO = actx.createOscillator(); wobbleLFO.type='sine'; wobbleLFO.frequency.value=0.65;
+    const wobbleScale = actx.createGain(); wobbleScale.gain.value=0.3; // a refined, well-balanced 1.6 NA petrol runs smooth - minimal pitch wobble
+    wobbleLFO.connect(wobbleScale).connect(growlOsc.frequency);
+    wobbleLFO.start();
+
+    // ---- the engine's actual voice: a petrol four's buzz is fundamentally TONAL (periodic firing
+    // pulses and their harmonics), not broadband noise - that's what kept reading as "diesel" no
+    // matter how the noise layer above was filtered. A sawtooth at the true firing frequency already
+    // contains the full harmonic series for free; two slightly detuned copies through a wide, low-Q
+    // filter gives the rising buzz a small NA engine has. A pair of clean saws alone reads as a synth
+    // lead though, so this layer also: bleeds in a touch of the raw noise source (glues tone+texture
+    // into one mechanical sound instead of two separate competing layers), runs through a gentle
+    // waveshaper (breaks up the too-perfect digital sawtooth), and gets gated by the SAME firing-pulse
+    // LFO as the noise layer below so both breathe in sync like one engine instead of a tone playing
+    // over an unrelated noise bed. ----
+    harmOsc1 = actx.createOscillator(); harmOsc1.type='sawtooth'; harmOsc1.frequency.value=30;
+    harmOsc2 = actx.createOscillator(); harmOsc2.type='sawtooth'; harmOsc2.frequency.value=30.2; // slight detune - richer, less synthetic
+    harmFilter = actx.createBiquadFilter(); harmFilter.type='bandpass'; harmFilter.frequency.value=400; harmFilter.Q.value=0.7;
+    harmShaper = actx.createWaveShaper(); harmShaper.curve = makeDistortionCurve(0.35); harmShaper.oversample='2x';
+    harmPulseGain = actx.createGain(); harmPulseGain.gain.value = 0.9;
+    harmFireLFOScale = actx.createGain(); harmFireLFOScale.gain.value = 0.12; // subtler than the noise layer's pulse - tone mostly stays present, just a light chuff
+    fireLFO.connect(harmFireLFOScale).connect(harmPulseGain.gain);
+    harmGain = actx.createGain(); harmGain.gain.value=0.0001;
+    harmTrim = actx.createGain(); harmTrim.gain.value = layerVol.harm;
+    harmOsc1.connect(harmFilter); harmOsc2.connect(harmFilter);
+    const noiseIntoHarm = actx.createGain(); noiseIntoHarm.gain.value = 0.07;
+    rasp.connect(noiseIntoHarm).connect(harmFilter);
+    harmFilter.connect(harmShaper).connect(harmPulseGain).connect(harmGain).connect(harmTrim).connect(masterGain);
+    harmOsc1.start(); harmOsc2.start();
+
+    // ---- valvetrain / tappet clatter: light high-frequency mechanical ticking a petrol four has
+    // over the combustion note. Noise through a resonant bandpass (metallic ring), gated by a fast
+    // sawtooth pulse LFO whose rate tracks valve-event frequency so the tick speeds up with rpm. ----
+    valveNoiseSrc = actx.createBufferSource(); valveNoiseSrc.buffer = buf; valveNoiseSrc.loop = true;
+    const valveHP = actx.createBiquadFilter(); valveHP.type='highpass'; valveHP.frequency.value=1800;
+    valveFilter = actx.createBiquadFilter(); valveFilter.type='bandpass'; valveFilter.frequency.value=3400; valveFilter.Q.value=2.4;
+    valveShaper = actx.createWaveShaper(); valveShaper.curve = makeDistortionCurve(0.3); valveShaper.oversample='2x';
+    valvePulse = actx.createGain(); valvePulse.gain.value = 0.35;
+    valveLFO = actx.createOscillator(); valveLFO.type='sawtooth'; valveLFO.frequency.value=56;
+    valveLFOScale = actx.createGain(); valveLFOScale.gain.value = 0.3; // pulse between quiet and loud, never below zero
+    valveLFO.connect(valveLFOScale).connect(valvePulse.gain);
+    valveLFO.start();
+    valveGain = actx.createGain(); valveGain.gain.value = 0.0001;
+    valveTrim = actx.createGain(); valveTrim.gain.value = layerVol.valve;
+    valveNoiseSrc.connect(valveHP).connect(valveFilter).connect(valveShaper).connect(valvePulse).connect(valveGain).connect(valveTrim).connect(masterGain);
+    valveNoiseSrc.start();
+
+    // ---- CVT transmission whine: pushbelt + pulley whine, a steadyish high tone that tracks belt
+    // speed (engine rpm) and gets louder under load. A triangle plus a touch of sawtooth through a
+    // narrow bandpass for the turbine-ish character; second osc detuned for a slow beat. ----
+    cvtOsc1 = actx.createOscillator(); cvtOsc1.type='triangle'; cvtOsc1.frequency.value=600;
+    cvtOsc2 = actx.createOscillator(); cvtOsc2.type='sawtooth'; cvtOsc2.frequency.value=603;
+    const cvtOsc2Gain = actx.createGain(); cvtOsc2Gain.gain.value = 0.22;
+    cvtFilter = actx.createBiquadFilter(); cvtFilter.type='bandpass'; cvtFilter.frequency.value=900; cvtFilter.Q.value=4;
+    cvtGain = actx.createGain(); cvtGain.gain.value = 0.0001;
+    cvtTrim = actx.createGain(); cvtTrim.gain.value = layerVol.cvt;
+    cvtOsc1.connect(cvtFilter); cvtOsc2.connect(cvtOsc2Gain).connect(cvtFilter);
+    cvtFilter.connect(cvtGain).connect(cvtTrim).connect(masterGain);
+    cvtOsc1.start(); cvtOsc2.start();
+
+    // ---- wind / road noise: broadband, rises steeply with speed; the filter opens brighter the
+    // faster you go. Independent of the engine so it keeps working when coasting with ignition off. ----
+    windNoiseSrc = actx.createBufferSource(); windNoiseSrc.buffer = buf; windNoiseSrc.loop = true;
+    windFilter = actx.createBiquadFilter(); windFilter.type='bandpass'; windFilter.frequency.value=500; windFilter.Q.value=0.6;
+    windGain = actx.createGain(); windGain.gain.value = 0.0001;
+    windTrim = actx.createGain(); windTrim.gain.value = layerVol.wind;
+    windNoiseSrc.connect(windFilter).connect(windGain).connect(windTrim).connect(masterGain);
+    windNoiseSrc.start();
+
+    // ---- intake: air rushing through the airbox and throttle body. Broadband noise, near-silent at
+    // closed throttle, whooshes up as the throttle opens; the filter brightens with airflow. ----
+    intakeNoiseSrc = actx.createBufferSource(); intakeNoiseSrc.buffer = buf; intakeNoiseSrc.loop = true;
+    intakeFilter = actx.createBiquadFilter(); intakeFilter.type='bandpass'; intakeFilter.frequency.value=800; intakeFilter.Q.value=0.7;
+    intakeGain = actx.createGain(); intakeGain.gain.value = 0.0001;
+    intakeTrim = actx.createGain(); intakeTrim.gain.value = layerVol.intake;
+    intakeNoiseSrc.connect(intakeFilter).connect(intakeGain).connect(intakeTrim).connect(masterGain);
+    intakeNoiseSrc.start();
+
+    // ---- exhaust: tailpipe note. A sawtooth at the firing frequency (its harmonic series is the
+    // exhaust drone) through a low, resonant lowpass for tailpipe boom. ----
+    exhaustOsc = actx.createOscillator(); exhaustOsc.type='sawtooth'; exhaustOsc.frequency.value=60;
+    exhaustFilter = actx.createBiquadFilter(); exhaustFilter.type='lowpass'; exhaustFilter.frequency.value=170; exhaustFilter.Q.value=4;
+    exhaustGain = actx.createGain(); exhaustGain.gain.value = 0.0001;
+    exhaustTrim = actx.createGain(); exhaustTrim.gain.value = layerVol.exhaust;
+    exhaustOsc.connect(exhaustFilter).connect(exhaustGain).connect(exhaustTrim).connect(masterGain);
+    exhaustOsc.start();
+
+    idleLFO = actx.createOscillator(); idleLFO.type='sine'; idleLFO.frequency.value=7.5;
+    idleLFOGain = actx.createGain(); idleLFOGain.gain.value=0.015; // very shallow idle lope - deep modulation here read as a steam-train chuff
+    idleLFO.connect(idleLFOGain).connect(raspGain.gain);
+    idleLFO.start();
+
+    // expose the layers to the shared sound-mixer panel (public/js/car-mixer.js)
+    const trims = { rasp:raspTrim, subbass:subTrim, growl:growlTrim, harm:harmTrim, valve:valveTrim, cvt:cvtTrim, wind:windTrim, intake:intakeTrim, exhaust:exhaustTrim };
+    const setTrim = (id) => (f) => { layerVol[id] = f; if(trims[id]) trims[id].gain.setTargetAtTime(f, actx.currentTime, 0.03); };
+    const setMaster = (f) => { layerVol.master = f; if(masterGain) masterGain.gain.setTargetAtTime(soundOn?MASTER_BASE*f:0, actx.currentTime, 0.03); };
+    if(window.EngineMixer) window.EngineMixer.register({
+      title: 'Petrol Engine',
+      layers: [
+        { id:'master',  label:'Master',           value:layerVol.master,  set:setMaster },
+        { id:'rasp',    label:'Combustion Rasp',   value:layerVol.rasp,    set:setTrim('rasp') },
+        { id:'subbass', label:'Sub-Bass',          value:layerVol.subbass, set:setTrim('subbass') },
+        { id:'growl',   label:'Growl',             value:layerVol.growl,   set:setTrim('growl') },
+        { id:'valve',   label:'Valvetrain',        value:layerVol.valve,   set:setTrim('valve') },
+        { id:'harm',    label:'Tonal Harmonics',   value:layerVol.harm,    set:setTrim('harm') },
+        { id:'cvt',     label:'CVT Whine',         value:layerVol.cvt,     set:setTrim('cvt') },
+        { id:'wind',    label:'Wind Noise',        value:layerVol.wind,    set:setTrim('wind') },
+        { id:'intake',  label:'Intake',            value:layerVol.intake,  set:setTrim('intake') },
+        { id:'exhaust', label:'Exhaust',           value:layerVol.exhaust, set:setTrim('exhaust') },
+      ],
+    });
+
+    startEngineSequence();
+  }
+
+  function startEngineSequence(){
+    const t = actx.currentTime;
+    simRpm = 0;
+
+    const bufSize = Math.floor(actx.sampleRate * 1.2);
+    const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<bufSize;i++) data[i] = Math.random()*2-1;
+    const crankNoise = actx.createBufferSource(); crankNoise.buffer = buf; crankNoise.loop = true;
+    const crankFilter = actx.createBiquadFilter(); crankFilter.type='bandpass'; crankFilter.frequency.value=230; crankFilter.Q.value=1.6;
+    const crankGain = actx.createGain(); crankGain.gain.value = 0.0001;
+    crankNoise.connect(crankFilter).connect(crankGain).connect(masterGain);
+    crankNoise.start(t);
+
+    const pulseCount = 4, pulseInterval = 0.13;
+    for(let i=0;i<pulseCount;i++){
+      const pt = t + i*pulseInterval;
+      const peak = soundOn ? 0.24 : 0.0001;
+      crankGain.gain.setValueAtTime(0.02, pt);
+      crankGain.gain.linearRampToValueAtTime(peak, pt+0.04);
+      crankGain.gain.exponentialRampToValueAtTime(0.025, pt+0.11);
+      crankFilter.frequency.setValueAtTime(215 + i*18, pt);
+    }
+    const crankEnd = t + pulseCount*pulseInterval + 0.1;
+    crankGain.gain.setValueAtTime(soundOn?0.14:0.0001, crankEnd-0.05);
+    crankGain.gain.exponentialRampToValueAtTime(0.0001, crankEnd+0.08);
+    setTimeout(()=>{ try{crankNoise.stop();}catch(e){} }, (pulseCount*pulseInterval+0.5)*1000);
+
+    engineGain.gain.cancelScheduledValues(t);
+    raspGain.gain.cancelScheduledValues(t);
+    engineGain.gain.setValueAtTime(0.0001, t);
+    raspGain.gain.setValueAtTime(0.0001, t);
+    engineGain.gain.setValueAtTime(0.0001, crankEnd-0.05);
+    raspGain.gain.setValueAtTime(0.0001, crankEnd-0.05);
+    engineGain.gain.exponentialRampToValueAtTime(soundOn?0.14:0.0001, crankEnd+0.12);
+    raspGain.gain.exponentialRampToValueAtTime(soundOn?0.22:0.0001, crankEnd+0.12);
+    engineGain.gain.exponentialRampToValueAtTime(soundOn?0.06:0.0001, crankEnd+0.8);
+    raspGain.gain.exponentialRampToValueAtTime(soundOn?0.09:0.0001, crankEnd+0.8);
+  }
+
+  function updateSound(rpmK, ignitionOn){
+    if(!actx) return;
+    const t = actx.currentTime;
+
+    // wind / road noise: speed-dependent, runs whether or not the engine is on
+    const spd = Math.max(0, speed);
+    const windFrac = Math.min(1, Math.pow(spd/160, 1.6));
+    windFilter.frequency.setTargetAtTime(350 + spd*7, t, 0.2);
+    windGain.gain.setTargetAtTime(soundOn ? Math.min(0.16, windFrac*0.16) : 0.0001, t, 0.2);
+
+    if(!ignitionOn){
+      engineGain.gain.setTargetAtTime(0.0001, t, 0.25);
+      raspGain.gain.setTargetAtTime(0.0001, t, 0.2);
+      idleLFOGain.gain.setTargetAtTime(0.0001, t, 0.2);
+      harmGain.gain.setTargetAtTime(0.0001, t, 0.2);
+      valveGain.gain.setTargetAtTime(0.0001, t, 0.2);
+      cvtGain.gain.setTargetAtTime(0.0001, t, 0.2);
+      intakeGain.gain.setTargetAtTime(0.0001, t, 0.2);
+      exhaustGain.gain.setTargetAtTime(0.0001, t, 0.2);
+      return;
+    }
+    const rpmKForSound = Math.min(rpmK, 8);
+    const targetRpm = 850 + rpmKForSound*1000;
+    simRpm += (targetRpm - simRpm) * 0.22;
+    const revFactor = Math.min(1,(simRpm-850)/7150);
+
+    raspFilter.frequency.setTargetAtTime(190 + simRpm*0.17, t, 0.08); // higher and climbs faster - refined petrol pitch, not diesel rumble
+    raspFilter.Q.setTargetAtTime(0.8 + revFactor*0.7, t, 0.1); // gentler resonance - smoother, less gravelly
+
+    const subFreq = 24 + simRpm*0.017;
+    subOsc.frequency.setTargetAtTime(subFreq, t, 0.05);
+    growlOsc.frequency.setTargetAtTime(subFreq*1.6, t, 0.05);
+    engineFilter.frequency.setTargetAtTime(75 + simRpm*0.04, t, 0.1);
+    idleLFOGain.gain.setTargetAtTime(Math.max(0.004, 0.015 - simRpm*0.000002), t, 0.2);
+
+    // 4-stroke, 4 cylinders = 2 firing pulses per revolution
+    const firingHz = Math.max(4, (simRpm/60) * 2);
+    fireLFO.frequency.setTargetAtTime(firingHz, t, 0.06);
+    fireLFOScale.gain.setTargetAtTime(0.09 - revFactor*0.05, t, 0.15); // shallow pulsing - minimal chuff
+
+    // background texture only now - kept quiet so it can't dominate and read as diesel clatter
+    const raspVol = soundOn ? Math.min(0.17, 0.055 + revFactor*0.115) : 0.0001;
+    raspGain.gain.setTargetAtTime(raspVol, t, 0.05);
+
+    const engVol = soundOn ? Math.min(0.18, 0.06 + revFactor*0.12) : 0.0001;
+    engineGain.gain.setTargetAtTime(engVol, t, 0.06);
+
+    // the dominant layer: two detuned saws at the true firing frequency, blended with a touch of
+    // noise and gated by the same firing LFO as the noise layer (see initAudio) so it reads as one
+    // breathing mechanical sound rather than a clean synth tone floating over unrelated noise
+    harmOsc1.frequency.setTargetAtTime(firingHz, t, 0.05);
+    harmOsc2.frequency.setTargetAtTime(firingHz*1.008, t, 0.05);
+    harmFilter.frequency.setTargetAtTime(260 + simRpm*0.5, t, 0.07);
+    harmFilter.Q.setTargetAtTime(0.6 + revFactor*0.5, t, 0.1); // wide/low-Q on purpose - a narrow resonant peak on a saw is what reads as an electronic "whistle"
+    harmFireLFOScale.gain.setTargetAtTime(0.1 + revFactor*0.06, t, 0.15);
+    const harmVol = soundOn ? Math.min(0.34, 0.09 + revFactor*0.25) : 0.0001;
+    harmGain.gain.setTargetAtTime(harmVol, t, 0.05); // level set by the mixer's Tonal Harmonics trim (default 0 - it read as an electric hum)
+
+    // valvetrain clatter: tick rate follows valve events, brightness and level rise gently with rpm
+    const valveClatterHz = Math.min(240, Math.max(24, (simRpm/60) * 4));
+    valveLFO.frequency.setTargetAtTime(valveClatterHz, t, 0.05);
+    valveFilter.frequency.setTargetAtTime(3000 + revFactor*1800, t, 0.1);
+    const valveVol = soundOn ? Math.min(0.09, 0.03 + revFactor*0.06) : 0.0001;
+    valveGain.gain.setTargetAtTime(valveVol, t, 0.06);
+
+    // CVT whine: pitch tracks belt speed (engine rpm); louder under throttle load and a bit with revs
+    const cvtFreq = 420 + simRpm*0.42;
+    cvtOsc1.frequency.setTargetAtTime(cvtFreq, t, 0.08);
+    cvtOsc2.frequency.setTargetAtTime(cvtFreq*1.005, t, 0.08);
+    cvtFilter.frequency.setTargetAtTime(cvtFreq*1.4, t, 0.1);
+    const load = Math.min(1, parseInt(throttleSlider.value,10)/100);
+    const cvtVol = soundOn ? Math.min(0.05, 0.006 + load*0.03 + revFactor*0.02) : 0.0001;
+    cvtGain.gain.setTargetAtTime(cvtVol, t, 0.1);
+
+    // intake: airflow whoosh - scales with throttle opening and rpm, filter brightens with both
+    const airflow = (0.12 + load*0.88) * (0.25 + revFactor*0.75);
+    intakeFilter.frequency.setTargetAtTime(600 + airflow*1800 + revFactor*600, t, 0.1);
+    const intakeVol = soundOn ? Math.min(0.13, airflow*0.14) : 0.0001;
+    intakeGain.gain.setTargetAtTime(intakeVol, t, 0.08);
+
+    // exhaust: drone pitched at the firing frequency; the tailpipe boom rises slightly with rpm and
+    // it swells under load
+    exhaustOsc.frequency.setTargetAtTime(firingHz, t, 0.05);
+    exhaustFilter.frequency.setTargetAtTime(120 + simRpm*0.05, t, 0.08);
+    const exhaustVol = soundOn ? Math.min(0.16, 0.045 + load*0.08 + revFactor*0.07) : 0.0001;
+    exhaustGain.gain.setTargetAtTime(exhaustVol, t, 0.06);
+  }
+
+  /* ================= STATE + PHYSICS (107 hp / 150 Nm, 1.6 NA, CVT) ================= */
+  const throttleSlider = document.getElementById('throttle');
+  const throttleVal = document.getElementById('throttle-val');
+  const powerBtn = document.getElementById('power-btn');
+  const brakeBtn = document.getElementById('brake-btn');
+  const muteBtn = document.getElementById('mute-btn');
+  const refuelBtn = document.getElementById('refuel-btn');
+  const gearBtns = { P:document.getElementById('gear-p-btn'), R:document.getElementById('gear-r-btn'), N:document.getElementById('gear-n-btn'), D:document.getElementById('gear-d-btn') };
+  const gearBadge = document.getElementById('gear-badge');
+  const odoTxt = document.getElementById('odo-txt');
+  const avgTxt = document.getElementById('avg-txt');
+
+  let ignition=false, braking=0, speed=0, engineOnTime=0;
+  let odometer=49559.0, trip=0.0, tripFuelUsedL=0.0, fuelFrac=0.62;
+  let coolantC = 22; // real °C, starts cold
+  let overheatBuildup = 0; // 0..1, slow heat-soak accumulator for sustained past-redline running
+  let transmissionMode = 'P';
+
+  const TANK_SIZE_L = 40;
+  const REFUEL_RATE = 0.12; // tank fraction/sec while refuelling — full 40L fill in ~8s, ramps linearly like the brake
+  let refueling = false;
+  const MASS = 1060;
+  const HP_WATTS = 107*735.5; // ~78.7 kW
+  const TORQUE_NM = 150;
+  const IDLE_RPMK = 0.85, REV_CEILING_K = 6.8;
+
+  function setTransmission(mode){
+    if(mode==='P' && speed > 0.5) return; // can't select Park while rolling
+    if(mode==='R' && speed > 3) return;   // can't select Reverse while still moving forward
+    transmissionMode = mode;
+    Object.entries(gearBtns).forEach(([k,b])=> b.classList.toggle('active', k===mode));
+    gearBadge.textContent = mode;
+  }
+  Object.entries(gearBtns).forEach(([k,b])=> b.addEventListener('click', ()=> setTransmission(k)));
+
+  powerBtn.addEventListener('click', ()=>{
+    ignition=!ignition;
+    powerBtn.classList.toggle('active', ignition);
+    powerBtn.textContent = ignition ? 'Ignition ON' : 'Ignition';
+    if(ignition){
+      engineOnTime = 0;
+      const firstTime = !actx;
+      initAudio();
+      if(actx.state==='suspended') actx.resume();
+      if(!firstTime) startEngineSequence();
+    }
+    if(!ignition){
+      throttleSlider.value=0; throttleVal.textContent='0%';
+      setTransmission('P');
+    }
+  });
+  muteBtn.addEventListener('click', ()=>{
+    soundOn = !soundOn;
+    muteBtn.classList.toggle('active', !soundOn);
+    muteBtn.textContent = soundOn ? 'Sound On' : 'Muted';
+    if(masterGain) masterGain.gain.setTargetAtTime(soundOn?MASTER_BASE*layerVol.master:0, actx.currentTime, 0.05);
+  });
+  refuelBtn.addEventListener('click', ()=>{ refueling = true; });
+
+  throttleSlider.addEventListener('input', ()=>{
+    throttleVal.textContent = throttleSlider.value+'%';
+    throttleSlider.style.setProperty('--pct', throttleSlider.value+'%');
+  });
+  let mouseBrakeDown = false, sDown=false, spaceDown=false;
+  brakeBtn.addEventListener('mousedown', ()=>{ mouseBrakeDown=true; startBrakeLoop(); });
+  brakeBtn.addEventListener('mouseup', ()=>mouseBrakeDown=false);
+  brakeBtn.addEventListener('mouseleave', ()=>mouseBrakeDown=false);
+  brakeBtn.addEventListener('touchstart', ()=>{ mouseBrakeDown=true; startBrakeLoop(); });
+  brakeBtn.addEventListener('touchend', ()=>mouseBrakeDown=false);
+
+  let rpmK = 0;
+
+  // ---- Stepped Automatic Transmission (SAT): the Punch VT2 CVT's real party trick. At light/mid
+  // throttle it's a normal CVT (rpm rubber-bands with throttle position, no ratio steps). Past ~70%
+  // throttle the CVT's own ECU commands the pulleys to fixed ratio points to fake a conventional
+  // stepped shift and stop the engine drone-and-hold that CVTs are known for; it disengages again
+  // once throttle drops back off, same hysteresis a real SAT calibration uses to avoid hunting.
+  const SAT_ENGAGE_THROTTLE = 0.70, SAT_DISENGAGE_THROTTLE = 0.55;
+  let satActive = false, stepIdx = -1, shiftCooldown = 0, zeroThrottleTime = 0;
+  const STEP_SPAN = [18, 35, 55, 80, 110, 145, 220]; // km/h each simulated step reaches its shift point at full throttle
+  const STEP_LANDING_RPMK = [1.6, 3.0, 3.2, 3.3, 3.4, 3.4, 3.5]; // rpm right after landing in each step
+  const SHIFT_BASE_K = 2.0, SHIFT_FULL_K = 6.3; // light-throttle short-shift vs WOT hold-to-redline
+  const COAST_DOWNSHIFT_DELAY = 1.2; // seconds of closed throttle before a step-down is allowed
+  function pickStepForSpeed(spd){
+    let g = 0;
+    for(let i=0;i<STEP_SPAN.length-1;i++){ if(spd >= STEP_SPAN[i]) g = i+1; }
+    return g;
+  }
+  function computeStepRpm(g, spd, throttle){
+    const lo = g===0 ? 0 : STEP_SPAN[g-1];
+    const hi = STEP_SPAN[g];
+    const frac = (spd-lo)/(hi-lo);
+    const landing = STEP_LANDING_RPMK[g];
+    let raw = landing + frac*(SHIFT_FULL_K-landing) + throttle*0.3;
+    return Math.max(0, Math.min(raw, REV_CEILING_K));
+  }
+
+  let lastT = performance.now();
+  function frame(now){
+    const dt = Math.min(0.05, (now-lastT)/1000);
+    lastT = now;
+    if(ignition) engineOnTime += dt;
+
+    const throttleRaw = ignition ? (parseInt(throttleSlider.value,10)/100) : 0;
+    const throttlePct = Math.pow(throttleRaw, 1.6);
+    // cold engine makes less power until it reaches operating temp - 72% by 30C, full power at ~90C
+    const coldPowerMul = 0.72 + 0.28 * Math.max(0, Math.min(1, (coolantC - 30) / 60));
+    // cold fast idle: held raised through the whole warm-up, only drops to normal idle once the
+    // engine reaches operating temp (~82C -> 88C)
+    const idleK = IDLE_RPMK + Math.max(0, Math.min(1, (88 - coolantC) / 6)) * 0.45;
+    let v_ms = speed/3.6;
+
+    const AIR_RHO = 1.225, DRAG_CDA = 0.62, ROLL_DECEL = 0.5;
+    const dragDecel_ms2 = (0.5*AIR_RHO*DRAG_CDA*v_ms*v_ms)/MASS;
+
+    if(!ignition){
+      speed = Math.max(0, speed - 40*dt);
+    } else if(braking){
+      const decel_ms2 = 15*(braking/100) + dragDecel_ms2;
+      speed = Math.max(0, speed - decel_ms2*3.6*dt);
+    } else if(transmissionMode === 'D' && throttlePct > 0.02){
+      const availPower = HP_WATTS * throttlePct * coldPowerMul;
+      let a_ms2;
+      if(v_ms < 8){
+        // torque-limited launch through our own simulated CVT low-ratio + final-drive reduction
+        const LAUNCH_GEAR_MULT = 12;
+        const wheelForce = (TORQUE_NM * LAUNCH_GEAR_MULT * 0.9) / 0.29;
+        a_ms2 = Math.min(4.2, wheelForce/MASS) * throttlePct * coldPowerMul;
+      } else {
+        a_ms2 = Math.min(4.2, availPower/(MASS*v_ms));
+      }
+      a_ms2 -= (dragDecel_ms2 + ROLL_DECEL);
+      speed = Math.max(0, speed + a_ms2 * 3.6 * dt);
+    } else if(transmissionMode === 'R' && throttlePct > 0.02){
+      const REVERSE_MAX_SPEED = 20;
+      const revSpeedFrac = Math.min(1, speed/REVERSE_MAX_SPEED);
+      let a_ms2 = 2.4 * throttlePct * (1 - revSpeedFrac*0.85);
+      a_ms2 -= (dragDecel_ms2 + ROLL_DECEL);
+      speed = Math.max(0, Math.min(REVERSE_MAX_SPEED, speed + a_ms2 * 3.6 * dt));
+    } else {
+      // coasting: a CVT's belt/pulley coupling gives much weaker engine braking than a geared box
+      const inGearCoasting = (transmissionMode === 'D' || transmissionMode === 'R') && speed > 0.3;
+      const engineBrakeDecel = inGearCoasting ? rpmK * 0.18 : 0;
+      const decel_ms2 = ROLL_DECEL + dragDecel_ms2 + engineBrakeDecel;
+      speed = Math.max(0, speed - decel_ms2*3.6*dt);
+    }
+    speed = Math.max(0, Math.min(speed, 230));
+
+    // ---- CVT rpm: rubber-bands with throttle position at light/mid throttle; SAT (see above) takes
+    // over past 70% throttle and drives rpm off simulated fixed-ratio steps instead ----
+    if(transmissionMode === 'D'){
+      if(!satActive && throttlePct >= SAT_ENGAGE_THROTTLE) satActive = true;
+      else if(satActive && throttlePct < SAT_DISENGAGE_THROTTLE) satActive = false;
+    } else {
+      satActive = false;
+    }
+    if(shiftCooldown > 0) shiftCooldown = Math.max(0, shiftCooldown - dt);
+    if(throttlePct < 0.02) zeroThrottleTime += dt; else zeroThrottleTime = 0;
+    const coastDownshiftReady = zeroThrottleTime >= COAST_DOWNSHIFT_DELAY;
+
+    let targetRpmK;
+    if(!ignition){ targetRpmK = 0; stepIdx = -1; }
+    else if(transmissionMode === 'N' || transmissionMode === 'P'){ targetRpmK = idleK + throttlePct*1.0; stepIdx = -1; }
+    else if(speed < 1 && throttlePct < 0.03){ targetRpmK = idleK; stepIdx = -1; }
+    else if(satActive){
+      let g = stepIdx===-1 ? pickStepForSpeed(speed) : stepIdx;
+      if(shiftCooldown <= 0){
+        const curRpm = computeStepRpm(g, speed, throttlePct);
+        const upshiftThreshold = SHIFT_BASE_K + throttlePct*(SHIFT_FULL_K-SHIFT_BASE_K);
+        if(curRpm >= upshiftThreshold && g < STEP_SPAN.length-1){
+          g = g+1; shiftCooldown = 0.25;
+        } else if(g > 0 && coastDownshiftReady){
+          const candRpm = computeStepRpm(g-1, speed, throttlePct);
+          if(candRpm <= SHIFT_FULL_K){ g = g-1; shiftCooldown = 0.25; }
+        }
+      }
+      stepIdx = g;
+      const idleFormula = idleK + throttlePct*0.9;
+      const stepFormula = computeStepRpm(stepIdx, speed, throttlePct);
+      const blend = Math.max(0, Math.min(1, speed/6));
+      targetRpmK = idleFormula*(1-blend) + stepFormula*blend;
+    } else {
+      stepIdx = -1;
+      targetRpmK = idleK + throttlePct*(REDLINE-idleK)*1.05;
+    }
+    targetRpmK = Math.min(REV_CEILING_K, targetRpmK);
+    if(!ignition){
+      rpmK = 0;
+    } else {
+      const rpmRate = targetRpmK > rpmK ? 0.11 : 0.02;
+      rpmK += (Math.max(0,targetRpmK) - rpmK) * rpmRate;
+    }
+    rpmK = Math.max(0, Math.min(REV_CEILING_K, rpmK));
+
+    // ---- needles ----
+    const displaySpeed = Math.min(speed, SPD_MAX*1.1);
+    speedNeedle.style.transform = `rotate(${angleFor(displaySpeed,SPD_MIN,SPD_MAX)}deg)`;
+    const displayRpmK = Math.min(rpmK, TACH_MAX*1.1);
+    tachNeedle.style.transform = `rotate(${angleFor(displayRpmK,TACH_MIN,TACH_MAX)}deg)`;
+
+    // ---- fuel: BSFC-based model so consumption scales with actual power delivered ----
+    const IDLE_FLOW_LPH = 0.6;
+    const PETROL_BSFC_LPH_PER_HP = 0.5 * 3.785 / 6.3; // ≈0.30 L/hr per hp
+    const currentPowerW = ignition ? HP_WATTS * throttlePct : 0;
+    const currentPowerHp = currentPowerW/735.5;
+    const fuelFlowLph = ignition ? (IDLE_FLOW_LPH + currentPowerHp*PETROL_BSFC_LPH_PER_HP) : 0;
+    if(ignition && (transmissionMode==='D' || transmissionMode==='R')){
+      odometer += speed*dt/3600;
+      trip += speed*dt/3600;
+    }
+    if(ignition){
+      const litersUsed = fuelFlowLph*dt/3600;
+      fuelFrac = Math.max(0, fuelFrac - litersUsed/TANK_SIZE_L);
+      tripFuelUsedL += litersUsed;
+    }
+    if(refueling){
+      fuelFrac = Math.min(1, fuelFrac + REFUEL_RATE*dt);
+      if(fuelFrac >= 1) refueling = false;
+    }
+    setLedBar(fuelLedSegs, fuelFrac, fuelFrac<=0.1 ? 'var(--red)' : null);
+    odoTxt.textContent = Math.floor(odometer) + ' km';
+    const avgL100 = trip > 0.05 ? (tripFuelUsedL/trip)*100 : 0;
+    avgTxt.textContent = avgL100.toFixed(1) + ' L/100km';
+
+    // ---- auto shutdown: engine dies once the tank is empty ----
+    if(ignition && fuelFrac <= 0){
+      ignition = false;
+      powerBtn.classList.remove('active');
+      powerBtn.textContent = 'Ignition';
+      throttleSlider.value = 0; throttleVal.textContent = '0%';
+      setTransmission('P');
+    }
+
+    // ---- coolant temperature: cold warm-up takes minutes; only climbs past the 90C operating point
+    // through a slow heat-soak accumulator that builds over sustained time spent past redline, and the
+    // first slice of that build is absorbed by thermal mass before the gauge reacts ----
+    if(ignition){
+      if(rpmK >= REDLINE) overheatBuildup = Math.min(1, overheatBuildup + dt*0.004);
+      else overheatBuildup = Math.max(0, overheatBuildup - dt*0.012);
+      const soak = Math.max(0, (overheatBuildup - 0.2) / 0.8);
+      const targetC = 90 + soak*(125-90);
+      const warmRate = 0.0009 + (rpmK/REV_CEILING_K)*0.002;
+      const heating = targetC > coolantC;
+      let rate;
+      if(!heating) rate = warmRate;                                                   // cooling - normal
+      else if(coolantC < 89) rate = warmRate * 0.28 * Math.min(1, engineOnTime/9);     // warming to operating temp - slow, eased in from a cold start
+      else rate = 0.0008;                                                             // heat-soak past operating temp - gentle creep
+      coolantC += (targetC - coolantC) * rate;
+    } else {
+      coolantC += (22 - coolantC) * 0.0006;
+      overheatBuildup = Math.max(0, overheatBuildup - dt*0.005);
+    }
+    coolantC = Math.max(15, Math.min(130, coolantC));
+    setLedBar(coolantLedSegs, (coolantC-20)/(110-20), coolantC>105 ? 'var(--red)' : null);
+    // blue low-temp tell-tale: lit until the engine reaches operating temp
+    const coolantCold = ignition && coolantC < 87;
+    coolantColdIcon.setAttribute('stroke', coolantCold ? 'var(--blue)' : '#7a3a34');
+    coolantColdIcon.setAttribute('fill', coolantCold ? 'var(--blue)' : 'none');
+    coolantColdIcon.style.filter = coolantCold ? 'drop-shadow(0 0 4px rgba(79,168,255,.9))' : 'none';
+
+    updateSound(rpmK, ignition);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  setLedBar(fuelLedSegs, fuelFrac, null);
+  setLedBar(coolantLedSegs, (coolantC-20)/(110-20), null);
+
+  /* ================= KEYBOARD CONTROLS =================
+     P/R/N/D: select gear | W: throttle | S/Space: brake */
+  let wDown = false;
+  let throttleKeyRAF = null, throttleKeyLastT = null;
+  const THROTTLE_KEY_RATE = 100;
+  function throttleKeyStep(now){
+    if(throttleKeyLastT === null) throttleKeyLastT = now;
+    const dt = (now - throttleKeyLastT)/1000;
+    throttleKeyLastT = now;
+    const target = wDown ? 100 : 0;
+    let current = parseFloat(throttleSlider.value);
+    if(current < target) current = Math.min(target, current + THROTTLE_KEY_RATE*dt);
+    else if(current > target) current = Math.max(target, current - THROTTLE_KEY_RATE*dt);
+    throttleSlider.value = current;
+    throttleSlider.dispatchEvent(new Event('input'));
+    if(wDown || current !== target){
+      throttleKeyRAF = requestAnimationFrame(throttleKeyStep);
+    } else {
+      throttleKeyRAF = null;
+      throttleKeyLastT = null;
+    }
+  }
+  function startThrottleKeyLoop(){
+    if(throttleKeyRAF === null){
+      throttleKeyLastT = null;
+      throttleKeyRAF = requestAnimationFrame(throttleKeyStep);
+    }
+  }
+  let brakeRAF = null, brakeLastT = null;
+  const BRAKE_RATE = 100;
+  function brakeStep(now){
+    if(brakeLastT === null) brakeLastT = now;
+    const dt = (now - brakeLastT)/1000;
+    brakeLastT = now;
+    const active = sDown || spaceDown || mouseBrakeDown;
+    const target = active ? 100 : 0;
+    if(braking < target) braking = Math.min(target, braking + BRAKE_RATE*dt);
+    else if(braking > target) braking = Math.max(target, braking - BRAKE_RATE*dt);
+    if(active || braking !== target){
+      brakeRAF = requestAnimationFrame(brakeStep);
+    } else {
+      brakeRAF = null;
+      brakeLastT = null;
+    }
+  }
+  function startBrakeLoop(){
+    if(brakeRAF === null){
+      brakeLastT = null;
+      brakeRAF = requestAnimationFrame(brakeStep);
+    }
+  }
+  window.addEventListener('keydown', (e)=>{
+    if(e.key === ' ' || e.code === 'Space') e.preventDefault();
+    if(e.repeat) return;
+    switch(e.key){
+      case 'i': case 'I': powerBtn.click(); break;
+      case 'p': case 'P': setTransmission('P'); break;
+      case 'r': case 'R': setTransmission('R'); break;
+      case 'n': case 'N': setTransmission('N'); break;
+      case 'd': case 'D': setTransmission('D'); break;
+      case 'w': case 'W': wDown = true; startThrottleKeyLoop(); break;
+      case 's': case 'S': sDown = true; startBrakeLoop(); break;
+      case ' ': spaceDown = true; startBrakeLoop(); break;
+    }
+  });
+  window.addEventListener('keyup', (e)=>{
+    switch(e.key){
+      case 'w': case 'W':
+        wDown = false;
+        throttleSlider.value = 0;
+        throttleSlider.dispatchEvent(new Event('input'));
+        break;
+      case 's': case 'S': sDown = false; break;
+      case ' ': spaceDown = false; break;
+    }
+  });
+})();
+</script>
+</body>
+</html>

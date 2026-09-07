@@ -1,0 +1,254 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-dim: #8a8f96;
+    --color-amber: #ff9d2e;
+    --color-red: #e8402a;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    min-height: 100%;
+    background: #000;
+    font-family: var(--font-sans);
+}
+
+/* Nav */
+
+.navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid #1c1c1c;
+}
+
+.navbar-brand {
+    color: #f4f6f8;
+    font-size: .85rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    text-decoration: none;
+}
+
+.navbar-links {
+    display: flex;
+    gap: 22px;
+}
+
+.navbar-link {
+    color: var(--color-dim);
+    font-size: .72rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: .15s;
+}
+
+.navbar-link:hover,
+.navbar-link.active {
+    color: var(--color-amber);
+}
+
+/* Page shell */
+
+.page {
+    min-height: calc(100vh - 64px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.panel {
+    width: 100%;
+    max-width: 720px;
+    padding: 40px 30px;
+    background: radial-gradient(120% 160% at 50% -10%, #101010 0%, #000 65%);
+    border-radius: 28px;
+    border: 1px solid #2a1210;
+    box-shadow: 0 30px 70px -30px rgba(0, 0, 0, .9), 0 0 40px -18px rgba(232, 64, 42, .35);
+}
+
+.panel.panel-narrow {
+    max-width: 480px;
+}
+
+.panel h1 {
+    text-align: center;
+    color: #f4f6f8;
+    font-size: 1.4rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+}
+
+.panel .sub {
+    text-align: center;
+    color: var(--color-dim);
+    font-size: .8rem;
+    margin-bottom: 28px;
+}
+
+.section-label {
+    font-size: .62rem;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--color-dim);
+    margin-bottom: 12px;
+}
+
+/* Car grid (menu) */
+
+.car-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.car-card {
+    cursor: pointer;
+    text-align: center;
+    padding: 22px 14px;
+    background: #0c0c0c;
+    border: 1px solid #262626;
+    border-radius: 16px;
+    color: var(--color-dim);
+    transition: .15s;
+}
+
+.car-card:hover {
+    border-color: var(--color-red);
+    box-shadow: 0 0 16px -6px rgba(232, 64, 42, .6);
+}
+
+.car-card.selected {
+    border-color: var(--color-amber);
+    color: #f4f6f8;
+    box-shadow: 0 0 20px -6px rgba(255, 157, 46, .6);
+}
+
+.car-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #f4f6f8;
+    letter-spacing: .03em;
+}
+
+.car-sub {
+    font-size: .68rem;
+    color: var(--color-dim);
+    margin-top: 6px;
+}
+
+/* Buttons */
+
+.btn {
+    display: block;
+    width: 100%;
+    font-family: inherit;
+    font-size: .8rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    font-weight: 800;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid var(--color-amber);
+    background: var(--color-amber);
+    color: #100a00;
+    cursor: pointer;
+    transition: .15s;
+    text-align: center;
+    text-decoration: none;
+}
+
+.btn:hover {
+    box-shadow: 0 0 20px -4px rgba(255, 157, 46, .8);
+}
+
+.btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.back-link {
+    display: block;
+    text-align: center;
+    margin-top: 16px;
+    color: var(--color-dim);
+    font-size: .75rem;
+    text-decoration: none;
+}
+
+.back-link:hover {
+    color: var(--color-amber);
+}
+
+/* Forms */
+
+.field {
+    margin-bottom: 18px;
+}
+
+.field label {
+    display: block;
+    font-size: .62rem;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--color-dim);
+    margin-bottom: 8px;
+}
+
+.field input[type=text],
+.field input[type=file] {
+    width: 100%;
+    padding: 12px 14px;
+    background: #0c0c0c;
+    border: 1px solid #262626;
+    border-radius: 10px;
+    color: #f4f6f8;
+    font-size: .85rem;
+    font-family: inherit;
+}
+
+.field input[type=text]:focus {
+    outline: none;
+    border-color: var(--color-amber);
+}
+
+.errors {
+    color: var(--color-red);
+    font-size: .72rem;
+    margin-bottom: 18px;
+    padding-left: 18px;
+}
+
+.errors li {
+    margin-bottom: 4px;
+}
+
+/* Car frame (show) */
+
+.page.page-frame {
+    padding: 0;
+    display: block;
+}
+
+.car-frame {
+    display: block;
+    width: 100%;
+    height: calc(100vh - 64px);
+    border: 0;
+}
