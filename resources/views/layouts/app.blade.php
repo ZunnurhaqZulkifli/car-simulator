@@ -11,6 +11,7 @@
     <div class="navbar-links">
       <a href="{{ route('menu') }}" class="navbar-link @if(request()->routeIs('menu')) active @endif">Garage</a>
       <a href="{{ route('car.create') }}" class="navbar-link @if(request()->routeIs('car.create')) active @endif">Upload</a>
+      <a href="{{ route('car.manage') }}" class="navbar-link @if(request()->routeIs('car.manage')) active @endif">Manage</a>
     </div>
   </nav>
 

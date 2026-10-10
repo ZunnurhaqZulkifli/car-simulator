@@ -196,6 +196,63 @@ html, body {
     color: var(--color-amber);
 }
 
+/* Manage list */
+
+.manage-list {
+    margin-bottom: 28px;
+}
+
+.manage-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #0c0c0c;
+    border: 1px solid #262626;
+    border-radius: 12px;
+    margin-bottom: 10px;
+}
+
+.manage-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.manage-actions form {
+    display: contents;
+}
+
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1;
+    border-radius: 8px;
+    border: 1px solid #262626;
+    background: #141414;
+    color: var(--color-dim);
+    cursor: pointer;
+    transition: .15s;
+}
+
+.btn-icon:hover:not(:disabled) {
+    border-color: var(--color-amber);
+    color: var(--color-amber);
+}
+
+.btn-icon:disabled {
+    opacity: .3;
+    cursor: not-allowed;
+}
+
+.btn-icon-danger:hover:not(:disabled) {
+    border-color: var(--color-red);
+    color: var(--color-red);
+}
+
 /* Forms */
 
 .field {

@@ -15,9 +15,13 @@
 // volume in the car's audio graph. This module owns only the UI + persistence: it merges
 // any saved settings from window.__CAR_STATE__.engineMix, calls set() for each layer, and
 // debounce-saves changes back through CarAPI.saveEngineMix().
+//
+// Shared modules (e.g. car-service.js's tyre screech) add their own slider with
+// EngineMixer.addLayer({ id, label, value, set }), before or after the car registers.
 (function () {
   const PREFIX = 'emix';
   let layers = [];
+  let extraLayers = [];
   let title = 'Engine';
   let registered = false;
   let panelBuilt = false;
@@ -134,13 +138,24 @@
     }, 600);
   }
 
+  function withSaved(l) {
+    const value = (saved && typeof saved[l.id] === 'number') ? saved[l.id] : (l.value != null ? l.value : 1);
+    return { id: l.id, label: l.label || l.id, value, set: l.set || function () {} };
+  }
+
   window.EngineMixer = {
+    addLayer(config) {
+      const layer = withSaved(config);
+      extraLayers.push(layer);
+      try { layer.set(layer.value); } catch (e) {}
+      if (registered) {
+        layers.push(layer);
+        if (panel) renderRows();
+      }
+    },
     register(config) {
       title = config.title || title;
-      layers = (config.layers || []).map((l) => {
-        const value = (saved && typeof saved[l.id] === 'number') ? saved[l.id] : (l.value != null ? l.value : 1);
-        return { id: l.id, label: l.label || l.id, value, set: l.set || function () {} };
-      });
+      layers = (config.layers || []).map(withSaved).concat(extraLayers);
       registered = true;
       // push merged (saved) values into the audio graph immediately
       layers.forEach((l) => { try { l.set(l.value); } catch (e) {} });

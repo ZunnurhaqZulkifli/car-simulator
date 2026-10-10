@@ -10,7 +10,7 @@ window.CarAPI = {
         'Content-Type': 'application/json',
         'X-CSRF-TOKEN': state.csrfToken,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, ...(window.CarService ? window.CarService.saveData() : {}) }),
     });
   },
 

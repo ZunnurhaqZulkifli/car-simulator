@@ -130,7 +130,7 @@ composer install && npm install
 cp .env.example .env
 php artisan key:generate
 touch database/database.sqlite
-php artisan migrate --seed     # seeds BMW 550D, BMW 320D, Proton Iriz
+php artisan migrate --seed     # seeds BMW 550D, BMW 320D, BMW M140i xDrive, Proton Iriz
 php artisan storage:link       # serve uploaded car files
 composer dev                   # server + vite + queue + logs
 ```

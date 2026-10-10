@@ -34,6 +34,18 @@ class CarSeeder extends Seeder
                 'subtitle' => 'Diesel Instrument Cluster · Single-Turbo I4',
                 'source' => 'bmw-320d.html',
             ],
+            [
+                'name' => 'BMW M140i xDrive',
+                'slug' => 'bmw-140i',
+                'subtitle' => 'Petrol Instrument Cluster · Turbo I6 · ZF8 · xDrive AWD · 335 hp / 500 Nm',
+                'source' => 'bmw-140i.html',
+            ],
+            [
+                'name' => 'BMW 530e xDrive',
+                'slug' => 'bmw-530e',
+                'subtitle' => 'Plug-in Hybrid Cluster · B48 I4 + eDrive · 248 hp / 420 Nm',
+                'source' => 'bmw-530e.html',
+            ],
         ];
 
         foreach ($cars as $car) {
