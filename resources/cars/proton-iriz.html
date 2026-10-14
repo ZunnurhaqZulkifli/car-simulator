@@ -188,11 +188,9 @@
   .dyno-panel.dyno-collapsed{ display:none; }
   .dyno-title-row{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
   .dyno-title{ font-size:.72rem; font-weight:700; letter-spacing:.08em; color:#c7cbd0; text-transform:uppercase; }
-  .dyno-sub{ font-weight:400; text-transform:none; letter-spacing:0; color:var(--dim); font-size:.68rem; margin-left:8px; }
   .dyno-title-actions{ display:flex; gap:8px; align-items:center; }
   .dyno-close{ background:none; border:none; color:var(--dim); font-size:1.15rem; line-height:1; cursor:pointer; padding:2px 8px; }
   .dyno-close:hover{ color:var(--white); }
-  #live-log-btn.active{ color:#04140f; background:#33d17a; border-color:#33d17a; }
   .dyno-svg{ width:100%; height:auto; display:block; }
   .dyno-content-row{ display:flex; gap:16px; align-items:flex-start; }
   .dyno-content-row > .dyno-svg{ flex:1 1 auto; min-width:0; }
@@ -334,46 +332,14 @@
   </button>
   <div class="dyno-panel dyno-collapsed">
     <div class="dyno-title-row">
-      <div class="dyno-title">Dyno Chart <span class="dyno-sub">Power vs RPM &middot; click a legend entry to show/hide it</span></div>
+      <div class="dyno-title">Dyno</div>
       <div class="dyno-title-actions">
-        <button id="live-log-btn">Start Live Log</button>
         <button class="dyno-close" id="dyno-close-btn" aria-label="Close dyno chart">&times;</button>
       </div>
     </div>
     <div id="dyno-graph-wrap" class="dyno-hidden">
     <div class="dyno-content-row">
-    <svg viewBox="0 0 640 260" class="dyno-svg">
-      <!-- grid -->
-      <g stroke="#1c1c1c" stroke-width="1">
-        <line x1="50" y1="220" x2="620" y2="220"/>
-        <line x1="50" y1="20" x2="50" y2="220"/>
-        <line x1="153.6" y1="20" x2="153.6" y2="220"/>
-        <line x1="257.3" y1="20" x2="257.3" y2="220"/>
-        <line x1="360.9" y1="20" x2="360.9" y2="220"/>
-        <line x1="464.5" y1="20" x2="464.5" y2="220"/>
-        <line x1="568.2" y1="20" x2="568.2" y2="220"/>
-      </g>
-      <!-- rev cut marker, moved by JS with the stage -->
-      <line id="dyno-cut-line" x1="0" y1="20" x2="0" y2="220" stroke="#4fa8ff" stroke-width="1.3" stroke-dasharray="4,3" opacity="0.7"/>
-      <text id="dyno-cut-txt" x="0" y="14" text-anchor="middle" fill="#4fa8ff" font-size="9" font-family="Arial" font-weight="700"></text>
-      <!-- x axis labels -->
-      <g fill="#6a6a6a" font-size="9" font-family="Arial" text-anchor="middle">
-        <text x="50" y="234">0</text>
-        <text x="153.6" y="234">2k</text>
-        <text x="257.3" y="234">4k</text>
-        <text x="360.9" y="234">6k</text>
-        <text x="464.5" y="234">8k</text>
-        <text x="568.2" y="234">10k</text>
-      </g>
-      <text x="335" y="252" text-anchor="middle" fill="#6a6a6a" font-size="9" font-family="Arial" letter-spacing="1">RPM</text>
-      <!-- reference power curve for the current stage, built by JS -->
-      <polyline id="dyno-ref-curve" points="" fill="none" stroke="#6a6a6a" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" opacity="0.4" stroke-dasharray="3,3"/>
-      <!-- live per-gear traces, injected by JS -->
-      <g id="dyno-live-lines"></g>
-      <g id="dyno-live-dots"></g>
-      <!-- legend, injected by JS -->
-      <g id="dyno-legend" font-size="9" font-family="Arial"></g>
-    </svg>
+    <svg viewBox="0 0 640 260" class="dyno-svg"><!-- power + torque, drawn by car-dyno.js --></svg>
     <div class="telemetry-grid">
       <div class="telemetry-card">
         <div class="telemetry-title">Engine Temp</div>
@@ -676,7 +642,8 @@
   let cvtOsc1, cvtOsc2, cvtFilter, cvtGain;
   let windNoiseSrc, windFilter, windGain;
   let intakeNoiseSrc, intakeFilter, intakeGain, intakeTrim;
-  let exhaustOsc, exhaustFilter, exhaustGain, exhaustTrim;
+  let exhaustSrc, exhaustFilter, exhaustGain, exhaustTrim;
+  const EX_MAKEUP = 3.3; // brings the gas exhaust up to the old sawtooth's loudness at the same slider
   let raspTrim, subTrim, growlTrim, harmTrim, valveTrim, cvtTrim, windTrim;
   let simRpm = 0;
   let limiterRaspDepth, limiterBodyDepth, limiterIntakeDepth, limiterExhaustDepth, limiterWasActive = false;
@@ -705,6 +672,27 @@
       curve[i] = Math.tanh(amount*x)/norm;
     }
     return curve;
+  }
+
+  // exhaust source: one loop of the petrol four's blow-down pulses (firing order 1-3-4-2, 180 deg apart) at
+  // EX_LOOP_RPM, rendered once with per-event jitter; playbackRate = rpm / EX_LOOP_RPM keeps it locked to the crank.
+  // Replaces a sawtooth oscillator - a clean, perfectly periodic wave is what made the exhaust sound electronic.
+  const EX_LOOP_RPM = 1000, EX_LOOP_CYCLES = 48; // ~5.8 s at 1,000 rpm: the jitter never falls into an audible pattern
+  function renderExhaustLoop(){
+    const sr = actx.sampleRate, cycleS = 120/EX_LOOP_RPM, len = Math.round(sr*cycleS*EX_LOOP_CYCLES);
+    const buf = actx.createBuffer(1, len, sr), d = buf.getChannelData(0);
+    const ORDER = [1,3,4,2], CYL = [0, 1.0, 0.96, 1.03, 0.98]; // no two cylinders breathe quite alike
+    const TAU = 0.0046, TAU_A = 0.0009, n = Math.floor(TAU*7*sr); // a petrol's blow-down is sharper than a diesel's
+    for(let c=0;c<EX_LOOP_CYCLES;c++) ORDER.forEach((cyl,k)=>{
+      const i0 = Math.floor(((c + k/4)*cycleS + (Math.random()-0.5)*0.0005)*sr), amp = CYL[cyl]*(0.9 + Math.random()*0.2);
+      const tau = TAU*(0.85 + Math.random()*0.35); let grit = 0; // every burn is a little different, with the gas turbulence riding on it
+      for(let j=0;j<n;j++){ const t = j/sr; grit += 0.18*((Math.random()*2-1) - grit);
+        d[((i0+j) % len + len) % len] += amp*(Math.exp(-t/tau) - Math.exp(-t/TAU_A) - 0.18*Math.exp(-t/(tau*2.6)) + 0.55*grit*Math.exp(-t/(tau*1.4))); }
+    });
+    let m = 0; for(let i=0;i<len;i++) m += d[i]; m /= len;
+    let pk = 0; for(let i=0;i<len;i++){ d[i] -= m; pk = Math.max(pk, Math.abs(d[i])); }
+    for(let i=0;i<len;i++) d[i] *= 0.9/pk;
+    return buf;
   }
 
   function initAudio(){
@@ -844,12 +832,31 @@
 
     // ---- exhaust: tailpipe note. A sawtooth at the firing frequency (its harmonic series is the
     // exhaust drone) through a low, resonant lowpass for tailpipe boom. ----
-    exhaustOsc = actx.createOscillator(); exhaustOsc.type='sawtooth'; exhaustOsc.frequency.value=60;
-    exhaustFilter = actx.createBiquadFilter(); exhaustFilter.type='lowpass'; exhaustFilter.frequency.value=170; exhaustFilter.Q.value=4;
+    exhaustSrc = actx.createBufferSource(); exhaustSrc.buffer = renderExhaustLoop(); exhaustSrc.loop = true; exhaustSrc.playbackRate.value = 0.85;
+    // a tailpipe is mostly turbulent gas: some of the clean pulse tone for pitch, pulse-gated low noise leading it, both
+    // through the silencer's echoes (two short feedback delays, damped each pass), then the tailpipe boom and a lowpass
+    const mkGain = v => { const g = actx.createGain(); g.gain.value = v; return g; };
+    const mkFilter = (type, f, q, db) => { const b = actx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; if(db !== undefined) b.gain.value = db; return b; };
+    const exSum = mkGain(1);
+    exhaustSrc.connect(mkGain(0.6)).connect(exSum); // a touch more clean pulse tone vs the gas - cleaner (as the 140i)
+    const gasEnv = actx.createWaveShaper();
+    { const c = new Float32Array(1024); for(let i=0;i<1024;i++) c[i] = Math.abs(i/511.5 - 1); gasEnv.curve = c; }
+    const gasGate = mkGain(0);
+    exhaustSrc.connect(gasEnv).connect(mkFilter('lowpass', 600, 0.7)).connect(gasGate.gain);
+    const gasNoise = actx.createBufferSource(); gasNoise.buffer = buf; gasNoise.loop = true; gasNoise.start(0, 1.1);
+    gasNoise.connect(mkFilter('highpass', 45, 0.5)).connect(mkFilter('lowpass', 700, 0.5)).connect(gasGate).connect(mkGain(1.6)).connect(exSum); // gas level: 2.4 sounded too dirty
+    const muffler = mkGain(1); exSum.connect(muffler);
+    [[0.0037, 0.34], [0.0061, 0.28]].forEach(([dly, fb]) => {
+      const dl = actx.createDelay(0.05); dl.delayTime.value = dly; const g = mkGain(fb);
+      exSum.connect(dl).connect(mkFilter('lowpass', 1600, 0.7)).connect(g).connect(dl); // feedback loop
+      g.connect(muffler);
+    });
+    exhaustFilter = mkFilter('lowpass', 400, 0.7);
+    const exShaper = actx.createWaveShaper(); exShaper.curve = makeDistortionCurve(1.0); exShaper.oversample = '2x';
     exhaustGain = actx.createGain(); exhaustGain.gain.value = 0.0001;
     exhaustTrim = actx.createGain(); exhaustTrim.gain.value = layerVol.exhaust;
-    exhaustOsc.connect(exhaustFilter).connect(exhaustGain).connect(exhaustTrim).connect(masterGain);
-    exhaustOsc.start();
+    muffler.connect(mkFilter('peaking', 85, 0.9, 6)).connect(exhaustFilter).connect(exShaper).connect(mkGain(EX_MAKEUP)).connect(exhaustGain).connect(exhaustTrim).connect(masterGain);
+    exhaustSrc.start();
 
     // ---- rev limiter (ported from the 140i): on the cut under load a ~14 Hz sine through a steep
     // one-sided curve chops the rasp/body/intake/exhaust gains - the limiter's flutter. Depth is set
@@ -1015,8 +1022,8 @@
 
     // exhaust: drone pitched at the firing frequency; the tailpipe boom rises slightly with rpm and
     // it swells under load
-    exhaustOsc.frequency.setTargetAtTime(firingHz, t, 0.05);
-    exhaustFilter.frequency.setTargetAtTime(120 + simRpm*0.05, t, 0.08);
+    exhaustSrc.playbackRate.setTargetAtTime(simRpm/EX_LOOP_RPM, t, 0.03); // the pulse train stays locked to the crank
+    exhaustFilter.frequency.setTargetAtTime(400 + simRpm*0.13, t, 0.08); // no resonant peak (a Q-4 peak on a saw was the electronic whistle)
     const exhaustVol = soundOn ? Math.min(0.16, 0.045 + load*0.08 + revFactor*0.07) * (sportMode ? 1.3 : 1) : 0.0001; // Sport opens up the exhaust note
     exhaustGain.gain.setTargetAtTime(exhaustVol, t, 0.06);
 
@@ -1111,7 +1118,7 @@
   // switched off, the full drive goes through and the excess spins the wheels up (revs flare).
   // Launch control: at a standstill in gear, hold W + S - revs hold at LAUNCH_RPM_K on the brake;
   // let go of S with W still held and it launches with optimal slip and no TC cut, until 100 km/h.
-  const TC_GRIP = 3.6; // m/s^2 of drive before the tyres let go (FWD 1.6 manual)
+  const TC_GRIP = 4.6; // m/s^2 of drive before the front tyres let go (FWD 1.6 manual, weight comes off the front) - TC caps the drive here
   const LAUNCH_RPM_K = 3.0, LAUNCH_BOOST = 1.08;
   let tcOn = true, tcIntervening = false, wheelspinK = 0, launchState = 'idle'; // idle | armed | engage | go
   let launchTimer = 0; const LAUNCH_ENGAGE_S = 0.35; // brake off -> drive engaging: revs held, no pull yet
@@ -1139,12 +1146,13 @@
   // a = forward drive accel (m/s^2) before drag
   function applyTraction(a, thr){
     if(launchState === 'engage') return 0; // drive still engaging - revs held, no pull yet
-    if(launchState === 'go') return a * LAUNCH_BOOST;
-    if(thr < 0.5 || speed > 60 || a <= TC_GRIP) return a;
-    if(tcOn){ tcIntervening = true; return TC_GRIP + (a - TC_GRIP)*0.5; }
-    wheelspinK = Math.min(1.5, (a - TC_GRIP)/TC_GRIP * 3);
-    return a;
+    if(a <= TC_GRIP) return a;
+    if(launchState === 'go'){ return TC_GRIP*1.03; } // launch control: held at optimal slip
+    if(tcOn){ tcIntervening = true; return TC_GRIP*0.97; } // traction control trims the drive back to what the tyres can take
+    wheelspinK = Math.min(1.5, (a - TC_GRIP)/TC_GRIP * 3); // TC off: the excess spins the tyres (revs flare)
+    return TC_GRIP*0.93; // and spinning tyres grip less than rolling ones
   }
+
   // ---- drive mode: Sport sharpens the pedal map and rev response, opens up the exhaust, turns the TFT red ----
   let sportMode = false;
   const tftEl = document.getElementById('tft'), modeTxt = document.getElementById('mode-txt');
@@ -1165,9 +1173,15 @@
   let gear = 0; // -1 = R, 0 = N, 1-5
 
   const TANK_SIZE_L = 40;
+  let rangeShowIn = 0; // seconds until the range readout next refreshes
+  let rangePrevF = 0, rangePrevK = null, rangeWinF = 0, rangeWinK = 0; // rolling fuel / distance window behind the range readout
   const REFUEL_RATE = 0.12; // tank fraction/sec while refuelling — full 40L fill in ~8s, ramps linearly like the brake
   let refueling = false;
   const MASS = 1060;
+  // drivetrain physics, same model as the M5 CS: real rolling resistance + brakes, grip from the traction model,
+  // engine braking from the engine's own friction through the gears
+  const DRIVELINE_EFF = 0.9, ROLL_RES = 0.13, BRAKE_DECEL = 13.0; // full-pedal braking (uprated)
+  const engineFrictionNm = rpm => 12 + rpm*0.006; // 1.6 four-cylinder: what it drags when it isn't fuelling
   const IDLE_RPMK = 0.6;
   // engine maps: peak torque is flat between flatFrom-flatTo (x1000 rpm), then fades so power peaks at
   // the quoted hp (stage 1 ~6.2k, stage 2 ~8k). revCut is the limiter; stage 2 revs past the printed 8k.
@@ -1190,14 +1204,9 @@
   const torqueShape = k => torqueShapeFor(stage, k);
   const TWO_STEP_RPM_K = 5.5; // stage 2 launch limiter
   const stageBtns = { 1:document.getElementById('stage-1-btn'), 2:document.getElementById('stage-2-btn') };
-  // ---- dyno chart (same as the BMWs): live per-gear power log + rolling telemetry sparklines ----
-  const liveLogBtn = document.getElementById('live-log-btn');
-  const dynoLiveLinesG = document.getElementById('dyno-live-lines');
-  const dynoLiveDotsG = document.getElementById('dyno-live-dots');
-  const dynoLegendG = document.getElementById('dyno-legend');
-  const dynoReadout = document.getElementById('dyno-readout');
+  // ---- dyno panel (power/torque runs come from car-dyno.js) + rolling telemetry sparklines ----
   const dynoGraphWrap = document.getElementById('dyno-graph-wrap');
-  let liveLogActive = false;
+  CarDyno.init({ fuel:'petrol', turbo:false }); // scale follows the stage - see setStage
   const TELE_HISTORY_LEN = 90, TELE_SAMPLE_EVERY = 6;
   let teleFrameCounter = 0;
   const teleKeys = ['temp','cons','fuel','oil','avgspeed','fuelused','hp','tq'];
@@ -1214,61 +1223,6 @@
       return `${(6 + i/(TELE_HISTORY_LEN-1)*188).toFixed(1)},${(60 - frac*50).toFixed(1)}`;
     }).join(' '));
   }
-  const GEAR_COUNT_FOR_DYNO = 5;
-  const DYNO_GEAR_COLORS = ['#ffb020','#e8402a','#6c2fd4','#1c69d4','#3fe0c8'];
-  const DYNO_POWER_MAX = 250; // fixed chart scale, covers Stage 2's 215 hp
-  function dynoX(rpm){ return 50 + (rpm/11000)*(620-50); }
-  function dynoYPower(p){ return 220 - (p/DYNO_POWER_MAX)*(220-20); }
-  const dynoRefCurve = document.getElementById('dyno-ref-curve');
-  const dynoCutLine = document.getElementById('dyno-cut-line'), dynoCutTxt = document.getElementById('dyno-cut-txt');
-  function rebuildDynoRefCurve(){
-    const pts = [];
-    for(let k=0; k<=stage.revCut+0.001; k+=0.2){
-      const p = k < 0.6 ? 0 : stage.nm*torqueShapeFor(stage, k)*k*1000/7127;
-      pts.push(`${dynoX(k*1000).toFixed(1)},${dynoYPower(Math.min(DYNO_POWER_MAX,p)).toFixed(1)}`);
-    }
-    dynoRefCurve.setAttribute('points', pts.join(' '));
-    const cx = dynoX(stage.revCut*1000).toFixed(1);
-    dynoCutLine.setAttribute('x1', cx); dynoCutLine.setAttribute('x2', cx);
-    dynoCutTxt.setAttribute('x', cx); dynoCutTxt.textContent = `CUT ${stage.revCut}k`;
-  }
-  let dynoLines = [], dynoDots = [];
-  const DYNO_BIN_COUNT = 55;
-  const DYNO_BIN_WIDTH = 11000/DYNO_BIN_COUNT;
-  let dynoBinsByGear = Array.from({length:GEAR_COUNT_FOR_DYNO}, ()=> new Array(DYNO_BIN_COUNT).fill(null));
-  const gearVisible = new Array(GEAR_COUNT_FOR_DYNO).fill(true);
-  for(let g=0; g<GEAR_COUNT_FOR_DYNO; g++){
-    const line = el('polyline', {points:'', fill:'none', stroke:DYNO_GEAR_COLORS[g], 'stroke-width':2.2, 'stroke-linejoin':'round', 'stroke-linecap':'round'});
-    line.style.filter = `drop-shadow(0 0 4px ${DYNO_GEAR_COLORS[g]}99)`;
-    dynoLiveLinesG.appendChild(line); dynoLines.push(line);
-    const dot = el('circle', {cx:50, cy:220, r:3.2, fill:DYNO_GEAR_COLORS[g], opacity:0});
-    dynoLiveDotsG.appendChild(dot); dynoDots.push(dot);
-    const lx = 545, ly = 26 + g*13;
-    const item = el('g', {style:'cursor:pointer;'});
-    item.appendChild(el('rect', {x:lx-4, y:ly-8, width:64, height:13, fill:'transparent'}));
-    item.appendChild(el('line', {x1:lx, y1:ly, x2:lx+16, y2:ly, stroke:DYNO_GEAR_COLORS[g], 'stroke-width':2.4}));
-    const t = el('text', {x:lx+20, y:ly+3, fill:'#c7cbd0', style:'font-size:8px;'}); t.textContent = `G${g+1}`;
-    item.appendChild(t);
-    item.addEventListener('click', ()=>{
-      gearVisible[g] = !gearVisible[g];
-      line.style.display = gearVisible[g] ? '' : 'none';
-      item.style.opacity = gearVisible[g] ? '1' : '0.3';
-      if(!gearVisible[g]) dot.setAttribute('opacity','0');
-    });
-    dynoLegendG.appendChild(item);
-  }
-  liveLogBtn.addEventListener('click', ()=>{
-    liveLogActive = !liveLogActive;
-    liveLogBtn.textContent = liveLogActive ? 'Stop Live Log' : 'Start Live Log';
-    liveLogBtn.classList.toggle('active', liveLogActive);
-    dynoDots.forEach(d=>d.setAttribute('opacity','0'));
-    if(liveLogActive){
-      dynoBinsByGear = Array.from({length:GEAR_COUNT_FOR_DYNO}, ()=> new Array(DYNO_BIN_COUNT).fill(null));
-      dynoLines.forEach(l=>l.setAttribute('points',''));
-      dynoReadout.textContent = 'Live logging \u2014 drive normally, shift and throttle as you like';
-    } else dynoReadout.textContent = 'Live log stopped';
-    liveLogBtn.blur();
-  });
   const dynoToggleBtn = document.getElementById('dyno-toggle-btn');
   const dynoPanel = document.querySelector('.dyno-panel');
   function setDynoOpen(open){
@@ -1285,7 +1239,7 @@
     HP_WATTS = stage.hp*735.5; TORQUE_NM = stage.nm; REV_CEILING_K = stage.revCut;
     Object.entries(stageBtns).forEach(([k,b])=> b.classList.toggle('active', +k === n));
     launchIndicator.textContent = n === 2 ? '2-STEP' : 'LAUNCH';
-    rebuildDynoRefCurve();
+    CarDyno.init({ hpMax: stage.hp, tqMax: stage.nm, rpmMax: stage.revCut*1000 });
   }
   setStage(savedState.engineMap === 2 ? 2 : 1);
   Object.entries(stageBtns).forEach(([k,b])=> b.addEventListener('click', ()=>{ setStage(+k); b.blur(); }));
@@ -1347,7 +1301,14 @@
     muteBtn.blur();
     if(masterGain) masterGain.gain.setTargetAtTime(soundOn?MASTER_BASE*layerVol.master:0, actx.currentTime, 0.05);
   });
-  refuelBtn.addEventListener('click', ()=>{ refueling = true; refuelBtn.classList.add('active'); refuelBtn.blur(); });
+  // press and hold to pump fuel, let go to stop (mouse/touch, or Enter while the button is focused)
+  const setRefueling = on => { refueling = on && fuelFrac < 1; refuelBtn.classList.toggle('active', refueling); };
+  refuelBtn.style.touchAction = 'none';
+  refuelBtn.addEventListener('contextmenu', e => e.preventDefault()); // long-press on touch shouldn't open a menu
+  refuelBtn.addEventListener('pointerdown', e => { refuelBtn.setPointerCapture(e.pointerId); setRefueling(true); });
+  ['pointerup','pointercancel','lostpointercapture','blur'].forEach(ev => refuelBtn.addEventListener(ev, () => setRefueling(false)));
+  refuelBtn.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); if(!e.repeat) setRefueling(true); } });
+  refuelBtn.addEventListener('keyup', e => { if(e.key === 'Enter') setRefueling(false); });
   const wearPctTxt = document.getElementById('wear-pct'), wearBarFill = document.getElementById('wear-bar-fill');
   function updateWearDisplay(){
     wearPctTxt.textContent = Math.round(wearPct)+'%';
@@ -1370,6 +1331,20 @@
   let rpmK = 0;
 
   let lastT = performance.now();
+  // speedo needle: a critically-damped tracking filter. It follows both the speed AND how fast the speed is changing,
+  // so it sits right on the real speed while you accelerate (no lag) and only rounds off sudden changes of pace -
+  // shift dips, traction cuts - instead of twitching with them. k = stiffness.
+  function needleTrack(k){
+    let x = 0, v = 0, prev = 0;
+    const c = 2*Math.sqrt(k);
+    return (target, dt) => {
+      if(dt <= 0) return x;
+      const tv = (target - prev)/dt; prev = target;
+      v += (k*(target - x) + c*(tv - v))*dt; x += v*dt;
+      return Math.max(0, x);
+    };
+  }
+  const speedNeedleTrack = needleTrack(25);
   function frame(now){
     const dt = Math.max(0, Math.min(0.05, (now-lastT)/1000)); // first rAF timestamp can predate lastT
     lastT = now;
@@ -1377,7 +1352,7 @@
     if(shiftTimer > 0) shiftTimer = Math.max(0, shiftTimer - dt);
 
     const throttleRaw = ignition ? (parseInt(throttleSlider.value,10)/100) : 0;
-    const throttlePct = Math.pow(throttleRaw, sportMode ? 1.1 : 1.6); // Sport: sharper, near-linear pedal map
+    const throttlePct = Math.pow(throttleRaw, sportMode ? 1.0 : 1.2); // Sport: linear pedal map
     updateLaunch(dt);
     if(ignition && stallTimer <= 0 && gear >= 2 && speed < 3 && throttleRaw > 0.05 && !(sDown || spaceDown || mouseBrakeDown)){
       stallTimer = STALL_TIME;
@@ -1392,34 +1367,38 @@
     const wearMul = 1 - (wearPct/100)*0.1; // a fully worn engine loses 10% of its torque
     let v_ms = speed/3.6;
 
-    const AIR_RHO = 1.225, DRAG_CDA = 0.62, ROLL_DECEL = 0.5;
+    const AIR_RHO = 1.225, DRAG_CDA = 0.62;
     const dragDecel_ms2 = (0.5*AIR_RHO*DRAG_CDA*v_ms*v_ms)/MASS;
+    const rollA = speed > 0.5 ? ROLL_RES : 0;
+    // engine torque at the current rpm x pedal; cut at the limiter; unfuelled, its friction brakes through the gears
+    const rpmNow = Math.max(rpmK, idleK)*1000;
+    // the cut watches the gear's mechanical rpm too: clutched in, the wheels turn the engine, so it can't pull past the cut
+    const fuelling = ignition && stallTimer <= 0 && rpmK < REV_CEILING_K - 0.05 && !(gear >= 1 && mechRpmK(gear, speed) >= REV_CEILING_K - 0.05);
+    const engineNm = fuelling ? TORQUE_NM * torqueShape(rpmNow/1000) * throttlePct * coldPowerMul * wearMul : 0;
+    const engineTq = engineNm - engineFrictionNm(rpmNow)*Math.max(0, 1 - (fuelling ? throttlePct : 0)/0.05); // the ECU fuels to cover friction as soon as the pedal asks for torque - only a closed pedal engine-brakes
 
     if(!ignition){
       speed = Math.max(0, speed - 40*dt);
     } else if(braking){
-      const decel_ms2 = 15*(braking/100)*CarService.brakeMul() + dragDecel_ms2;
+      const decel_ms2 = BRAKE_DECEL*(braking/100)*CarService.brakeMul() + dragDecel_ms2 + rollA;
       speed = Math.max(0, speed - decel_ms2*3.6*dt);
-    } else if(gear >= 1 && throttlePct > 0.02 && shiftTimer <= 0 && stallTimer <= 0){
-      // wheel force = engine torque at the current rpm through the selected gear + final drive
-      const engineNm = TORQUE_NM * torqueShape(Math.max(rpmK, idleK)) * throttlePct * coldPowerMul * wearMul;
-      let a_ms2 = Math.min(4.2, engineNm * GEAR_RATIO[gear-1] * FINAL_DRIVE * 0.9 / WHEEL_R / MASS); // 4.2: front-tyre grip ceiling
-      if(rpmK >= REV_CEILING_K - 0.05) a_ms2 = 0; // rev limiter fuel cut
-      a_ms2 = applyTraction(a_ms2, throttlePct);
-      a_ms2 -= (dragDecel_ms2 + ROLL_DECEL);
+    } else if(gear >= 1 && shiftTimer <= 0 && stallTimer <= 0){
+      // wheel force = engine torque through the selected gear + final drive, less driveline loss; the traction
+      // model caps it at what the front tyres can take. Off the throttle the same path is engine braking.
+      let a_ms2 = engineTq * GEAR_RATIO[gear-1] * FINAL_DRIVE * (engineTq > 0 ? DRIVELINE_EFF : 1) / WHEEL_R / MASS;
+      if(engineTq < 0) a_ms2 *= Math.min(1, speed/8); // the clutch slips it out at a crawl - no braking to a stop
+      if(a_ms2 > 0) a_ms2 = applyTraction(a_ms2, throttlePct);
+      a_ms2 -= (dragDecel_ms2 + rollA);
       speed = Math.max(0, speed + a_ms2 * 3.6 * dt);
     } else if(gear === -1 && throttlePct > 0.02 && shiftTimer <= 0){
       const REVERSE_MAX_SPEED = 20;
       const revSpeedFrac = Math.min(1, speed/REVERSE_MAX_SPEED);
       let a_ms2 = 2.4 * throttlePct * (1 - revSpeedFrac*0.85);
-      a_ms2 -= (dragDecel_ms2 + ROLL_DECEL);
+      a_ms2 -= (dragDecel_ms2 + rollA);
       speed = Math.max(0, Math.min(REVERSE_MAX_SPEED, speed + a_ms2 * 3.6 * dt));
     } else {
-      // coasting in gear: a manual's solid coupling gives proper engine braking, more in the low gears
-      const inGearCoasting = gear !== 0 && speed > 0.3 && shiftTimer <= 0;
-      const engineBrakeDecel = inGearCoasting ? rpmK * 0.2 : 0;
-      const decel_ms2 = ROLL_DECEL + dragDecel_ms2 + engineBrakeDecel;
-      speed = Math.max(0, speed - decel_ms2*3.6*dt);
+      // neutral / clutch in mid-shift: it just rolls against aero and rolling resistance
+      speed = Math.max(0, speed - (rollA + dragDecel_ms2)*3.6*dt);
     }
     speed = Math.max(0, Math.min(speed, 300)); // sanity ceiling only
 
@@ -1442,6 +1421,8 @@
       } else targetRpmK = LAUNCH_RPM_K; // launch control holds the revs on the brake / while engaging
     }
     else if(launchState === 'go' && gear >= 1) targetRpmK = Math.max(targetRpmK, stageNum === 2 ? TWO_STEP_RPM_K : LAUNCH_RPM_K); // clutch slips at launch revs until road speed catches up
+    // start-up flare, like the M5: the engine catches, revs up a bit and settles back to idle
+    if(ignition && engineOnTime < 0.5 && speed < 3) targetRpmK = Math.max(targetRpmK, idleK + 0.9*(1 - engineOnTime/0.5));
     if(stallTimer > 0) targetRpmK = 0; // bogging down into the stall
     else if(wheelspinK > 0) targetRpmK = Math.min(REV_CEILING_K, targetRpmK + wheelspinK); // TC off: wheelspin flares the revs
     targetRpmK = Math.min(REV_CEILING_K, targetRpmK);
@@ -1458,7 +1439,7 @@
     if(ignition && throttlePct > 0.05 && rpmK >= REV_CEILING_K - 0.03) rpmK -= 0.12;
 
     // ---- needles ----
-    const displaySpeed = Math.min(speed, SPD_MAX*1.1);
+    const displaySpeed = Math.min(speedNeedleTrack(speed, dt), SPD_MAX*1.1);
     speedNeedle.style.transform = `rotate(${angleFor(displaySpeed,SPD_MIN,SPD_MAX)}deg)`;
     const displayRpmK = rpmK; // already capped at the rev cut - stage 2 sweeps past the printed 8
     tachNeedle.style.transform = `rotate(${angleFor(displayRpmK,TACH_MIN,TACH_MAX)}deg)`;
@@ -1468,10 +1449,10 @@
     // ---- fuel: BSFC-based model so consumption scales with actual power delivered ----
     const IDLE_FLOW_LPH = 0.6;
     const PETROL_BSFC_LPH_PER_HP = 0.5 * 3.785 / 6.3; // ≈0.30 L/hr per hp
-    const currentPowerW = ignition ? HP_WATTS * throttlePct : 0;
+    const currentPowerW = ignition ? Math.max(0, engineNm)*rpmNow*Math.PI/30 : 0; // what the engine is actually making
     const currentPowerHp = currentPowerW/735.5;
     const fuelFlowLph = ignition ? (IDLE_FLOW_LPH + currentPowerHp*PETROL_BSFC_LPH_PER_HP) * (1 + (wearPct/100)*0.06) : 0;
-    CarService.tick({ dt, speed, braking, slip: Math.max(wheelspinK, launchState === 'go' ? 0.35 : 0), engineWear: wearPct, ignition }); // every frame, so the screech can't stick on with the ignition off
+    CarService.tick({ dt, speed, braking, slip: Math.max(wheelspinK, launchState === 'go' ? 0.35 : 0), engineWear: wearPct, ignition, lowFuel: fuelFrac <= 0.1 }); // every frame, so the screech can't stick on with the ignition off
     if(speed > 0){
       odometer += speed*dt/3600;
       trip += speed*dt/3600;
@@ -1493,8 +1474,15 @@
     const avgL100 = trip > 0.05 ? (tripFuelUsedL/trip)*100 : 0;
     avgTxt.textContent = avgL100.toFixed(1) + ' L/100km';
     // range: the trip's own average once it's long enough to mean something, the Iriz's rated ~6.5 L/100km before that
-    const rangeL100 = trip > 1 ? Math.max(4, Math.min(20, avgL100)) : 6.5;
-    rangeTxt.textContent = Math.round(fuelFrac*TANK_SIZE_L/rangeL100*100);
+    // rolling consumption over roughly the last 3 km (distance-weighted, so it follows how you're driving now - the
+    // whole-trip average barely moved); idling still burns fuel with no distance, so the range creeps down at a standstill
+    if(rangePrevK === null){ rangePrevF = tripFuelUsedL; rangePrevK = trip; }
+    const rangeDF = Math.max(0, tripFuelUsedL - rangePrevF), rangeDK = Math.max(0, trip - rangePrevK), rangeKeep = Math.exp(-rangeDK/3);
+    rangePrevF = tripFuelUsedL; rangePrevK = trip;
+    rangeWinF = rangeWinF*rangeKeep + rangeDF; rangeWinK = rangeWinK*rangeKeep + rangeDK;
+    const rangeL100 = rangeWinK > 0.3 ? Math.max(4, Math.min(20, rangeWinF/rangeWinK*100)) : trip > 1 ? Math.max(4, Math.min(20, avgL100)) : 6.5;
+    // readout steps in 1 km, refreshed every second
+    if((rangeShowIn -= dt) <= 0){ rangeShowIn = 1; rangeTxt.textContent = Math.ceil(fuelFrac*TANK_SIZE_L/rangeL100*100); }
     rangeRow.classList.toggle('low', fuelFrac <= 0.1);
 
     // ---- auto shutdown: engine dies once the tank is empty ----
@@ -1551,24 +1539,8 @@
     LIVE.hp.readout.textContent   = Math.round(LIVE.hp.disp) + ' hp';
     LIVE.tq.readout.textContent   = Math.round(LIVE.tq.disp) + ' Nm';
 
-    // ---- live dyno log: best power per rpm bin, per gear ----
-    if(liveLogActive){
-      if(ignition && gear >= 1){
-        const g = gear-1, rpmActual = rpmK*1000, dispHp = LIVE.hp.disp;
-        const bins = dynoBinsByGear[g];
-        const binIdx = Math.max(0, Math.min(DYNO_BIN_COUNT-1, Math.floor(rpmActual/DYNO_BIN_WIDTH)));
-        if(bins[binIdx]===null || dispHp > bins[binIdx]) bins[binIdx] = dispHp;
-        const pts = [];
-        for(let b=0;b<DYNO_BIN_COUNT;b++) if(bins[b]!==null) pts.push(`${dynoX((b+0.5)*DYNO_BIN_WIDTH).toFixed(1)},${dynoYPower(bins[b]).toFixed(1)}`);
-        dynoLines[g].setAttribute('points', pts.join(' '));
-        dynoDots.forEach((d,i)=> d.setAttribute('opacity', (i===g && gearVisible[g]) ? '1':'0'));
-        dynoDots[g].setAttribute('cx', dynoX(rpmActual)); dynoDots[g].setAttribute('cy', dynoYPower(dispHp));
-        dynoReadout.textContent = `G${gear}  \u00B7  ${Math.round(rpmActual)} rpm  \u00B7  ${Math.round(dispHp)} hp  \u00B7  ${Math.round(LIVE.tq.disp)} Nm`;
-      } else {
-        dynoDots.forEach(d=>d.setAttribute('opacity','0'));
-        dynoReadout.textContent = 'Live logging \u2014 select a gear to start tracing';
-      }
-    }
+    CarDyno.tick({ dt, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: liveHp, tq: liveNm, gear: gear-1, gearLabel: `${gear}`,
+      speed, coolant: coolantC });
     if(++teleFrameCounter >= TELE_SAMPLE_EVERY){
       teleFrameCounter = 0;
       const consL100 = speed > 2 ? Math.min(30, fuelFlowLph/speed*100) : 0;
@@ -1579,7 +1551,7 @@
       telePush('oil', oilBar, 0, 6, oilBar.toFixed(1)+' bar');
       telePush('avgspeed', avgSpeedKmh, 0, SPD_MAX, Math.round(avgSpeedKmh)+' km/h');
       telePush('fuelused', tripFuelUsedL, 0, TANK_SIZE_L, tripFuelUsedL.toFixed(1)+' L');
-      telePush('hp', LIVE.hp.disp, 0, DYNO_POWER_MAX, Math.round(LIVE.hp.disp)+' hp');
+      telePush('hp', LIVE.hp.disp, 0, 250, Math.round(LIVE.hp.disp)+' hp');
       telePush('tq', LIVE.tq.disp, 0, 300, Math.round(LIVE.tq.disp)+' Nm');
     }
 
@@ -1627,7 +1599,7 @@
     }
   }
   let brakeRAF = null, brakeLastT = null;
-  const BRAKE_RATE = 100;
+  const BRAKE_RATE = 250; // %/sec -> 0.4 s for a full 0-100 sweep: the brakes bite straight away
   function brakeStep(now){
     if(brakeLastT === null) brakeLastT = now;
     const dt = (now - brakeLastT)/1000;

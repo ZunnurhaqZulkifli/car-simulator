@@ -1,16 +1,20 @@
 // Shared servicing, dashboard faults + tyre screech, injected into every car's raw HTML alongside car-api.js.
 //
 // A car hooks in with:
-//   CarService.tick({ dt, speed, braking, slip, engineWear, ignition }) - once per frame: wears parts,
+//   CarService.tick({ dt, speed, braking, slip, engineWear, ignition, lowFuel }) - once per frame: wears parts,
 //        drives the screech, the service light and the dashboard messages. slip = wheelspin/launch (0 none, 1+ heavy),
 //        engineWear = the car's own engine wear % (the car keeps owning it and its repair button)
+//        lowFuel = the car is into its fuel reserve (pops the Low Fuel message)
+//   CarService.holdMessages(sec)        - hold dashboard messages for up to sec (0 releases them), e.g. while
+//        the car's own start-up chime plays
 //   CarService.brakeMul()                - multiply brake decel (worn pads + tyres stop longer)
 //   CarService.oilMul()                  - multiply engine wear rate (old oil wears the engine faster)
 //   CarService.attachAudio(ctx, out, { chime, randomFaults }) - once its Web Audio graph exists. The screech
 //        plays into `out` (the car's master gain, so mute + master volume apply); `chime` is the car's own
 //        chime player (else the shared BMW chime file is used); randomFaults pops random check-control messages.
 //
-// The dyno panel is split into tabbed sections: Dyno (the car's own chart), Servicing, Diagnostics (filled by
+// The dyno panel is split into tabbed sections: Dyno (the car's own chart), Tuning (the car's tuning panel, while
+// it's hidden from beside the cluster), Servicing, Diagnostics (filled by
 // car-diagnostics.js through CarService.sections.diag) and Controls (the car's keyboard/info line, moved in). Service rows: the car's own engine Wear row
 // is moved in and cloned for the rest, so they pick up each car's styling. A part at 100% raises its own
 // dashboard message + chime, logs an active fault code and lights the service light until it's serviced.
@@ -98,6 +102,23 @@
     .cs-tab svg{width:14px;height:14px;}
     .cs-tab .cs-badge{min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e8402a;color:#fff;
       font-size:.55rem;letter-spacing:0;display:none;align-items:center;justify-content:center;}
+    .cs-tab[hidden]{display:none;}
+    /* hidden tuning panel: the whole panel sits in the Tuning tab (so the car's own .side-panel / .tuning-panel
+       styles keep applying) minus its frame and size; its sections flow into columns across the tab */
+    .cs-in-tab{flex:none !important;left:auto !important;top:auto !important;width:auto !important;max-width:none !important;height:auto !important;max-height:none !important;
+      margin:0 !important;padding:0 !important;border:0 !important;background:none !important;box-shadow:none !important;}
+    .cs-in-tab > .cs-grip{display:none;}
+    .cs-in-tab > .cs-scroller{columns:250px;column-gap:28px;}
+    .cs-in-tab > .cs-scroller > *{break-inside:avoid;}
+    /* wide enough: everything above Live Data in one column, its gauges in the next, the digital readout beside them */
+    .dyno-panel:not(.cs-narrow) .cs-in-tab > .cs-scroller{columns:3;max-width:1020px;}
+    .dyno-panel:not(.cs-narrow) .cs-in-tab .tuning-section:has(> .led-multi-panel){break-before:column;break-inside:auto;margin-top:0;}
+    .dyno-panel:not(.cs-narrow) .cs-in-tab .led-multi-panel{break-before:column;}
+    /* control deck: its items move onto an inner row (same flex layout) that scrolls once a height is set,
+       so the grips stay put; docked in the dyno panel it never outgrows the panel */
+    .cs-ctl-row{display:flex;flex-direction:inherit;flex-wrap:inherit;align-items:inherit;justify-content:inherit;gap:inherit;
+      flex:1 1 100%;min-width:0;max-height:100%;overflow:auto;}
+    .cs-dock > .controls, .cs-dock > .deck{max-width:100% !important;}
     .cs-tabs .dyno-close{margin-left:auto;}
     .cs-section{background:#0d0e10;border:1px solid #1f2125;border-radius:12px;padding:16px 18px;}
     .cs-section[hidden]{display:none;}
@@ -132,12 +153,12 @@
     .cs-sized > .cs-section[data-sec=dyno]:not([hidden]){display:flex;flex-direction:column;}
     .cs-sized #dyno-graph-wrap{flex:1 1 auto;min-height:0;}
     .cs-sized .dyno-content-row{height:100%;}
-    /* chart takes the width its height allows; the telemetry cards fill whatever width is left */
-    .cs-sized .dyno-content-row > .dyno-svg{height:100%;min-height:150px;width:auto;max-width:100%;aspect-ratio:640/260;flex:0 1 auto;}
-    .cs-sized .telemetry-grid{max-height:100%;overflow:auto;flex:1 1 260px;width:auto;align-content:start;
-      grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
+    /* chart fills the height and whatever width the car's 2-column telemetry cards leave (car-dyno.js fits its
+       viewBox to that box); the cards scroll once they outgrow the height */
+    .cs-sized .dyno-content-row > .dyno-svg{height:100%;min-height:150px;flex:1 1 0;min-width:0;}
+    .cs-sized .telemetry-grid{max-height:100%;overflow:auto;align-content:start;}
     .cs-narrow .dyno-content-row{flex-direction:column;height:auto;}
-    .cs-narrow .dyno-content-row > .dyno-svg{height:auto;width:100%;}
+    .cs-narrow .dyno-content-row > .dyno-svg{height:auto;width:100%;flex:none;}
     .cs-narrow .telemetry-grid{width:100%;flex:none;max-height:none;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
     .cs-xs .cs-tab{padding:8px 11px;letter-spacing:.08em;}
     .cs-xs .cs-section{padding:12px;}
@@ -145,6 +166,7 @@
   `;
   const TAB_ICONS = {
     dyno: '<path d="M4 4v16h16"/><path d="M7 14l3.5-4.5 3 2.5L18 6"/>',
+    tuning: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
     service: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-2.4z"/>',
     diag: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M7 11h2l1.5-3 3 6 1.5-3h2"/><path d="M9 21h6"/>',
     keys: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
@@ -162,7 +184,7 @@
       sections[k].hidden = k !== id;
       btns[k].setAttribute('aria-selected', String(k === id));
     });
-    [['dyno', 'Dyno'], ['service', 'Servicing'], ['diag', 'Diagnostics'], ['keys', 'Controls']].forEach(([id, label]) => {
+    [['dyno', 'Dyno'], ['tuning', 'Tuning'], ['service', 'Servicing'], ['diag', 'Diagnostics'], ['keys', 'Controls']].forEach(([id, label]) => {
       const sec = document.createElement('section');
       sec.className = 'cs-section';
       sec.setAttribute('role', 'tabpanel');
@@ -174,6 +196,7 @@
       btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${TAB_ICONS[id]}</svg>${label}` +
         (id === 'diag' ? '<span class="cs-badge"></span>' : '');
       btn.addEventListener('click', () => { select(id); btn.blur(); });
+      btn.hidden = id === 'tuning'; // only while the tuning panel is hidden
       btns[id] = btn;
       tabs.appendChild(btn);
     });
@@ -195,26 +218,69 @@
     if (controls) {
       const home = document.createComment('controls home');
       controls.before(home);
+      // car-layout.js sets html.cl-nodock while it arranges the page: the controls are then an area of their own
       const place = () => {
-        if (panel.classList.contains('dyno-collapsed')) home.after(controls);
-        else dock.appendChild(controls);
+        const atHome = panel.classList.contains('dyno-collapsed') || document.documentElement.classList.contains('cl-nodock');
+        if (atHome && home.nextSibling !== controls) home.after(controls);
+        else if (!atHome && controls.parentNode !== dock) dock.appendChild(controls);
       };
       new MutationObserver(place).observe(panel, { attributes: true, attributeFilter: ['class'] });
+      new MutationObserver(place).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
       place();
     }
-    panel.append(tabs, dock, sections.dyno, sections.service, sections.diag, sections.keys);
+    panel.append(tabs, dock, sections.dyno, sections.tuning, sections.service, sections.diag, sections.keys);
     select('dyno');
     diagBadge = btns.diag.querySelector('.cs-badge');
     const toggle = document.getElementById('dyno-toggle-btn');
     if (toggle) { toggle.title = 'Dyno, servicing & diagnostics'; toggle.setAttribute('aria-label', toggle.title); }
     makeAreasResizable(panel);
+    const tuning = document.querySelector('.tuning-panel, .side-panel');
+    if (tuning) makeTuningHideable(tuning, btns.tuning, select);
   }
 
-  // ---- resizable areas (dyno panel, tuning panel, gauge cluster) ----
+  // a floating button beside the dyno toggle hides the tuning panel from beside the cluster: the whole panel then
+  // moves into the dyno panel's Tuning tab, and back to where the car laid it out when shown again
+  function makeTuningHideable(tuning, tab, select) {
+    const home = document.createComment('tuning home');
+    tuning.before(home);
+    const fab = document.createElement('button');
+    fab.className = 'dyno-toggle-btn'; // the car's own floating-button look
+    fab.style.left = '70px';
+    // side-panel icon - the sliders icon is already the sound mixer's button
+    fab.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg>';
+    const apply = (hidden) => {
+      if (hidden) sections.tuning.appendChild(tuning);
+      else home.after(tuning);
+      tuning.classList.toggle('cs-in-tab', hidden);
+      tab.hidden = !hidden;
+      if (!hidden && !sections.tuning.hidden) select('dyno');
+      fab.classList.toggle('active', hidden); // lit only away from the default, like the mute button
+      fab.title = hidden ? 'Show tuning panel' : 'Hide tuning panel (moves into a Dyno tab)';
+      fab.setAttribute('aria-label', fab.title);
+    };
+    fab.addEventListener('click', () => {
+      const hidden = !tuning.classList.contains('cs-in-tab');
+      apply(hidden);
+      if (hidden) select('tuning');
+      setLayout('tuning', { hidden });
+      fab.blur();
+    });
+    document.body.appendChild(fab);
+    apply(!!(layout.tuning && layout.tuning.hidden));
+  }
+
+  // ---- resizable areas (dyno panel, tuning panel, gauge cluster, control deck) ----
   // Drag the right edge (width), bottom edge (height) or corner (both); double-click a grip to reset. Sizes are
-  // kept in `layout` ({ dyno|tuning|cluster: { w, h } }), saved per car with the rest of the state.
+  // kept in `layout` ({ dyno|tuning|cluster|controls: { w, h }, tuning.hidden }), saved per car with the rest of the state.
   const layout = { ...((window.__CAR_STATE__ && window.__CAR_STATE__.layout) || {}) };
+  function setLayout(key, patch) {
+    const entry = { ...layout[key], ...patch };
+    if (Object.values(entry).some(Boolean)) layout[key] = entry;
+    else delete layout[key];
+    if (window.saveCarState) window.saveCarState(); // the car's own save - layout rides along in saveData()
+  }
   const resizables = [];
+  const areas = []; // { key, el, apply(w, h), minW, minH, scale } - car-layout.js moves these around the page
   // scale: only the width is ever set and the content's own aspect ratio sets the height (the gauge cluster);
   // vertical drags are turned into the width that gives that height
   function makeResizable(el, key, { grips = ['e', 's', 'se'], minW = 340, minH = 260, scale = false, onApply = () => {} } = {}) {
@@ -229,14 +295,10 @@
       onApply(w, h);
     };
     resizables.push(el);
+    areas.push({ key, el, apply, minW, minH, scale });
     const saved = layout[key];
     if (saved) apply(saved.w, saved.h);
-    const save = () => {
-      const w = parseFloat(el.style.width) || null, h = parseFloat(el.style.height) || null;
-      if (w || h) layout[key] = { w, h };
-      else delete layout[key];
-      if (window.saveCarState) window.saveCarState(); // the car's own save - layout rides along in saveData()
-    };
+    const save = () => setLayout(key, { w: parseFloat(el.style.width) || null, h: parseFloat(el.style.height) || null });
     const DIRS = { e: [true, false], s: [false, true], se: [true, true] };
     grips.forEach((dir) => {
       const [dx, dy] = DIRS[dir];
@@ -318,6 +380,16 @@
     // gauge cluster: the dials keep their proportions, so every grip scales it as a whole
     const cluster = document.querySelector('.cluster');
     if (cluster) makeResizable(cluster, 'cluster', { minW: 480, scale: true });
+
+    // control deck (.deck, or .controls on the 550d / Iriz): same size at home and docked in the dyno panel
+    const controls = document.querySelector('.deck, .controls');
+    if (controls) {
+      const row = document.createElement('div');
+      row.className = 'cs-ctl-row';
+      while (controls.firstChild) row.appendChild(controls.firstChild);
+      controls.appendChild(row);
+      makeResizable(controls, 'controls', { minW: 300, minH: 60 });
+    }
   }
 
   let diagBadge = null;
@@ -385,10 +457,11 @@
 
   // ---- dashboard messages: queued, one at a time, each with a chime ----
   const queue = [];
-  let showFor = 0;
+  let showFor = 0, holdFor = 0;
   function announce(title, msg, color) { queue.push({ title, msg, color }); }
   function updateBanner(dt, ignition) {
-    if (!ignition) { queue.length = 0; showFor = 0; }
+    if (!ignition) { queue.length = 0; showFor = 0; holdFor = 0; }
+    if (holdFor > 0) { holdFor -= dt; return; }
     if (showFor > 0) { showFor -= dt; return; }
     if (banner) banner.style.display = 'none';
     const next = queue.shift();
@@ -404,7 +477,7 @@
   }
 
   // ---- audio: tyre screech + chime ----
-  let actx = null, out = null, screechGain = null, screechVol = 0.5, carChime = null, chimeBuf = null;
+  let actx = null, out = null, screechGain = null, screechVol = 0.5, warnChimeVol = 0.8, carChime = null, chimeBuf = null;
   let randomFaults = false, nextRandomIn = 40 + Math.random() * 80;
   function chime() {
     if (carChime) return carChime();
@@ -412,7 +485,7 @@
     const src = actx.createBufferSource();
     src.buffer = chimeBuf;
     const g = actx.createGain();
-    g.gain.value = 0.8;
+    g.gain.value = warnChimeVol;
     src.connect(g).connect(out);
     src.start();
   }
@@ -457,15 +530,16 @@
     lfo.start();
     if (window.EngineMixer) {
       window.EngineMixer.addLayer({ id: 'screech', label: 'Tyre Screech', value: screechVol, set: (f) => { screechVol = f; } });
+      window.EngineMixer.addLayer({ id: 'warnChime', label: 'Warning Chime', value: warnChimeVol, set: (f) => { warnChimeVol = f; } });
     }
   }
 
   // wheelspin / launch only - braking doesn't screech (ABS)
   const screechAmount = (slip) => Math.min(1, slip);
 
-  let wasIgnition = false, bulbCheck = 0;
+  let wasIgnition = false, bulbCheck = 0, lowFuelShown = false;
   window.CarService = {
-    tick({ dt, speed, braking, slip = 0, engineWear = 0, ignition }) {
+    tick({ dt, speed, braking, slip = 0, engineWear = 0, ignition, lowFuel = false }) {
       const screech = screechAmount(slip);
       const t = { dt, screech, km: speed * dt / 3600, brakeWork: (braking / 100) * speed * dt }; // brakeWork ~170 for a full stop from 100 km/h
       byKey.engine.value = engineWear;
@@ -503,6 +577,9 @@
         diagBadge.textContent = codes.size;
         diagBadge.style.display = codes.size ? 'inline-flex' : 'none';
       }
+      // low fuel: once on dropping into it, and again at every start-up while still low
+      if (ignition && lowFuel && !lowFuelShown) announce('Low Fuel', 'Fuel reserve reached. Refuel at the next opportunity.', '#ff9d2e');
+      lowFuelShown = ignition && lowFuel;
       updateBanner(dt, ignition);
       // 3.0 makeup gain: the narrow band-passes only let a sliver of the noise through
       if (screechGain) screechGain.gain.setTargetAtTime(screech * screechVol * 3.0, actx.currentTime, 0.06);
@@ -512,6 +589,10 @@
     // fully degraded oil triples engine wear
     oilMul: () => 1 + byKey.oil.value / 100 * 2,
     attachAudio,
+    holdMessages: (sec) => { holdFor = sec; },
+    setLayout, // for car-dyno.js / car-layout.js: their settings ride along in the per-car layout
+    layout,
+    areas,
     // for car-diagnostics.js
     parts,
     codes,

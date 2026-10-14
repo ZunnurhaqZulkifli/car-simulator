@@ -81,13 +81,18 @@ class CarSimController extends Controller
             'csrfToken' => csrf_token(),
         ]);
 
+        // mtime query busts the browser cache whenever a shared script changes
+        $js = fn ($f) => '<script src="'.asset("js/$f").'?v='.filemtime(public_path("js/$f")).'"></script>';
+
         $html = str_replace(
             '</head>',
             "<script>window.__CAR_STATE__ = {$state};</script>\n".
-            '<script src="'.asset('js/car-api.js').'"></script>'."\n".
-            '<script src="'.asset('js/car-service.js').'"></script>'."\n".
-            '<script src="'.asset('js/car-diagnostics.js').'"></script>'."\n".
-            '<script src="'.asset('js/car-mixer.js').'"></script></head>',
+            $js('car-api.js')."\n".
+            $js('car-service.js')."\n".
+            $js('car-diagnostics.js')."\n".
+            $js('car-dyno.js')."\n".
+            $js('car-mixer.js')."\n".
+            $js('car-layout.js').'</head>',
             $html
         );
 
@@ -108,11 +113,28 @@ class CarSimController extends Controller
             'fault_codes.*.module' => ['required', 'string', 'max:8'],
             'fault_codes.*.status' => ['required', 'in:active,stored'],
             'fault_codes.*.at' => ['required', 'string', 'max:40'],
-            // resizable areas: { dyno|tuning|cluster: { w, h } } in px, null = default size
-            'layout' => ['sometimes', 'array:dyno,tuning,cluster'],
-            'layout.*' => ['array:w,h'],
+            // resizable areas: { dyno|tuning|cluster|controls: { w, h } } in px, null = default size;
+            // tuning.hidden = the tuning panel lives in the dyno panel's Tuning tab;
+            // telemetry: { off: [card ids switched off], hidden: every telemetry card switched off };
+            // arrange: { preset: pitwall|free (null = the car's own), cluster|controls|tuning|dyno: { x, y, w, h } } -
+            // the free layout's rects in px, h null for the cluster (its height follows its width)
+            'layout' => ['sometimes', 'array:dyno,tuning,cluster,controls,telemetry,arrange'],
+            ...array_fill_keys(['layout.dyno', 'layout.tuning', 'layout.cluster', 'layout.controls'], ['array:w,h,hidden']),
+            'layout.telemetry' => ['array:off,hidden'],
+            'layout.telemetry.off' => ['nullable', 'array', 'max:40'],
+            'layout.telemetry.off.*' => ['string', 'max:20'],
+            'layout.arrange' => ['array:preset,cluster,controls,tuning,dyno'],
+            'layout.arrange.preset' => ['nullable', 'in:pitwall,free'],
+            ...collect(['cluster', 'controls', 'tuning', 'dyno'])->flatMap(fn ($area) => [
+                "layout.arrange.$area" => ['nullable', 'array:x,y,w,h'],
+                "layout.arrange.$area.x" => ["required_with:layout.arrange.$area", 'numeric', 'min:0', 'max:20000'],
+                "layout.arrange.$area.y" => ["required_with:layout.arrange.$area", 'numeric', 'min:0', 'max:20000'],
+                "layout.arrange.$area.w" => ["required_with:layout.arrange.$area", 'numeric', 'min:1', 'max:20000'],
+                "layout.arrange.$area.h" => ['nullable', 'numeric', 'min:1', 'max:20000'],
+            ])->all(),
             'layout.*.w' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'layout.*.h' => ['nullable', 'numeric', 'min:0', 'max:10000'],
+            'layout.*.hidden' => ['sometimes', 'boolean'],
         ]);
 
         $car->update($validated);
