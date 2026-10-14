@@ -105,7 +105,7 @@ class CarSimController extends Controller
             'odometer' => ['required', 'numeric', 'min:0'],
             'fuel_level' => ['required', 'numeric', 'min:0', 'max:1'],
             'engine_wear_pct' => ['required', 'numeric', 'min:0', 'max:100'],
-            'engine_map' => ['required', 'integer', 'min:1', 'max:6'],
+            'engine_map' => ['required', 'integer', 'min:1', 'max:9'],
             ...array_fill_keys(Car::SERVICE_COLUMNS, ['sometimes', 'numeric', 'min:0', 'max:100']),
             'fault_codes' => ['sometimes', 'array', 'max:50'],
             'fault_codes.*.code' => ['required', 'string', 'max:8'],
