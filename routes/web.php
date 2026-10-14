@@ -13,4 +13,5 @@ Route::delete('/car/{car:slug}', [CarSimController::class, 'destroy'])->name('ca
 Route::get('/car/{car:slug}', [CarSimController::class, 'show'])->name('car.show');
 Route::get('/car/{car:slug}/raw', [CarSimController::class, 'raw'])->name('car.raw');
 Route::post('/car/{car:slug}/state', [CarSimController::class, 'saveState'])->name('car.state.save');
+Route::post('/car/{car:slug}/name', [CarSimController::class, 'saveName'])->name('car.name.save');
 Route::post('/car/{car:slug}/engine-mix', [CarSimController::class, 'saveEngineMix'])->name('car.enginemix.save');

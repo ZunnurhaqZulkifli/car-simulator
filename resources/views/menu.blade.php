@@ -10,7 +10,7 @@
     <div class="car-grid" id="car-grid">
       @foreach($cars as $car)
         <div class="car-card" data-slug="{{ $car->slug }}">
-          <div class="car-name">{{ $car->name }}</div>
+          <div class="car-name">{{ $car->displayName() }}</div>
           <div class="car-sub">{{ $car->subtitle }}</div>
         </div>
       @endforeach

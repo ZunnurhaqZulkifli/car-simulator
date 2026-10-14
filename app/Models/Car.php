@@ -13,7 +13,7 @@ class Car extends Model
     ];
 
     protected $fillable = [
-        'name', 'slug', 'subtitle', 'file_path', 'position',
+        'name', 'nickname', 'slug', 'subtitle', 'file_path', 'position',
         'odometer', 'fuel_level', 'engine_wear_pct', 'engine_map', 'engine_mix',
         ...self::SERVICE_COLUMNS,
         'fault_codes', 'layout',
@@ -26,6 +26,12 @@ class Car extends Model
             'fault_codes' => 'array',
             'layout' => 'array',
         ];
+    }
+
+    // what the owner calls the car: their nickname, else the model
+    public function displayName(): string
+    {
+        return $this->nickname ?: $this->name;
     }
 
     public function getRouteKeyName(): string

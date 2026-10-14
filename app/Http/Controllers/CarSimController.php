@@ -67,6 +67,8 @@ class CarSimController extends Controller
         // JS via a global instead of Blade interpolation
         $state = json_encode([
             'slug' => $car->slug,
+            'name' => $car->name,
+            'nickname' => $car->nickname,
             'odometer' => $car->odometer !== null ? (float) $car->odometer : null,
             'fuelLevel' => $car->fuel_level !== null ? (float) $car->fuel_level : null,
             'wearPct' => $car->engine_wear_pct !== null ? (float) $car->engine_wear_pct : null,
@@ -111,6 +113,17 @@ class CarSimController extends Controller
             'layout.*' => ['array:w,h'],
             'layout.*.w' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'layout.*.h' => ['nullable', 'numeric', 'min:0', 'max:10000'],
+        ]);
+
+        $car->update($validated);
+
+        return response()->json(['saved' => true]);
+    }
+
+    public function saveName(Request $request, Car $car)
+    {
+        $validated = $request->validate([
+            'nickname' => ['nullable', 'string', 'max:60'],
         ]);
 
         $car->update($validated);

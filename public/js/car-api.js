@@ -14,6 +14,20 @@ window.CarAPI = {
     });
   },
 
+  // null = back to the model name
+  saveName(nickname) {
+    const state = window.__CAR_STATE__;
+    if (!state) return Promise.resolve();
+    return fetch(`/car/${state.slug}/name`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': state.csrfToken,
+      },
+      body: JSON.stringify({ nickname }),
+    });
+  },
+
   saveEngineMix(mix) {
     const state = window.__CAR_STATE__;
     if (!state) return Promise.resolve();
