@@ -1,0 +1,1716 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drive Demo</title>
+<style>
+  /* dark: only seen through the cluster's rounded corners */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0b0c; font: 14px system-ui, sans-serif; }
+  #hud { position: fixed; z-index: 2; left: 12px; top: 12px; color: #fff; background: rgba(0, 0, 0, .5); padding: 8px 12px; border-radius: 6px; }
+  #pump, #rollers { margin-top: 4px; color: #7dff9a; font-weight: 600; }
+  #padlink { margin-top: 4px; color: #8cc8ff; font-weight: 600; }
+  #map { position: fixed; z-index: 2; right: 12px; top: 12px; width: 200px; height: 290px; background: rgba(0, 0, 0, .5); border-radius: 8px; }
+  .menu { position: fixed; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 300px; padding: 18px 20px;
+          border-radius: 12px; background: rgba(15, 16, 18, .92); color: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
+  .menu h2 { margin: 0 0 6px; font-size: 18px; }
+  .menu p { margin: 0 0 4px; color: #aab0b8; font-size: 13px; }
+  .menu button { display: block; width: 100%; margin-top: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid #3a3d42;
+                 background: #1f2226; color: #fff; font: inherit; text-align: left; cursor: pointer; }
+  .menu button:hover, .menu button:focus-visible { border-color: #4fa8ff; }
+  .menu button.on { border-color: #4fa8ff; background: #17324d; }
+  .menu button small { display: block; color: #aab0b8; }
+  .menu .menu-leave { text-align: center; background: transparent; }
+  /* over the car page while it's open as the car menu */
+  #panel-close { position: fixed; z-index: 4; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px;
+                 border: 1px solid #3a3d42; background: rgba(15, 16, 18, .9); color: #fff; font: 13px system-ui, sans-serif; cursor: pointer; }
+  #panel-close:hover, #panel-close:focus-visible { border-color: #4fa8ff; }
+  .panel-open #hud, .panel-open #map, .panel-open #credit { visibility: hidden; }
+  kbd { padding: 0 5px; border: 1px solid #555; border-radius: 4px; font: 12px ui-monospace, monospace; }
+  #credit { position: fixed; z-index: 2; right: 12px; bottom: 8px; font-size: 11px; color: rgba(255, 255, 255, .75); text-shadow: 0 1px 2px #000; }
+  #credit a { color: inherit; }
+  #carpage { width: 1100px; height: 510px; border: 0; } /* the car page at a fixed width; the CSS3D layer places and scales it */
+</style>
+<script type="importmap">{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }</script>
+</head>
+<body>
+<div id="hud">I start · W gas · S brake · A/D steer · R reverse · ←/→ signal · C in-car view · two-finger swipe to look around
+  <div><kbd>↑</kbd><kbd>↓</kbd> throttle limit <b id="lim-throttle">100%</b> · <kbd>O</kbd><kbd>P</kbd> brake limit <b id="lim-brake">100%</b></div>
+  <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <a href="/" style="color:inherit">main menu</a></div>
+  <div id="pump" hidden></div>
+  <div id="rollers" hidden>On the dyno rollers - Dyno mode is on (<kbd>Tab</kbd> car menu, Dyno) - switch it off to drive</div>
+  <div id="padlink" hidden></div>
+  <div>Home: drive into the garage to change car · straight over the valley road is the city, its avenue running on to the mountains' direct road · the mechanic is just east of home, the racetrack down the road south 400 m past it (its pit garage, at the start line: service, tuning, dyno, fuel and a change of car) · the valley road runs west to the autobahn, east to the mountains</div></div>
+<div id="garage" class="menu" hidden>
+  <h2>Garage</h2>
+  <div id="garage-cars"></div>
+  <button class="menu-leave" data-leave>Keep driving</button>
+</div>
+<div id="shop" class="menu" hidden>
+  <h2>Mechanic</h2>
+  <p>Servicing and repairs happen here, on the car's own service, tuning and dyno pages.</p>
+  <button data-tab="service">Servicing<small>oil, coolant, brakes, tyres, battery, engine repair</small></button>
+  <button data-tab="tune">Tuning<small>maps, parts and the setup</small></button>
+  <button data-tab="dyno">Dyno<small>power and torque, live data</small></button>
+  <button class="menu-leave" data-leave>Leave</button>
+</div>
+<div id="pit" class="menu" hidden>
+  <h2>Pit garage</h2>
+  <p>Switch the engine off (I) to refuel here.</p>
+  <button data-tab="service">Servicing<small>oil, coolant, brakes, tyres, battery, engine repair</small></button>
+  <button data-tab="tune">Tuning<small>maps, parts and the setup</small></button>
+  <button data-tab="dyno">Dyno<small>power and torque, live data</small></button>
+  <p style="margin-top:12px">Change car</p>
+  <div id="pit-cars"></div>
+  <button class="menu-leave" data-leave>Back to the track</button>
+</div>
+<button id="panel-close" hidden>Back to driving <kbd>Tab</kbd></button>
+<canvas id="map" aria-label="Mini map"></canvas>
+<div id="credit"></div>
+<iframe id="carpage" title="Instrument cluster"></iframe>
+<script type="module">
+import * as THREE from 'three';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// The drivable cars (?car=, picked in the garage at home). Each runs on its own car page - engine, gearbox, gauges -
+// with a model of the same car as its body. A model's parts are found by matching "material|mesh|parent" names:
+// paint (repainted Black Sapphire, or paintColor), glass (tinted), cabin (mirrored to right-hand drive), wheels and tyre (hung on
+// pivots that spin and steer), steering (searched for its rim, from `near` if it hides inside a bigger mesh; with
+// no `re`, the built wheel goes at `near`; `look`: how high over its centre the eye looks for the cluster), tail (its rear half glows when braking), head/tail/mirror lamps (where the
+// amber signals go), credit (title, page, licence if not by-nc-sa, author if not Ddiaz Design and their page)
+const CARS = {
+  x1: {
+    name: 'BMW X1 xDrive20d', page: 'bmw-x1-xdrive20d', model: '/models/bmw-x1-f48.glb', length: 4.447, wheelbase: 2.76, redline: 4850, // rpm, for the phone pad's shift lights
+    credit: ['2020 BMW X1 xDrive 18d', 'https://sketchfab.com/3d-models/2020-bmw-x1-xdrive-18d-4ca3a2247af44e51919074565ed93486'],
+    paint: /^CarPaint\|/, glass: /^(glass|glass_D|Panorama)\|/,
+    cabin: /^(front_seat|back_seat|Tonel|steering_wheel|Torpeda|doors|Potolok|Salon_black)\|/,
+    wheels: /^(Tire_texture|rim_black|Rim_Chrome|disk)\||Koleso_mat_back/, tyre: /^Tire_texture\|/,
+    steering: { re: /^steering_wheel\|/ },
+    tail: { re: /^Back_lights_texture\|/, fromMap: true, idle: 0.25, brake: 6 },
+    lamps: { head: /^Front_lights_emmisive\|/, tail: /^Back_lights_emisive\|/, mirror: /^Mirrors\|/ },
+    exhaustX: 0.45,
+  },
+  m3: {
+    name: 'BMW M3 CS Touring', page: 'bmw-m3-touring', model: '/models/bmw-m3-cs-touring.glb', length: 4.801, wheelbase: 2.857, redline: 7200,
+    credit: ['2025 BMW M3 CS Touring', 'https://sketchfab.com/3d-models/2025-bmw-m3-cs-touring-ebda8c29a8ef4ec789391e918d52ef55'],
+    glass: /Window_Material1\|/, cabin: /Interior_Geo|SeatBelt_Geo/,
+    wheels: /Wheel1A_3D/, tyre: /Wheel1A_3D/,
+    // inside the one-piece interior, which comes twice: a see-through layer over a solid glow layer. Turned, the two
+    // speckle through each other, so the see-through layer's wheel is left out
+    steering: { re: /InteriorA_Material1\||^red_Int\|/, near: [-0.375, 0.885, 0.35], drop: /^m3cs\w*InteriorA_Material1\|/ },
+    // its lights are layered so that no layer's glow shows through: a soft red glow is laid over each tail light instead
+    tail: { overlay: true, keep: v => v.y > 0.75 && v.y < 1 && Math.abs(v.x) > 0.45 }, // the clusters at the rear corners
+    lamps: { head: /LightEmissiveA_Material1\|/, tail: /LightEmissiveA_Material1\|/ },
+    exhaustX: 0.4,
+  },
+  m5: {
+    name: 'BMW M5 CS', page: 'bmw-m5-cs', model: '/models/bmw-m5-competition.glb', length: 4.983, wheelbase: 2.982, redline: 7200,
+    credit: ['2021 BMW M5 Competition', 'https://sketchfab.com/3d-models/2021-bmw-m5-competition-29a4c13761cb40e6a050871bd40a0963'],
+    glass: /^bMAT_Glass1\|(?!bSM_FrontKit)/, glassPlain: true, cabin: /\|(bD_Body|bSM_Interior)_/, // (not the headlight lenses)
+    wheels: /Wheel1A_3D|\|bSM_(Hub|Disk)_/, tyre: /Wheel1A_3D/, // the calipers (bSM_Brake_) stay put
+    // in the interior's merged meshes: found by its rim, which sits here once the cabin is mirrored
+    steering: { re: /^bMAT_Details_(MAT1|INT1)\|bD_Body_/, near: [-0.4, 0.96, 0.405] },
+    // one light material for every lamp: its rear half (tail lights, third brake light) glows
+    tail: { re: /^bMAT_Lights1\|/, fromMap: true, idle: 0.25, brake: 6, keep: v => v.y > 0.8 }, // (signals: up in the clusters, not on the bumper)
+    lamps: { head: /^bMAT_Lights1\|bSM_FrontKit/, tail: /^bMAT_Lights1\|bSM_RearKit/, mirror: /^bMAT_Lights1\|bANC_Door_[LR]_0[456]_/ },
+    exhaustX: 0.5,
+  },
+  m140: {
+    name: 'BMW M140i xDrive', page: 'bmw-140i', model: '/models/bmw-m140i.glb', length: 4.324, wheelbase: 2.69, redline: 7400,
+    credit: ['2018 BMW M140i', 'https://sketchfab.com/3d-models/2018-bmw-m140i-24f09cc46773424fb2a3922427f1c37d', 'by'],
+    paint: /^iBody1\|/, glass: /^iGlass_Clear_Windshield1\|/, glassPlain: true, cabin: /^iInterior1\|/,
+    wheels: /^(iRim1|iTyres1|iBreak1)\|/, tyre: /^iTyres1\|/, // the (blue) calipers stay put
+    steering: { near: [-0.37, 0.86, 0.2] }, // its cabin has no steering wheel: the built one, here
+    tail: { overlay: true }, // its lights are already full red, so they can't glow brighter: a red glow goes over them
+    lamps: { head: /^iWhite_Glow1\|/, tail: /^iRed_Glow1\|/, mirror: /^iMirror1\|/ },
+    exhaustX: 0.5,
+  },
+  // a BeamNG car cut down to an M Sport 320d, its wheels, tyres and steering wheel fitted and its cabin's parts named cabin_
+  f30: {
+    name: 'BMW 320d', page: 'bmw-320d', model: '/models/bmw-320d-f30.glb', length: 4.633, wheelbase: 2.81, redline: 5500,
+    credit: ['BMW 3 Series MK6 (F30)', 'https://sketchfab.com/3d-models/bmw-3-series-mk6-f30-2011-2018-087efd9833714af2a68561bde9181985', 'by',
+      'DEMON_SCARY1235', 'https://sketchfab.com/szymonpasterczyk734'],
+    paint: /^F30paint\|/, paintColor: 0x1f3866, glass: /^F30_glass\|/, glassPlain: true, cabin: /\|cabin_/, // blue, like the garage photo
+    wheels: /\|wheel_/, tyre: /^F30_tyre\|/,
+    steering: { re: /\|cabin_steering$/, near: [-0.366, 0.777, 0.339], look: 0.2 }, // its dials sit high, over the rim
+    tail: { overlay: true }, // its brake lights are thin strips: a red glow goes over each tail light
+    lamps: { head: /^F30_headlight\|.*\|_12[01]$/, tail: /^F30_optikazad\|/, mirror: /^F30_signal_[LR]\|.*\|_10[01]$/ }, // (not the fog lights)
+    exhaustX: 0.44,
+  },
+  // a 540d M Sport turned nose-first, its rims cut out of its black trim so only they spin, Cerium Grey for its chrome,
+  // cognac seats, and every part named by its role
+  m550: {
+    name: 'BMW M550d xDrive', page: 'bmw-550d-mk2', model: '/models/bmw-m550d-g30.glb', length: 4.963, wheelbase: 2.975, redline: 6200,
+    credit: ['BMW 5-Series Sedan (G30) LCI', 'https://sketchfab.com/3d-models/bmw-5-series-sedan-g30-lci-c2910a4e0d154f2ebdc41e6265eaaac3', 'by',
+      'Mona x Supercars', 'https://sketchfab.com/Car2022'],
+    paint: /\|paint_(body|parts)\|/, paintColor: 0x403c38, glass: /\|glass\|/, glassPlain: true, cabin: /\|cabin_/, // dark graphite, like the garage photo
+    wheels: /\|wheel_/, tyre: /\|wheel_tyre_\d\|/,
+    steering: { re: /\|cabin_wheel\|/, near: [-0.395, 0.92, 0.385] }, // (it shares its mesh with the centre console)
+    tail: { re: /\|tail_lights\|/, fromMap: true, idle: 0.25, brake: 6 },
+    lamps: { head: /\|head_accents\|/, tail: /\|tail_lights\|/ },
+    exhaustX: 0.5,
+  },
+};
+CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', page: 'bmw-530e', redline: 6500, paintColor: 0x1a3363 }; // the M550d's body, in blue like the garage photo
+// ?car= takes a key above or the car page's slug (the main menu's Drive links); ?test_drive=1 runs the car page
+// without saving - for trying things out, the drive otherwise saves the car like its own page does
+const query = new URLSearchParams(location.search), TEST_DRIVE = query.has('test_drive');
+const CAR = CARS[query.get('car')] || Object.values(CARS).find(c => c.page === query.get('car')) || CARS.x1;
+
+// shortcut: kinematic bicycle model, no tyre slip or weight transfer; swap for a Pacejka tyre model to get drift/oversteer.
+const WHEELBASE = CAR.wheelbase, MAX_STEER = 0.6;
+// m/s² sideways at full A/D: 9 up to 70 km/h (hairpins, junctions), easing to 7 from 180 km/h - a real car's grip, so
+// fast bends still turn in
+const steerG = v => THREE.MathUtils.lerp(9, 7, THREE.MathUtils.smoothstep(Math.abs(v), 20, 50));
+
+// car.speed (m/s, negative in reverse) comes from the car page's own powertrain; this only steers and moves the car.
+// steer: -1..1, already eased in from the keys (steerInput)
+function step(car, steer, dt) {
+  // speed-sensitive lock: full lock when parking, shrinking with v² so full A/D never pulls more than steerG
+  const lock = Math.min(MAX_STEER, Math.atan(steerG(car.speed) * WHEELBASE / Math.max(car.speed ** 2, 1)));
+  car.steer += (steer * lock - car.steer) * Math.min(1, dt * 12);
+  // about the middle of the wheelbase (the car's origin): the rear wheels roll where they point instead of sliding
+  // out, so the car pivots like a real one at parking speeds; the middle runs beta inside the heading
+  const beta = Math.atan(Math.tan(car.steer) / 2);
+  car.heading += car.speed * Math.cos(beta) * Math.tan(car.steer) / WHEELBASE * dt;
+  car.x += Math.sin(car.heading + beta) * car.speed * dt;
+  car.z += Math.cos(car.heading + beta) * car.speed * dt;
+}
+// keys are on or off, so the wheel winds on over ~0.25 s (a tap is a small correction, holding is full lock) and
+// unwinds twice as fast when let go
+function steerInput(cur, want, dt) {
+  const rate = want !== 0 && want * cur >= 0 ? 4 : 8;
+  return cur + Math.sign(want - cur) * Math.min(Math.abs(want - cur), rate * dt);
+}
+
+// steering self-check; failures show in the devtools console
+{
+  const t = { x: 0, z: 0, heading: 0, speed: 10, steer: 0 };
+  for (let i = 0; i < 30; i++) step(t, 1, 1 / 60);
+  console.assert(t.heading > 0 && t.x > 0, 'A should turn left', t);
+  const f = { x: 0, z: 0, heading: 0, speed: 50, steer: 0 };
+  for (let i = 0; i < 60; i++) step(f, 1, 1 / 60);
+  console.assert(f.heading > 0 && f.heading < steerG(50) / 50, 'full A at 180 km/h should pull no more than steerG', f);
+  // full lock at parking speed: the car turns about one fixed point level with its rear axle (as a real one does),
+  // R = wheelbase / tan(lock) out to the left - the rear wheels roll round it instead of sliding
+  const R = WHEELBASE / Math.tan(MAX_STEER), p = { x: 0, z: 0, heading: 0, speed: 2, steer: MAX_STEER };
+  const centre = q => [q.x - Math.sin(q.heading) * WHEELBASE / 2 + Math.cos(q.heading) * R, q.z - Math.cos(q.heading) * WHEELBASE / 2 - Math.sin(q.heading) * R];
+  const c0 = centre(p);
+  for (let i = 0; i < 300; i++) step(p, 1, 1 / 60);
+  console.assert(Math.hypot(centre(p)[0] - c0[0], centre(p)[1] - c0[1]) < 0.1, 'the car should turn about a point level with its rear axle', p);
+  let s = 0;
+  for (let i = 0; i < 6; i++) s = steerInput(s, 1, 1 / 60);
+  console.assert(s > 0.35 && s < 0.45, 'a 0.1 s tap should give about 40% of the lock', s);
+}
+
+// log depth: no flicker between road and paint far away; alpha: the cluster's "hole" lets the CSS3D layer below show
+const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, alpha: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+Object.assign(renderer.domElement.style, { position: 'fixed', inset: '0', zIndex: 1 });
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87a9c9);
+scene.fog = new THREE.Fog(0x87a9c9, 150, 1600); // far enough to see the mountains
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 3000);
+// reflections of the outdoors - blue overhead, pale at the horizon, grass below, a small sun for highlights - so glossy
+// paint, glass and chrome read as glossy without mirroring a white studio (Standard/Physical materials only)
+const env = (() => {
+  const sky = new THREE.Scene(), g = new THREE.SphereGeometry(1, 32, 16), col = [];
+  for (let i = 0, p = g.attributes.position; i < p.count; i++) {
+    const y = p.getY(i), c = y > 0 ? new THREE.Color(0xdfe9f2).lerp(new THREE.Color(0x5d8fc7), y) : new THREE.Color(0x9aa38f).lerp(new THREE.Color(0x3d4a35), -y);
+    col.push(c.r, c.g, c.b);
+  }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  sky.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+  const sunSpot = new THREE.Mesh(new THREE.SphereGeometry(0.06), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  sunSpot.position.set(0.4, 0.8, 0.25);
+  sky.add(sunSpot);
+  return new THREE.PMREMGenerator(renderer).fromScene(sky, 0.01).texture;
+})();
+scene.environment = env;
+scene.environmentIntensity = 1;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445533, 2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(50, 100, 30);
+scene.add(sun);
+
+// The world: the autobahn top-speed oval and, east of it, a mountain loop, joined by a two-lane link road that leaves
+// the autobahn on the left (a keep-left exit) and runs out along a valley; a city between the links, a racetrack south
+// of the hills. Each road is a curve through control points, sampled every ~3 m into P (points) and L (left vectors);
+// offsets are metres from its centre line, + = left of travel.
+function makeRoad(points, closed, half, dip = 1.5) {
+  const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x, y, z)), closed);
+  curve.arcLengthDivisions = 20000; // the default 200 would space the 3 m samples (and so the dashes) unevenly
+  const N = Math.round(curve.getLength() / 3);
+  const P = curve.getSpacedPoints(N);
+  for (const p of P) p.y = Math.max(0, p.y); // the curve can dip a little below a flat stretch; nothing goes under the plain
+  const L = P.map((_, i) => { const t = curve.getTangentAt(i / N); return new THREE.Vector3(t.z, 0, -t.x).normalize(); });
+  return { curve, N, P, L, half, dip }; // half: centre line to the shoulder's outer edge; dip: the ditch beside it
+}
+// autobahn: ~28.6 km, 3 lanes each way - two 8 km straights joined by 2 km-radius bends (~2.4 m/s² at 250 km/h)
+const autobahnPts = [];
+for (const s of [1, -1]) { // a straight, then the bend after it
+  const STRAIGHT = 8000, BEND_R = 2000;
+  for (let z = -STRAIGHT / 2; z < STRAIGHT / 2; z += 500) autobahnPts.push([s * BEND_R, 0, s * z]);
+  for (let i = 0; i < 13; i++) {
+    const a = (s > 0 ? 0 : Math.PI) + i / 13 * Math.PI;
+    autobahnPts.push([BEND_R * Math.cos(a), 0, s * STRAIGHT / 2 + BEND_R * Math.sin(a)]);
+  }
+}
+const A = makeRoad(autobahnPts, true, 16.75, 0);
+// mountain: ~15 km, 2 lanes - up a valley, five switchback legs up a mountainside (5% climbs, 30 m hairpins), a long
+// climb north to the summit at ~320 m (a viewpoint lay-by looks south over it all), four switchback legs down the east
+// face, then a long sweeping run south down the eastern valley and back west to the start
+const M = makeRoad([
+  [4650, 0, -900], [4650, 0, -600], [4650, 2, -300], [4650, 5, -50], [4645, 8, 120], [4620, 10, 185], [4580, 11, 200],
+  [4300, 25, 200], [4020, 39, 200], [3979, 40.5, 209], [3970, 41.5, 230], [3979, 42.5, 251],
+  [4020, 44, 260], [4300, 58, 260], [4580, 72, 260], [4621, 73.5, 269], [4630, 74.5, 290], [4621, 75.5, 311],
+  [4580, 77, 320], [4300, 91, 320], [4020, 105, 320], [3979, 106.5, 329], [3970, 107.5, 350], [3979, 108.5, 371],
+  [4020, 110, 380], [4300, 124, 380], [4580, 138, 380], [4621, 139.5, 389], [4630, 140.5, 410], [4621, 141.5, 431],
+  [4580, 143, 440], [4300, 155, 440], [4000, 165, 440],
+  [3820, 172, 470], [3800, 175, 560], [3830, 185, 750], [3760, 200, 950], [3820, 216, 1150], [3980, 232, 1300],
+  [4200, 250, 1380], [4380, 266, 1480], [4450, 280, 1620], [4560, 296, 1720], [4750, 312, 1780], [4950, 320, 1790],
+  [5150, 318, 1760], [5260, 315, 1720], [5300, 311, 1640],
+  [5300, 290, 1350], [5300, 271, 1050], [5311, 269.5, 1023.5], [5337.5, 268.5, 1012.5], [5364, 267.5, 1023.5],
+  [5375, 266, 1060], [5375, 247, 1350], [5375, 227, 1640], [5386, 225.5, 1666.5], [5412.5, 224.5, 1677.5], [5439, 223.5, 1666.5],
+  [5450, 222, 1630], [5450, 203, 1340], [5450, 183, 1050], [5461, 181.5, 1023.5], [5487.5, 180.5, 1012.5], [5514, 179.5, 1023.5],
+  [5525, 178, 1060], [5525, 159, 1350], [5525, 140, 1640],
+  [5560, 136, 1700], [5650, 132, 1730], [5850, 120, 1640], [5950, 110, 1450], [6000, 96, 1200], [5980, 80, 900],
+  [6060, 64, 600], [6100, 48, 300], [6050, 34, 0], [5950, 22, -300], [5800, 12, -600], [5550, 5, -850], [5250, 1, -1000],
+  [4950, 0, -1080], [4760, 0, -1060],
+], true, 5.6);
+// links (two lanes, both ways), each leaving the autobahn's eastern straight from its northbound left lane:
+//   valley road: east past home to the mountain loop's first straight, which it meets from the west at a T-junction
+//   direct road: from the loop's first hairpin straight down the hillside to the autobahn
+const K1 = makeRoad([[2012, 0, -1600], [2025, 0, -1450], [2070, 0, -1330], [2160, 0, -1260], [2300, 0, -1235], [3000, 0, -1230],
+  [3800, 0, -1230], [4250, 0, -1190], [4440, 0, -1060], [4520, 0, -900], [4570, 0, -790], [4610, 0, -740], [4646, 0, -715]], false, 5.6);
+const K2 = makeRoad([[3972, 41.5, 230], [3940, 40.5, 231], [3800, 37, 236], [3500, 29, 250], [3200, 21, 270], [2900, 12, 300],
+  [2650, 5, 330], [2450, 1, 360], [2280, 0, 400], [2140, 0, 450], [2060, 0, 520], [2025, 0, 620], [2013, 0, 760], [2012, 0, 860]], false, 5.6);
+const EXIT1 = { x: 2017, z: -1400 }, EXIT2 = { x: 2017, z: 650 }; // where they leave the autobahn
+const nearestSample = (r, x, z) => {
+  let b = 0;
+  for (let i = 1; i < r.N; i++) if (Math.hypot(r.P[i].x - x, r.P[i].z - z) < Math.hypot(r.P[b].x - x, r.P[b].z - z)) b = i;
+  return b;
+};
+// home: a driveway south off the valley road to the garage, and a yard round the house (only there to flatten the land)
+const HOME = { x: 2700, z: -1290 }; // the middle of the garage; its door faces north, down the drive
+const D = makeRoad([[2700, 0, -1229], [2700, 0, -1250], [2700, 0, -1270], [2700, 0, -1288]], false, 3, 0.05);
+const Y = makeRoad([[2709, 0, -1262], [2709, 0, -1281], [2709, 0, -1300]], false, 10, 0.05);
+// the viewpoint: a lay-by on the loop's left at the summit, 14 m out from its centre line, looking south
+const IV = nearestSample(M, 4950, 1790);
+const V = makeRoad(Array.from({ length: 11 }, (_, k) => {
+  const i = IV - 25 + k * 5;
+  return [M.P[i].x + M.L[i].x * 14, M.P[i].y, M.P[i].z + M.L[i].z * 14];
+}), false, 8.5, 0.05);
+// the mechanic: a workshop north of the valley road, 450 m east of home, on a concrete apron (open towards the road)
+const SHOP = { x: 3150, z: -1172 }; // the middle of its bay
+const S = makeRoad([[3150, 0, -1225], [3150, 0, -1205], [3150, 0, -1185], [3150, 0, -1165]], false, 9, 0.05);
+// the city: 1 km of streets over the valley road from home, on flattened land, inside a ring road with rounded
+// corners. Its avenue runs north from the valley road at home's drive, through the middle of town and on up to the
+// direct road from the second exit; downtown's middle crossing is a roundabout
+const CITY = { x0: 2400, x1: 3500, z0: -1050, z1: 50 };
+const inCity = (x, z, m = 0) => x > CITY.x0 - m && x < CITY.x1 + m && z > CITY.z0 - m && z < CITY.z1 + m;
+const STREET_X = [2450, 2700, 2950, 3200, 3450], STREET_Z = [-1000, -750, -500, -250, 0]; // block lines: the outer ones the ring, x 2700 the avenue
+const RING_R = 80, ROUND = { x: 2950, z: -500, r: 28 }; // the ring's corner radius; the roundabout, r to its centre line
+const atK2 = K2.P[nearestSample(K2, 2700, 320)];
+const AV = makeRoad([[2700, 0, -1232], ...STREET_Z.map(z => [2700, 0, z]), [2700, 0, 120], [2700, atK2.y * 0.4, 220], [atK2.x, atK2.y, atK2.z]], false, 7.5, 0.05);
+const RING = makeRoad([[2530, -920, Math.PI], [3370, -920, 1.5 * Math.PI], [3370, -80, 0], [2530, -80, Math.PI / 2]].flatMap(([cx, cz, a0], k, all) => {
+  const arc = Array.from({ length: 7 }, (_, n) => [cx + RING_R * Math.cos(a0 + n * Math.PI / 12), 0, cz + RING_R * Math.sin(a0 + n * Math.PI / 12)]);
+  const [nx, nz] = all[(k + 1) % 4], [ex, , ez] = arc[6], ax = nx + RING_R * Math.cos(a0 + Math.PI / 2), az = nz + RING_R * Math.sin(a0 + Math.PI / 2);
+  return [...arc, ...[1, 2, 3].map(t => [ex + (ax - ex) * t / 4, 0, ez + (az - ez) * t / 4])]; // then the straight on to the next corner
+}), true, 7.5, 0.05);
+const RB = makeRoad(Array.from({ length: 24 }, (_, k) => [ROUND.x + ROUND.r * Math.cos(k * Math.PI / 12), 0, ROUND.z + ROUND.r * Math.sin(k * Math.PI / 12)]), true, 7.5, 0.05);
+const street = pts => makeRoad(pts.map(([x, z]) => [x, 0, z]), false, 7.5, 0.05); // half 7.5: the road and its pavements
+const STREETS = [AV, RING, RB,
+  street([[2950, -1000], [2950, -750], [2950, ROUND.z - ROUND.r]]), street([[2950, ROUND.z + ROUND.r], [2950, -250], [2950, 0]]),
+  street([[3200, -1000], [3200, -500], [3200, 0]]),
+  ...[-750, -250].map(z => street([[2450, z], [2950, z], [3450, z]])),
+  street([[2450, -500], [2700, -500], [ROUND.x - ROUND.r, -500]]), street([[ROUND.x + ROUND.r, -500], [3200, -500], [3450, -500]])];
+// where streets meet: the grid's crossings (not the ring's rounded corners or the roundabout's middle), the
+// roundabout's four entries, and the avenue's ends on the valley and direct roads
+const JUNCTIONS = [
+  ...STREET_X.flatMap(x => STREET_Z.map(z => ({ x, z, grid: true })))
+    .filter(j => !(STREET_X.indexOf(j.x) % 4 === 0 && STREET_Z.indexOf(j.z) % 4 === 0) && !(j.x === ROUND.x && j.z === ROUND.z)),
+  ...[[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b]) => ({ x: ROUND.x + a * ROUND.r, z: ROUND.z + b * ROUND.r })),
+  { x: 2700, z: -1232 }, { x: atK2.x, z: atK2.z }];
+// the racetrack: ~9 km on the plain south of the hills, laid out as straights and arcs from the start line, heading
+// east. Fast: the 1.5 km pit straight, then 300-500 m bends and esses down the east side. Slow: a left-right-left
+// chicane, another splitting the back straight, then the infield - a tight left, a quick right, a 150° near-hairpin,
+// two rights - before the west straight back to the pits
+function circuit(start, legs) { // [length] a straight, [radius, degrees] a bend (- = a left-hander); a point every ~50 m
+  let [x, z, h] = start;
+  const pts = [];
+  for (const [a, deg] of legs) {
+    if (deg === undefined) for (let k = 1, n = Math.ceil(a / 50); k <= n; k++) pts.push([x + Math.cos(h) * a * k / n, 0, z + Math.sin(h) * a * k / n]);
+    else {
+      const d = deg * Math.PI / 180, s = Math.sign(d), cx = x - s * a * Math.sin(h), cz = z + s * a * Math.cos(h);
+      for (let k = 1, n = Math.ceil(Math.abs(d) * a / 40); k <= n; k++) pts.push([cx + s * a * Math.sin(h + d * k / n), 0, cz - s * a * Math.cos(h + d * k / n)]);
+      h += d;
+    }
+    [x, , z] = pts.at(-1);
+  }
+  return pts;
+}
+// the back straight's 645 m and the west straight's 853.9 m are the lengths that bring it back round to the start
+const trackPts = circuit([2700, -2350, 0], [[1500], [300, -90], [300], [500, 40], [500, -40], [200], [35, -45], [35, 90], [35, -45], [300],
+  [400, -90], [500], [30, 55], [30, -110], [30, 55], [645], [70, -90], [350], [120, 60], [200], [45, -150], [300], [60, 90], [250], [40, 90], [600],
+  [80, -90], [853.9], [250, -90]]);
+console.assert(Math.hypot(trackPts.at(-1)[0] - 2700, trackPts.at(-1)[2] + 2350) < 1, 'the circuit should close', trackPts.at(-1));
+const T = makeRoad(trackPts.slice(0, -1), true, 14, 0); // half: the track and its verges
+const ISF = nearestSample(T, 3100, -2350); // the start / finish line, by the grandstand
+// the track road: south off the valley road 400 m past the mechanic, down to the circuit's main straight
+const TR = makeRoad([[3550, 0, -1231], [3555, 0, -1500], [3610, 0, -1800], [3600, 0, -2100], [3552, 0, -2343]], false, 5.6);
+// the pit lane: off the track just out of the last bend, 30 m to its left past the garages, back on before turn 1.
+// The garages open onto it; the team's own is the one at the start line (PIT), where the car is serviced, tuned,
+// dyno'd, refuelled and swapped
+const PL = makeRoad([[2730, 0, -2352], [2800, 0, -2362], [2870, 0, -2376], [2930, 0, -2380], [3300, 0, -2380], [3670, 0, -2380],
+  [3730, 0, -2376], [3800, 0, -2362], [3870, 0, -2352]], false, 6, 0);
+const PG = makeRoad([[2990, 0, -2395], [3100, 0, -2395], [3210, 0, -2395]], false, 8, 0); // the garages' floors (not drawn)
+const PIT = { x: 3100, z: -2396 };
+const ROADS = [A, M, K1, K2, D, Y, V, S, ...STREETS, T, TR, PL, PG];
+
+const IS = 450; // the fuel station's autobahn sample: 750 m past the start, on the keep-left side
+
+// ribbon along a road between two (offset, height) edges; flat for paint, upright for walls; `on` picks the samples
+function strip(r, o1, y1, o2, y2, color, on = () => true) {
+  const v = [];
+  const at = (i, o, y) => [r.P[i].x + r.L[i].x * o, r.P[i].y + y, r.P[i].z + r.L[i].z * o];
+  for (let i = 0; i < r.N; i++) {
+    if (!on(i)) continue;
+    const a = at(i, o1, y1), b = at(i, o2, y2), c = at(i + 1, o1, y1), d = at(i + 1, o2, y2);
+    v.push(...a, ...b, ...c, ...b, ...d, ...c);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+  g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })));
+}
+const dashed = i => i % 6 < 2; // 6 m dash, 12 m gap
+const paint = (r, o, w, on) => strip(r, o - w / 2, 0.02, o + w / 2, 0.02, 0xeeeeee, on);
+const nearStation = (i, m) => Math.abs(i - IS) <= m;
+const awayFrom = (r, p, m) => i => Math.hypot(r.P[i].x - p.x, r.P[i].z - p.z) > m;
+// where something joins a road, the edge on that side opens - no line or guardrail within m of the spot
+const spot = (r, i, m) => ({ x: r.P[i].x, z: r.P[i].z, m });
+const opens = (r, spots) => (i, s) => spots.some(p => Math.hypot(r.P[i].x - p.x, r.P[i].z - p.z) < p.m &&
+  Math.sign((p.x - r.P[i].x) * r.L[i].x + (p.z - r.P[i].z) * r.L[i].z) === s);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(16000, 16000), new THREE.MeshLambertMaterial({ color: 0x5a7a4a }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.1; // just under the terrain, which takes over round the mountains
+scene.add(ground);
+
+// autobahn: asphalt, median wall, lines, guardrails - the outer one open at the fuel station and both exits
+strip(A, -16.75, 0.01, 16.75, 0.01, 0x3a3a3c);
+strip(A, 0, 0, 0, 0.9, 0xb0b0a8);
+strip(A, 16.75, 0.012, 46, 0.012, 0x4a4a4c, i => nearStation(i, 22)); // fuel station forecourt
+const exits = i => awayFrom(A, EXIT1, 280)(i) && awayFrom(A, EXIT2, 240)(i);
+for (const s of [1, -1]) {
+  paint(A, s * 2.5, 0.3);           // inner edge line
+  paint(A, s * 6.25, 0.15, dashed); // lane lines
+  paint(A, s * 10, 0.15, dashed);
+  paint(A, s * 13.75, 0.3);         // hard shoulder line
+  strip(A, s * 17.5, 0, s * 17.5, 0.75, 0x9aa0a6, i => s < 0 || (!nearStation(i, 24) && exits(i)));
+}
+// two-lane roads: dashed centre line, gravel shoulders, guardrails, and skirts down their edges into the ditch beside
+// them; open(i, side) says where an edge opens for a road joining it
+function twoLane(r, open = () => false, rails = () => true) {
+  strip(r, -4.5, 0.01, 4.5, 0.01, 0x3a3a3c);
+  paint(r, 0, 0.15, dashed);
+  for (const s of [1, -1]) {
+    strip(r, s * 4.5, 0.008, s * 5.6, 0.008, 0x77706a);
+    strip(r, s * 5.6, -2.5, s * 5.6, 0.008, 0x5f574d);
+    paint(r, s * 3.6, 0.15, i => !open(i, s));
+    strip(r, s * 5.2, 0, s * 5.2, 0.75, 0x9aa0a6, i => rails(i) && !open(i, s));
+  }
+}
+twoLane(M, opens(M, [spot(K1, K1.N - 6, 24), spot(K2, 6, 24), spot(V, 5, 75)]));
+// the links have no rails where they run over the autobahn or into the loop
+twoLane(K1, opens(K1, [spot(D, 3, 12), spot(S, 0, 14), spot(AV, 3, 12), spot(TR, 3, 12)]), i => K1.P[i].x > 2170 && awayFrom(K1, K1.P[K1.N], 25)(i));
+twoLane(K2, opens(K2, [spot(AV, AV.N, 24)]), i => K2.P[i].x > 2170 && awayFrom(K2, K2.P[0], 25)(i));
+twoLane(TR, undefined, i => awayFrom(TR, TR.P[0], 15)(i) && awayFrom(TR, TR.P[TR.N], 50)(i));
+strip(D, -3, 0.011, 3, 0.011, 0x77746e); // concrete drive
+strip(S, -9, 0.011, 9, 0.011, 0x77746e); // the mechanic's apron
+// the viewpoint lay-by: asphalt, a stone wall along its edge, benches, a coin telescope and a sign
+strip(V, -8.5, 0.013, 8.5, 0.013, 0x45454a);
+strip(V, 8.5, 0, 8.5, 0.9, 0x8d8579);
+{
+  const view = new THREE.Group(), mid = Math.round(V.N / 2), t = V.curve.getTangentAt(mid / V.N);
+  view.position.copy(V.P[mid]);
+  view.rotation.y = Math.atan2(t.x, t.z); // local +Z along the lay-by, +X towards the wall (its left)
+  const vBox = (w, h, d, color, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color })); b.position.set(x, y, z); view.add(b); };
+  for (const z of [-12, 12]) { vBox(0.5, 0.45, 1.8, 0x6b4f35, 6.8, 0.45, z); vBox(0.1, 0.5, 1.8, 0x6b4f35, 7.05, 0.9, z); } // benches
+  vBox(0.12, 1.1, 0.12, 0x555a60, 7.4, 0.55, 0); vBox(0.25, 0.25, 0.6, 0x2f3338, 7.4, 1.2, 0.15);                // telescope
+  vBox(0.12, 2.4, 0.12, 0x555a60, -7.5, 1.2, -20); vBox(0.08, 0.9, 1.6, 0x7a5a2a, -7.5, 2.2, -20);              // sign
+  scene.add(view);
+}
+
+// the city's streets: asphalt, a dashed centre line, kerbs, pavements and zebra crossings, all open where streets
+// meet. gapOf(r)(i): how far a sample is from the nearest junction. The roundabout: no centre line, its pavement
+// only round the outside (its left), a grass island in the middle
+const gapOf = r => i => Math.min(...JUNCTIONS.map(j => Math.hypot(r.P[i].x - j.x, r.P[i].z - j.z)));
+const KERB_R = 6; // the rounded kerbs at the grid's crossings, below
+for (const r of STREETS) {
+  const gaps = r.P.map((_, i) => gapOf(r)(i)), gap = i => gaps[i];
+  const lift = Math.abs(r.P[r.N].x - r.P[0].x) > 300 ? 0.003 : 0; // east-west a hair higher: no flicker where they overlap
+  strip(r, -4.5, 0.012 + lift, 4.5, 0.012 + lift, 0x3a3a3c);
+  if (r !== RB) paint(r, 0, 0.15, i => dashed(i) && gap(i) > 14.5);
+  for (const s of [1, -1]) {
+    strip(r, s * 4.5, 0.02 + lift, s * 4.75, 0.02 + lift, 0xd4d2cc, i => gap(i) > 4.5 + KERB_R);  // kerb
+    if (r !== RB || s > 0) strip(r, s * 4.75, 0.016 + lift, s * 7.5, 0.016 + lift, 0x9a9890, i => gap(i) > 4.5 + KERB_R); // pavement
+  }
+  if (r !== RB) for (let o = -3.5; o <= 3.5; o += 1.4) paint(r, o, 0.7, i => gap(i) > 11.5 && gap(i) < 14.5); // zebra crossings
+}
+// rounded kerbs: each corner of a grid crossing curves round at KERB_R - the asphalt filled out to the curve (a fan
+// from the square corner), the kerb and pavement bending round it
+{
+  const R = KERB_R, fill = [], kerb = [], walk = [];
+  const roadAt = (x, z) => STREETS.some(r => r.P.some(p => Math.abs(p.x - x) < 3 && Math.abs(p.z - z) < 3));
+  for (const j of JUNCTIONS) if (j.grid) for (const sx of [1, -1]) for (const sz of [1, -1]) {
+    if (!roadAt(j.x + sx * 20, j.z) || !roadAt(j.x, j.z + sz * 20)) continue; // no street that way: no corner
+    const qx = j.x + sx * 4.5, qz = j.z + sz * 4.5, cx = qx + sx * R, cz = qz + sz * R; // the square corner; the curve's centre
+    const arc = t => [cx + R * (-sx * Math.cos(t * Math.PI / 2)), cz + R * (-sz * Math.sin(t * Math.PI / 2))];
+    const v = [];
+    for (let k = 0; k < 8; k++) v.push(qx, 0.012, qz, arc(k / 8)[0], 0.012, arc(k / 8)[1], arc((k + 1) / 8)[0], 0.012, arc((k + 1) / 8)[1]);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    fill.push(g);
+    const start = Math.atan2(sz, -sx) - Math.PI / 4; // RingGeometry's angles, once laid flat
+    kerb.push(new THREE.RingGeometry(R - 0.25, R, 8, 1, start, Math.PI / 2).rotateX(-Math.PI / 2).translate(cx, 0.02, cz));
+    walk.push(new THREE.RingGeometry(R - 3, R - 0.25, 8, 1, start, Math.PI / 2).rotateX(-Math.PI / 2).translate(cx, 0.016, cz));
+  }
+  const bare = g => { // positions only, unindexed, so the fans and the rings merge
+    g = g.index ? g.toNonIndexed() : g;
+    for (const a of Object.keys(g.attributes)) if (a !== 'position') g.deleteAttribute(a);
+    return g;
+  };
+  for (const [geos, color] of [[fill, 0x3a3a3c], [kerb, 0xd4d2cc], [walk, 0x9a9890]]) {
+    const g = mergeGeometries(geos.map(bare));
+    g.computeVertexNormals();
+    scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })));
+  }
+  // the roundabout's island: grass, a fountain, and a steel ring standing in it
+  const island = new THREE.Mesh(new THREE.CircleGeometry(ROUND.r - 4.75, 48).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x6a9a58 }));
+  island.position.set(ROUND.x, 0.02, ROUND.z);
+  const basin = new THREE.Mesh(new THREE.CylinderGeometry(11, 11.5, 0.9, 40), new THREE.MeshLambertMaterial({ color: 0xbdb8ad }));
+  basin.position.set(ROUND.x, 0.45, ROUND.z);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(10.4, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x4f9cc9, roughness: 0.1, metalness: 0.2 }));
+  water.position.set(ROUND.x, 0.92, ROUND.z); // just over the basin's rim
+  const sculpture = new THREE.Mesh(new THREE.TorusGeometry(8, 0.8, 14, 64), new THREE.MeshStandardMaterial({ color: 0xdfe3e8, metalness: 1, roughness: 0.15 }));
+  sculpture.position.set(ROUND.x, 9.6, ROUND.z);
+  sculpture.rotation.y = Math.PI / 4; // square to neither street, so it reads as a ring from every way in
+  scene.add(island, basin, water, sculpture);
+}
+// its buildings, the same town every drive (a seeded random): towers in the middle blocks, twin towers joined by a
+// skybridge, a park with an observation tower, and 3-12 storey blocks round the sides of the rest (none out past the
+// ring's curves); window bays 4 m wide, storeys 3.5 m. Street lamps along the pavements
+{
+  let seed = 20261018;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32, pick = a => a[Math.floor(rnd() * a.length)];
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  c.width = c.height = 64;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#56616c'; g.fillRect(9, 14, 46, 34); // one window, tinted with its building
+  const windows = Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
+  const parts = [], col = new THREE.Color();
+  const insideRing = (x, z) => { // 9 m in from the ring road's centre line, round its curves too
+    const cx = Math.min(Math.max(x, STREET_X[0] + RING_R), STREET_X[4] - RING_R), cz = Math.min(Math.max(z, STREET_Z[0] + RING_R), STREET_Z[4] - RING_R);
+    return Math.hypot(x - cx, z - cz) <= RING_R - 9 + 1e-6;
+  };
+  const building = (x0, x1, z0, z1, h, color) => {
+    if (![[x0, z0], [x1, z0], [x0, z1], [x1, z1]].every(([x, z]) => insideRing(x, z))) return;
+    const w = x1 - x0, d = z1 - z0, b = new THREE.BoxGeometry(w, h + 0.5, d).translate((x0 + x1) / 2, h / 2 - 0.25, (z0 + z1) / 2), uv = b.attributes.uv;
+    for (let v = 0; v < 24; v++) { // faces +x, -x, +y, -y, +z, -z: the walls in window bays, the roof plain
+      const f = v >> 2;
+      if (f === 2 || f === 3) uv.setXY(v, 0.05, 0.05);
+      else uv.setXY(v, uv.getX(v) * (f < 2 ? d : w) / 4, uv.getY(v) * h / 3.5);
+    }
+    col.setHex(color);
+    b.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: 24 }, () => [col.r, col.g, col.b]).flat(), 3));
+    parts.push(b);
+  };
+  // a landmark's piece: walls in window bays (u round its girth, v up its height), or plain where girth is 0
+  const piece = (geo, color, girth = 0, height = 0) => {
+    const uv = geo.attributes.uv;
+    for (let v = 0; v < uv.count; v++) uv.setXY(v, girth ? uv.getX(v) * girth / 4 : 0.05, girth ? uv.getY(v) * height / 3.5 : 0.05);
+    col.setHex(color);
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: uv.count }, () => [col.r, col.g, col.b]).flat(), 3));
+    parts.push(geo);
+  };
+  const drum = (r0, r1, y0, y1, x, z, color, sides = 16) => { // an open-ended tier, its roof capped plain
+    piece(new THREE.CylinderGeometry(r1, r0, y1 - y0, sides, 1, true).translate(x, (y0 + y1) / 2, z), color, Math.PI * (r0 + r1), y1 - y0);
+    piece(new THREE.CircleGeometry(r1, sides).rotateX(-Math.PI / 2).translate(x, y1, z), color);
+  };
+  const WALLS = [0xd8cfc0, 0xc9c2b6, 0xe6e1d8, 0xb9a48c, 0xa7aeb5, 0xcfd6db, 0x9c8f80], GLASS = [0x9fb6c8, 0x8ea3b5, 0xbfc9d1, 0x7f95a8];
+  const parkTrees = [];
+  for (let k = 0; k < 4; k++) for (let j = 0; j < 4; j++) {
+    const x0 = STREET_X[k] + 9, x1 = STREET_X[k + 1] - 9, z0 = STREET_Z[j] + 9, z1 = STREET_Z[j + 1] - 9;
+    if (k === 0 && j === 1) { // the park: gravel paths across it, trees either side of them
+      for (const [w, d] of [[x1 - x0, 4], [4, z1 - z0]]) {
+        const path = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xb8ad97 }));
+        path.position.set((x0 + x1) / 2, 0.01, (z0 + z1) / 2);
+        scene.add(path);
+      }
+      while (parkTrees.length < 90) {
+        const x = x0 + 6 + rnd() * (x1 - x0 - 12), z = z0 + 6 + rnd() * (z1 - z0 - 12);
+        if (Math.abs(x - (x0 + x1) / 2) > 6 && Math.abs(z - (z0 + z1) / 2) > 6 && Math.hypot(x - (x0 + x1) / 2, z - (z0 + z1) / 2) > 22) parkTrees.push([x, z]); // (clear of the tower's foot)
+      }
+      // the observation tower on the plaza where the paths cross: a flared foot, a 200 m shaft, the glass pod, a mast
+      const [tx, tz] = [(x0 + x1) / 2, (z0 + z1) / 2];
+      piece(new THREE.CylinderGeometry(6, 14, 30, 16).translate(tx, 15, tz), 0xd9d6cf);
+      piece(new THREE.CylinderGeometry(5.5, 6, 200, 16).translate(tx, 130, tz), 0xd9d6cf);
+      drum(12, 18, 230, 252, tx, tz, 0x8fb0c4, 24);
+      piece(new THREE.CylinderGeometry(9, 18, 6, 24).translate(tx, 255, tz), 0xd9d6cf);
+      piece(new THREE.CylinderGeometry(1.2, 2.5, 80, 8).translate(tx, 298, tz), 0xc9cdd2);
+    } else if (k === 2 && j === 2) { // the twin towers: eight tapering tiers each, spires, and the skybridge at 170 m
+      for (const tx of [3035, 3125]) {
+        let y = 0;
+        for (const [r, h] of [[21, 110], [20, 40], [19, 30], [17.5, 30], [16, 25], [14, 20], [11.5, 15], [9, 12]]) { drum(r, r, y, y + h, tx, -375, 0xb9c6cf); y += h; }
+        piece(new THREE.ConeGeometry(2.4, 75, 8).translate(tx, y + 37.5, -375), 0xdfe3e8);
+      }
+      piece(new THREE.BoxGeometry(48, 6, 5).translate(3080, 173, -375), 0x9fb6c8);
+    } else if (k > 0 && k < 3 && j > 0 && j < 3) { // downtown
+      for (const [qx, qz] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) {
+        const cx = x0 + (x1 - x0) * qx, cz = z0 + (z1 - z0) * qz, w = 28 + rnd() * 24, d = 28 + rnd() * 24;
+        building(cx - w / 2, cx + w / 2, cz - d / 2, cz + d / 2, 3.5 * Math.round(16 + rnd() * 26), pick(GLASS));
+      }
+    } else {
+      const row = (from, to, place) => { // buildings along one side of the block, from-to along it
+        for (let t = from; to - t > 10;) {
+          const w = Math.min(18 + rnd() * 22, to - t);
+          place(t, t + w, 14 + rnd() * 14, 3.5 * Math.round(3 + rnd() * 9), pick(WALLS));
+          t += w + rnd() * 4;
+        }
+      };
+      row(x0, x1, (a, b, d, h, c) => building(a, b, z0, z0 + d, h, c));
+      row(x0, x1, (a, b, d, h, c) => building(a, b, z1 - d, z1, h, c));
+      row(z0 + 30, z1 - 30, (a, b, d, h, c) => building(x0, x0 + d, a, b, h, c));
+      row(z0 + 30, z1 - 30, (a, b, d, h, c) => building(x1 - d, x1, a, b, h, c));
+    }
+  }
+  scene.add(new THREE.Mesh(mergeGeometries(parts), new THREE.MeshLambertMaterial({ map: windows, vertexColors: true })));
+  const pt = new THREE.InstancedMesh(new THREE.ConeGeometry(2.2, 9, 6).translate(0, 4.5, 0), new THREE.MeshLambertMaterial({ color: 0x2f5a2a }), parkTrees.length);
+  parkTrees.forEach(([x, z], k) => pt.setMatrixAt(k, new THREE.Matrix4().makeTranslation(x, 0, z)));
+  scene.add(pt);
+  const lamps = [];
+  for (const r of STREETS) {
+    const gap = gapOf(r);
+    for (let i = 6; i < r.N; i += 12) if (gap(i) > 14.5) for (const s of r === RB ? [1] : [1, -1]) lamps.push([r, i, s]);
+  }
+  const lamp = new THREE.InstancedMesh(mergeGeometries([new THREE.CylinderGeometry(0.09, 0.12, 8, 6).translate(0, 4, 0), new THREE.BoxGeometry(0.35, 0.18, 1.4).translate(0, 8, 0.6)]),
+    new THREE.MeshLambertMaterial({ color: 0x50555b }), lamps.length);
+  lamps.forEach(([r, i, s], k) => { // on the pavement, its head out over the road
+    const p = r.P[i], o = s * 6.8;
+    lamp.setMatrixAt(k, new THREE.Matrix4().makeRotationY(Math.atan2(-s * r.L[i].x, -s * r.L[i].z)).setPosition(p.x + r.L[i].x * o, p.y, p.z + r.L[i].z * o));
+  });
+  scene.add(lamp);
+}
+
+// the racetrack: asphalt with white edge lines, red and white kerbs through the bends, gravel on their outsides, a
+// concrete wall all round 45 m out (open where the track road comes in, and along the pits), the start / finish line
+// under its gantry, a grandstand over the main straight and the pit lane and garages across from it. Walls and
+// gravel stop wherever they'd reach another part of the track (the infield, inside the tight bends)
+{
+  const TURN = Array.from({ length: T.N }, (_, i) => { // 1 bending left here, -1 right, 0 straight (or wider than 700 m)
+    const a = T.P[(i + 1) % T.N], b = T.P[(i + 2) % T.N], k = ((b.x - a.x) * T.L[i].x + (b.z - a.z) * T.L[i].z) / Math.hypot(b.x - a.x, b.z - a.z);
+    return Math.abs(k) > 4.5 / 700 ? Math.sign(k) : 0;
+  });
+  const open = opens(T, [spot(TR, TR.N, 35)]), pits = i => T.P[i].z > -2360 && T.P[i].x > 2650 && T.P[i].x < 3950;
+  const clear = (i, o) => { // no other stretch of the track nearer to this point than its own centre line
+    const x = T.P[i].x + T.L[i].x * o, z = T.P[i].z + T.L[i].z * o, r2 = (Math.abs(o) - 1.5) ** 2;
+    for (let j = 0; j < T.N; j += 2) if ((T.P[j].x - x) ** 2 + (T.P[j].z - z) ** 2 < r2) return false;
+    return true;
+  };
+  strip(T, -7, 0.01, 7, 0.01, 0x333336);
+  for (const s of [1, -1]) {
+    paint(T, s * 6.7, 0.3);
+    strip(T, s * 7, 0.015, s * 8.4, 0.015, 0xd11f1f, i => TURN[i] && i % 2 === 0); // kerbs
+    strip(T, s * 7, 0.015, s * 8.4, 0.015, 0xf2f2f2, i => TURN[i] && i % 2 === 1);
+    strip(T, s * 8.4, 0.006, s * 40, 0.006, 0xc9b58c, i => TURN[i] === -s && clear(i, s * 40));
+    strip(T, s * 45, 0, s * 45, 1.1, 0xd6d6d0, i => !open(i, s) && !(s > 0 && pits(i)) && clear(i, s * 45));
+  }
+  const sf = T.P[ISF]; // the main straight runs east along z -2350; its left (the pits) is to -z
+  const flag = document.createElement('canvas'), fg = flag.getContext('2d');
+  flag.width = 2; flag.height = 14;
+  for (let a = 0; a < 2; a++) for (let b = 0; b < 14; b++) { fg.fillStyle = (a + b) % 2 ? '#111' : '#f4f4f4'; fg.fillRect(a, b, 1, 1); }
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(3, 14).rotateX(-Math.PI / 2),
+    new THREE.MeshLambertMaterial({ map: Object.assign(new THREE.CanvasTexture(flag), { magFilter: THREE.NearestFilter, colorSpace: THREE.SRGBColorSpace }) }));
+  line.position.set(sf.x, 0.022, sf.z);
+  scene.add(line);
+  const tBox = (w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
+    b.position.set(sf.x + x, y, sf.z + z);
+    scene.add(b);
+  };
+  for (const z of [-9.5, 9.5]) tBox(0.5, 7.5, 0.5, 0xd6d6d0, 0, 3.75, z);             // the gantry
+  tBox(1.2, 1.2, 19.5, 0x24272b, 0, 7.6, 0);
+  for (let k = -2; k <= 2; k++) tBox(0.1, 0.5, 0.5, 0x6a0000, -0.65, 7.6, k * 1.2, THREE.MeshBasicMaterial); // start lights
+  for (let t = 0; t < 4; t++) tBox(180, 1.5 + t * 2, 6, t % 2 ? 0x2b5d9b : 0x3a6fb0, 0, 0.75 + t, 55 + t * 6); // grandstand tiers
+  tBox(184, 0.4, 30, 0xe4e4e0, 0, 12, 64);                                          // its roof
+  for (const x of [-88, 0, 88]) tBox(0.6, 12, 0.6, 0xbfc2c6, x, 6, 78);
+  // the pit lane, its white edges, and the pit wall between it and the track along its straight
+  strip(PL, -6, 0.012, 6, 0.012, 0x38383a);
+  for (const s of [1, -1]) paint(PL, s * 5.7, 0.2);
+  strip(PL, -14, 0, -14, 1.1, 0xd6d6d0, i => PL.P[i].x > 2935 && PL.P[i].x < 3665);
+  // twelve garages, 14 m wide, open to the pit lane; the team's (PIT, at the start line) has its shutter up, a sign,
+  // a fuel rig and a tool chest, the rest are shut
+  const W0 = PIT.x - 14 * 6.5, gBox = (w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
+    b.position.set(x, y, z);
+    scene.add(b);
+  };
+  gBox(168, 0.05, 16, 0x5e6266, W0 + 84, 0.02, -2395);                    // floor
+  gBox(168.6, 6, 0.3, 0xe8e8e8, W0 + 84, 3, -2403.2);                    // back wall
+  for (let k = 0; k <= 12; k++) gBox(0.3, 6, 16, 0xe8e8e8, W0 + 14 * k, 3, -2395); // walls between
+  gBox(170, 0.4, 18, 0x3a3d42, W0 + 84, 6.2, -2395.5);                   // roof
+  gBox(168.6, 1.4, 0.3, 0xe8e8e8, W0 + 84, 5.3, -2386.9);                // over the doors
+  for (let k = 0; k < 12; k++) if (k !== 6) gBox(13.4, 4.6, 0.15, 0x8a9099, W0 + 14 * k + 7, 2.3, -2387.1); // shutters
+  gBox(0.9, 1.9, 0.9, 0xd0302a, PIT.x - 5.2, 0.95, -2400.5);            // fuel rig
+  gBox(1.6, 1.1, 0.6, 0xc0392b, PIT.x + 5, 0.55, -2401.8);              // tool chest
+  gBox(4, 0.05, 1.2, 0xfffbe8, PIT.x, 5.95, -2395, THREE.MeshBasicMaterial); // ceiling light
+  for (const x of [-3.4, 3.4]) gBox(0.08, 0.03, 12, 0xf2c200, PIT.x + x, 0.06, -2395); // bay lines
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  c.width = 512; c.height = 64;
+  g.fillStyle = '#1c4f8a'; g.fillRect(0, 0, 512, 64);
+  g.fillStyle = '#fff'; g.font = 'bold 40px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('PIT  ·  SERVICE  ·  FUEL', 256, 34);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(12, 1.5), new THREE.MeshBasicMaterial({ map: Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace }) }));
+  sign.position.set(PIT.x, 5.3, -2386.7); // faces the pit lane (+z)
+  scene.add(sign);
+}
+// shortcut: walls, guardrails and trees have no collision, the car drives through them.
+
+// Road samples in 40 m cells, so any point finds the roads near it: [road, sample index]
+const CELL = 40, cells = new Map();
+for (const r of ROADS) for (let i = 0; i < r.N; i++) {
+  const k = Math.floor(r.P[i].x / CELL) + ',' + Math.floor(r.P[i].z / CELL);
+  if (!cells.has(k)) cells.set(k, []);
+  cells.get(k).push(r, i);
+}
+function eachNear(x, z, reach, fn) { // every sample within `reach` cells of (x, z)
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  for (let a = -reach; a <= reach; a++) for (let b = -reach; b <= reach; b++) {
+    const list = cells.get((cx + a) + ',' + (cz + b));
+    if (list) for (let k = 0; k < list.length; k += 2) fn(list[k], list[k + 1]);
+  }
+}
+// the road under (x, z): its nearest centre-line segment, with the height interpolated along it - smooth and exact,
+// so the car rides the slope without stepping from one 3 m sample to the next
+function onRoad(x, z) {
+  let d = Infinity, y = 0, half = 0;
+  eachNear(x, z, 1, (r, i) => {
+    const a = r.P[i], b = r.P[i + 1], dx = b.x - a.x, dz = b.z - a.z;
+    const t = Math.min(1, Math.max(0, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz)));
+    const e = Math.hypot(a.x + dx * t - x, a.z + dz * t - z);
+    if (e < d) { d = e; y = a.y + (b.y - a.y) * t; half = r.half; }
+  });
+  return { d, y, half };
+}
+
+// The land round the mountains: a terrain mesh over the box below, flat at its edges where it meets the plain (y 0).
+// Near a road it follows the road (a ditch alongside, so the coarse grid never pokes through the asphalt); away from
+// it, the roads' general height plus peaks and valleys that grow with distance; valley floors stop at the plain
+const LAND = { x0: 2100, x1: 6700, z0: -2000, z1: 2400 };
+const coarse = ROADS.filter(r => r !== T && !STREETS.includes(r)).flatMap(r => r.P.filter((_, i) => i % 25 === 0)), noise = new ImprovedNoise(); // (the flat city and track don't shape the hills)
+function terrainAt(x, z) {
+  const edge = Math.min(x - LAND.x0, LAND.x1 - x, z - LAND.z0, LAND.z1 - z);
+  if (edge <= 0) return -0.1; // the plain
+  let near = Infinity, sw = 0, sy = 0; // the road's height near here, weighted 1/d^4 (so: the road's own height on it)
+  eachNear(x, z, 2, (r, i) => {
+    const d2 = (r.P[i].x - x) ** 2 + (r.P[i].z - z) ** 2, w = 1 / (d2 * d2 + 1e-6);
+    near = Math.min(near, d2); sw += w; sy += w * (r.P[i].y - r.dip);
+  });
+  let fw = 0, fy = 0, fd = Infinity, n = 0; // the general height (1/d^2 over coarse samples) and the noise on it
+  for (const p of coarse) { const q = (p.x - x) ** 2 + (p.z - z) ** 2; fd = Math.min(fd, q); fw += 1 / (q + 1); fy += p.y / (q + 1); }
+  for (let o = 0, a = 1, f = 1 / 700; o < 4; o++, a /= 2, f *= 2) n += a * noise.noise(x * f, z * f, 7.3);
+  const far = fy / fw + n * (40 + 220 * THREE.MathUtils.smoothstep(Math.sqrt(fd), 60, 900));
+  const h = sw ? THREE.MathUtils.lerp(sy / sw, far, THREE.MathUtils.smoothstep(Math.sqrt(near), 10, 70)) : far;
+  const town = THREE.MathUtils.smoothstep(Math.min(x - CITY.x0, CITY.x1 - x, z - CITY.z0, CITY.z1 - z), -120, 0); // the city's flat
+  return THREE.MathUtils.lerp(-0.1, Math.max(-0.1, THREE.MathUtils.lerp(h, -0.05, town)), THREE.MathUtils.smoothstep(edge, 0, 300)); // floors meet the plain
+}
+// what the car rests on: the road itself on a road, the land off it
+const surfaceAt = (x, z) => { const r = onRoad(x, z); return r.d < r.half ? r.y : terrainAt(x, z); };
+
+{ // the terrain mesh, ~15 m grid, coloured grass, then rock where steep or high, then snow
+  const w = LAND.x1 - LAND.x0, h = LAND.z1 - LAND.z0;
+  const tg = new THREE.PlaneGeometry(w, h, Math.round(w / 15), Math.round(h / 15)).rotateX(-Math.PI / 2)
+    .translate((LAND.x0 + LAND.x1) / 2, 0, (LAND.z0 + LAND.z1) / 2);
+  const tp = tg.attributes.position, col = [], c = new THREE.Color();
+  for (let i = 0; i < tp.count; i++) tp.setY(i, terrainAt(tp.getX(i), tp.getZ(i)));
+  tg.computeVertexNormals();
+  for (let i = 0; i < tp.count; i++) {
+    const y = tp.getY(i), up = tg.attributes.normal.getY(i);
+    c.setHex(y > 240 ? 0xf2f4f6 : up < 0.72 || y > 200 ? 0x7d776e : 0x5a7a4a);
+    col.push(c.r, c.g, c.b);
+  }
+  tg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  scene.add(new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ vertexColors: true })));
+}
+
+// trees: along the autobahn, round the racetrack outside its walls, and on gentle grass slopes round the mountains
+// (not in town) - clear of every road and the forecourt
+const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(2, 8, 6).translate(0, 4, 0), new THREE.MeshLambertMaterial({ color: 0x2f5a2a }), 10000);
+const m = new THREE.Matrix4();
+for (let k = 0; k < trees.count; k++) {
+  const hills = k >= 6000 && k < 9200, track = k >= 9200, r = track ? T : hills ? [M, M, K1, K2][k % 4] : A;
+  let x, z, y, i, o, tries = 0;
+  do {
+    i = Math.floor(Math.random() * r.N);
+    o = (track ? 85 + Math.random() * 200 : hills ? 14 + Math.random() * 300 : 25 + Math.random() * 120) * (Math.random() < 0.5 ? -1 : 1);
+    x = r.P[i].x + r.L[i].x * o; z = r.P[i].z + r.L[i].z * o; y = terrainAt(x, z);
+  } while (tries++ < 20 && (onRoad(x, z).d < (track ? 55 : 14) || (r === A && o > 0 && nearStation(i, 30)) || inCity(x, z, 20) ||
+    (hills && (y > 200 || Math.abs(terrainAt(x + 4, z) - y) > 3 || Math.abs(terrainAt(x, z + 4) - y) > 3))));
+  trees.setMatrixAt(k, m.makeTranslation(x, y, z));
+}
+scene.add(trees);
+
+// self-checks: the car rests exactly on the mountain and link roads, the drive and the lay-by, and no climb is
+// steeper than 12%
+for (const r of [M, K1, K2, D, V, S, ...STREETS, T, TR]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z) - r.P[i].y) < 0.05, 'the car should rest on the road', i);
+let steepest = 0;
+for (const r of [M, K2, AV]) for (let i = 0; i < r.N; i++) steepest = Math.max(steepest, Math.abs(r.P[i + 1].y - r.P[i].y) / Math.hypot(r.P[i + 1].x - r.P[i].x, r.P[i + 1].z - r.P[i].z));
+console.assert(steepest < 0.12, 'mountain grades should stay under 12%', steepest);
+
+// fuel station: canopy, two pump islands, a shop and a sign. Local +Z runs along the road, +X away from it
+const tS = A.curve.getTangentAt(IS / A.N), station = new THREE.Group();
+station.position.set(A.P[IS].x + A.L[IS].x * 31, 0, A.P[IS].z + A.L[IS].z * 31);
+station.rotation.y = Math.atan2(tS.x, tS.z);
+const sBox = (w, h, d, color, x, y, z) => {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color }));
+  b.position.set(x, y, z);
+  station.add(b);
+};
+const canopy = new THREE.Mesh(new THREE.BoxGeometry(16, 0.8, 26), new THREE.MeshBasicMaterial({ color: 0xe6e6e6 })); // lit by its own lights
+canopy.position.y = 5.2;
+station.add(canopy);
+sBox(16.2, 0.3, 26.2, 0x1f9d55, 0, 5.3, 0);  // green band round its edge
+for (const x of [-5, 5]) for (const z of [-9, 9]) sBox(0.4, 5, 0.4, 0xdddddd, x, 2.5, z);
+for (const x of [-3, 3]) for (const z of [-5, 5]) { sBox(0.7, 1.7, 1.1, 0xf5f5f5, x, 0.85, z); sBox(0.72, 0.3, 1.12, 0x1f9d55, x, 1.55, z); } // pumps
+sBox(14, 4, 10, 0xd9cfbf, 15, 2, 0);         // shop
+sBox(0.1, 1.6, 8, 0x2a3440, 7.95, 1.7, 0);   // shop window
+sBox(0.3, 9, 0.3, 0xcccccc, -10, 4.5, 16);   // sign
+sBox(0.25, 2.4, 2.4, 0x1f9d55, -10, 8.6, 16);
+scene.add(station);
+
+// home: the garage, open to the drive (north), with the house beside it. Local +Z is north, +X east
+{
+  const home = new THREE.Group();
+  home.position.set(HOME.x, 0, HOME.z);
+  const hBox = (w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
+    b.position.set(x, y, z);
+    home.add(b);
+  };
+  const WALL = 0xece6da, ROOF = 0x4a3f3a;
+  hBox(5.2, 0.05, 8.4, 0x55585c, 0, 0.03, 0);                        // garage floor
+  for (const x of [-2.6, 2.6]) hBox(0.25, 3, 8.4, WALL, x, 1.5, 0);  // its side walls
+  hBox(5.45, 3, 0.25, WALL, 0, 1.5, -4.1);                           // back wall
+  hBox(5.45, 0.6, 0.25, WALL, 0, 2.7, 4.1);                          // over the door
+  hBox(5.8, 0.3, 9, ROOF, 0, 3.15, 0);                               // flat roof
+  hBox(3, 0.05, 1.2, 0xfffbe8, 0, 2.97, 0, THREE.MeshBasicMaterial);  // ceiling light
+  hBox(10, 5.6, 9, WALL, 7.9, 2.8, -0.2);                            // the house: two storeys
+  const roof = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(-5.6, 0), new THREE.Vector2(5.6, 0), new THREE.Vector2(0, 2.8)]),
+    { depth: 9.6, bevelEnabled: false }).translate(0, 0, -4.8), new THREE.MeshLambertMaterial({ color: ROOF }));
+  roof.position.set(7.9, 5.6, -0.2);
+  home.add(roof);
+  for (const [x, y] of [[4.6, 1.5], [10.9, 1.5], [4.6, 4.2], [7.9, 4.2], [10.9, 4.2]]) hBox(1.4, 1.2, 0.1, 0x2d3b4a, x, y, 4.31); // windows
+  hBox(1.1, 2.2, 0.1, 0x6b4a32, 7.9, 1.1, 4.31);                     // front door
+  scene.add(home);
+}
+
+// the mechanic's workshop: one wide bay open to the road (south), a lift, a tool chest and a sign. Local +Z is north
+{
+  const shop = new THREE.Group();
+  shop.position.set(SHOP.x, 0, SHOP.z);
+  const wBox = (w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
+    b.position.set(x, y, z);
+    shop.add(b);
+  };
+  const WALL = 0xc9ccd1;
+  wBox(14, 0.05, 12, 0x5e6266, 0, 0.03, 0);                        // floor
+  for (const x of [-7, 7]) wBox(0.3, 5, 12, WALL, x, 2.5, 0);      // side walls
+  wBox(14.3, 5, 0.3, WALL, 0, 2.5, 6);                             // back wall
+  wBox(14.3, 1, 0.3, 0x1c4f8a, 0, 4.5, -6);                        // over the door, in the sign's blue
+  wBox(15, 0.3, 13, 0x3a3d42, 0, 5.15, 0);                         // roof
+  for (const x of [-2.4, 2.4]) wBox(0.35, 3.4, 0.35, 0xd0302a, x, 1.7, 1); // two-post lift
+  wBox(5.2, 0.25, 0.35, 0xd0302a, 0, 3.5, 1);
+  wBox(1.6, 1.1, 0.6, 0xc0392b, -5.6, 0.55, 4.8);                  // tool chest
+  wBox(0.08, 0.03, 9, 0xf2c200, -3.4, 0.06, -1.5); wBox(0.08, 0.03, 9, 0xf2c200, 3.4, 0.06, -1.5); // bay lines
+  wBox(4, 0.05, 1.2, 0xfffbe8, 0, 4.98, 0, THREE.MeshBasicMaterial); // ceiling light
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  c.width = 512; c.height = 64;
+  g.fillStyle = '#1c4f8a'; g.fillRect(0, 0, 512, 64);
+  g.fillStyle = '#fff'; g.font = 'bold 44px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('MECHANIC  ·  SERVICE', 256, 34);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 1), new THREE.MeshBasicMaterial({ map: Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace }) }));
+  sign.position.set(0, 4.5, -6.16);
+  sign.rotation.y = Math.PI; // faces the road
+  shop.add(sign);
+  scene.add(shop);
+}
+
+// BMW X1 xDrive20d (E84) from primitives at real size: 4.45 m long, 1.80 wide, 1.55 tall.
+// Origin is mid-wheelbase on the ground; front is +Z, left is +X.
+const car = new THREE.Group();
+// Black Sapphire metallic, or the car's own colour; its own, dimmer reflections - at the scene's strength the studio
+// lights wash it to silver
+const bodyMat = new THREE.MeshPhysicalMaterial({ color: CAR.paintColor ?? 0x070809, metalness: 0.3, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.1, envMap: env, envMapIntensity: 0.07 });
+const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x0c0f13, metalness: 0.1, roughness: 0.05 });
+const blackMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+const gloss = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 });   // high-gloss black trim
+const chromeMat = new THREE.MeshStandardMaterial({ color: 0xdfe3e8, metalness: 1, roughness: 0.12 });
+const tailMat = new THREE.MeshLambertMaterial({ color: 0xa00d0d, emissive: 0x500000 }); // glows bright while braking
+const AMBER_OFF = 0x3d2600, AMBER_ON = 0xffa31a;
+const indMats = { 1: new THREE.MeshBasicMaterial({ color: AMBER_OFF }), [-1]: new THREE.MeshBasicMaterial({ color: AMBER_OFF }) }; // 1 = left
+const trims = []; // outside window trim: hidden from the driver's seat along with the body
+const add = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); car.add(m); return m; };
+const box = (w, h, d, mat, x, y, z) => add(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+// side profile drawn in (z, y), extruded across the width; bevel rounds the edges and grows the outline by `bevel`
+function profile(shape, width, mat, bevel = 0) {
+  const g = new THREE.ExtrudeGeometry(shape, { depth: width - 2 * bevel, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 16 });
+  return add(g.translate(0, 0, bevel - width / 2).rotateY(-Math.PI / 2), mat);
+}
+
+// body up to the beltline, points inset 4 cm for the bevel; arches clear the 0.33 m tyres
+const arch = Math.asin(0.01 / 0.44);
+const bodyMesh = profile(new THREE.Shape()
+  .moveTo(2.11, 0.32).quadraticCurveTo(2.19, 0.34, 2.18, 0.44).lineTo(2.18, 0.74)  // rounded bumper, grille face
+  .quadraticCurveTo(2.17, 0.83, 2.06, 0.85)                                         // nose rolls into the bonnet
+  .quadraticCurveTo(1.4, 0.96, 0.80, 0.99).lineTo(-2.08, 1.04)                     // crowned long bonnet, beltline
+  .quadraticCurveTo(-2.19, 1.02, -2.19, 0.92).lineTo(-2.21, 0.45)                  // tailgate
+  .quadraticCurveTo(-2.21, 0.33, -2.12, 0.32)                                       // rear bumper
+  .absarc(-1.38, 0.33, 0.44, Math.PI + arch, -arch, true)
+  .absarc(1.38, 0.33, 0.44, Math.PI + arch, -arch, true), 1.8, bodyMat, 0.04);
+
+// glasshouse with blacked-out pillars; sides lean in toward the roof (tumblehome)
+const glass = profile(new THREE.Shape([[0.80, 1.0], [0.0, 1.50], [-1.55, 1.48], [-1.85, 1.44], [-2.10, 1.05]].map(([z, y]) => new THREE.Vector2(z, y))), 1.62, glassMat);
+const gp = glass.geometry.attributes.position;
+for (let i = 0; i < gp.count; i++) gp.setX(i, gp.getX(i) * (1 - 0.2 * Math.max(0, (gp.getY(i) - 1.03) / 0.47)));
+glass.geometry.computeVertexNormals();
+profile(new THREE.Shape([[0.02, 1.495], [-1.55, 1.475], [-1.86, 1.435], [-1.84, 1.465], [-1.55, 1.505], [0.02, 1.525]].map(([z, y]) => new THREE.Vector2(z, y))), 1.3, bodyMat); // roof
+for (const s of [1, -1]) {
+  box(0.04, 0.035, 1.6, chromeMat, s * 0.55, 1.53, -0.85);  // roof rails
+  box(0.12, 0.11, 0.2, bodyMat, s * 0.95, 1.1, 0.68);       // mirrors
+  box(0.03, 0.12, 1.9, blackMat, s * 0.905, 0.34, 0);      // side skirts
+  for (const z of [1.38, -1.38]) {                           // black arch trims
+    add(new THREE.TorusGeometry(0.42, 0.03, 6, 24, Math.PI).rotateY(Math.PI / 2), blackMat, s * 0.89, 0.33, z);
+    box(1.2, 0.45, 0.9, blackMat, 0, 0.55, z);              // dark wheel wells
+  }
+  // front: slatted twin kidneys, headlight housing with two angel-eye rings, M Sport side intakes with fog lights
+  box(0.2, 0.17, 0.04, chromeMat, s * 0.13, 0.66, 2.225);
+  box(0.17, 0.14, 0.04, blackMat, s * 0.13, 0.66, 2.232);
+  for (let k = -2; k <= 2; k++) box(0.008, 0.13, 0.012, chromeMat, s * 0.13 + k * 0.03, 0.66, 2.247);
+  box(0.42, 0.13, 0.04, new THREE.MeshPhongMaterial({ color: 0x2a2f36, shininess: 120 }), s * 0.6, 0.7, 2.225);
+  for (const x of [0.48, 0.7]) add(new THREE.TorusGeometry(0.05, 0.012, 8, 24), new THREE.MeshBasicMaterial({ color: 0xf4f8ff }), s * x, 0.7, 2.25);
+  box(0.26, 0.11, 0.04, blackMat, s * 0.66, 0.45, 2.22);
+  add(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 16).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xdfe6ee }), s * 0.66, 0.45, 2.245);
+  // rear: L-shaped tail lights wrapping onto the sides
+  box(0.42, 0.12, 0.05, tailMat, s * 0.66, 0.9, -2.23);
+  box(0.1, 0.2, 0.05, tailMat, s * 0.82, 0.8, -2.235);
+  box(0.04, 0.11, 0.22, tailMat, s * 0.9, 0.9, -2.06);
+  // turn signals: under the headlight, the inner end of the tail light, the mirror cap
+  box(0.12, 0.03, 0.02, indMats[s], s * 0.6, 0.62, 2.235);
+  box(0.13, 0.05, 0.02, indMats[s], s * 0.52, 0.9, -2.26);
+  box(0.012, 0.025, 0.12, indMats[s], s * 1.012, 1.09, 0.7);
+  // side windows: chrome surround with the Hofmeister kink, black B- and C-pillars; door handles, shoulder line
+  const glassX = y => 0.81 * (1 - 0.2 * Math.max(0, (y - 1.03) / 0.47)) + 0.006; // just proud of the glass
+  const dlo = new THREE.CurvePath();
+  const pts = [[0.74, 1.05], [0.02, 1.455], [-1.5, 1.44], [-1.8, 1.4], [-1.97, 1.2], [-1.92, 1.1], [-1.78, 1.065], [0.74, 1.05]]
+    .map(([z, y]) => new THREE.Vector3(s * glassX(y), y, z));
+  for (let i = 1; i < pts.length; i++) dlo.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
+  trims.push(add(new THREE.TubeGeometry(dlo, 240, 0.011, 6, true), chromeMat));
+  for (const [z, w] of [[-0.52, 0.09], [-1.52, 0.05]]) {
+    const pillar = box(0.012, 0.38, w, gloss, s * glassX(1.25), 1.25, z);
+    pillar.rotation.z = s * 0.33; // leans in with the glass
+    trims.push(pillar);
+  }
+  for (const z of [0.25, -0.95]) box(0.018, 0.025, 0.13, chromeMat, s * 0.905, 0.985, z);
+  box(0.004, 0.012, 3.9, new THREE.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.3 }), s * 0.902, 0.93, -0.15);
+}
+box(0.7, 0.13, 0.04, blackMat, 0, 0.46, 2.225);                                      // lower intake
+box(1.15, 0.035, 0.22, bodyMat, 0, 1.458, -1.93);                                    // roof spoiler
+const hmbl = new THREE.MeshBasicMaterial({ color: 0x3a0606 });
+box(0.32, 0.025, 0.02, hmbl, 0, 1.43, -1.98);                                        // high-mounted brake light
+// a soft shadow pinned under the car
+const blob = rgba => {
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  c.width = c.height = 64;
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  r.addColorStop(0, rgba); r.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+};
+const shadow = add(new THREE.PlaneGeometry(2.3, 5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: blob('rgba(0,0,0,0.6)'), transparent: true, depthWrite: false }), 0, 0.025, 0);
+const plateMat = new THREE.MeshLambertMaterial({ color: 0xf2f2f2 });
+box(0.52, 0.11, 0.02, plateMat, 0, 0.47, 2.25);                                      // number plates
+box(0.52, 0.11, 0.02, plateMat, 0, 0.62, -2.255);
+add(new THREE.CylinderGeometry(0.04, 0.04, 0.15, 12).rotateX(Math.PI / 2), chromeMat, 0.55, 0.3, -2.22); // exhaust
+const EXHAUST = new THREE.Vector3(0.55, 0.3, -2.32);
+
+// Cabin, right-hand drive. All of it sits inside the opaque glass, so it only shows from the driver's seat - where
+// the solid body is swapped for just its bonnet (the body's top would otherwise be a floor at beltline height).
+const EYE = new THREE.Vector3(-0.37, 1.22, -0.4);
+const dashMat = new THREE.MeshLambertMaterial({ color: 0x2a2b2f });
+const hood = profile(new THREE.Shape([[0.80, 1.035], [2.10, 0.885], [2.10, 0.865], [0.80, 1.015]].map(([z, y]) => new THREE.Vector2(z, y))), 1.74, bodyMat);
+hood.visible = false;
+box(1.6, 0.26, 0.45, dashMat, 0, 0.9, 0.55);           // dashboard
+box(0.46, 0.025, 0.2, dashMat, -0.37, 1.12, 0.22);     // binnacle hood over the cluster
+for (const x of [-0.6, -0.14]) box(0.025, 0.14, 0.2, dashMat, x, 1.05, 0.22);
+box(0.24, 0.12, 0.015, new THREE.MeshPhongMaterial({ color: 0x05080d, emissive: 0x0a1830, shininess: 100 }), 0, 1.09, 0.42); // iDrive screen
+box(1.7, 0.04, 2.8, dashMat, 0, 0.45, -0.6);           // floor
+for (const s of [1, -1]) {
+  box(0.05, 0.58, 2.6, dashMat, s * 0.86, 0.77, -0.5); // door panels
+  const a = new THREE.Vector3(s * 0.79, 1.03, 0.8), b = new THREE.Vector3(s * 0.64, 1.48, 0.02); // A-pillar, along the windscreen edge
+  const pillar = add(new THREE.CylinderGeometry(0.022, 0.022, a.distanceTo(b), 8), dashMat);
+  pillar.position.copy(a).lerp(b, 0.5);
+  pillar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+}
+// steering wheel, tilted on its column; it turns 15x the front wheels' angle
+const wheelMat = new THREE.MeshLambertMaterial({ color: 0x151515 });
+let steeringWheel = new THREE.Group(); // the model's own wheel takes over once it loads
+const column = new THREE.Group();
+steeringWheel.add(new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.018, 10, 40), wheelMat));
+for (const [w, h, x, y] of [[0.16, 0.035, 0.09, 0], [0.16, 0.035, -0.09, 0], [0.035, 0.15, 0, -0.095]]) {
+  const spoke = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.02), wheelMat);
+  spoke.position.set(x, y, 0);
+  steeringWheel.add(spoke);
+}
+steeringWheel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.045, 20).rotateX(Math.PI / 2), wheelMat));
+column.add(steeringWheel, new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.3, 12).rotateX(Math.PI / 2).translate(0, 0, 0.16), wheelMat));
+column.position.set(-0.37, 0.985, 0);
+column.rotation.x = 0.35;
+car.add(column);
+// where the cluster sits in the dash, facing the driver: 1100 px wide page -> 0.33 m (the model moves it to its own dash)
+const dashAnchor = new THREE.Object3D();
+dashAnchor.position.set(-0.37, 1.0, 0.3);
+dashAnchor.rotation.set(-0.23, Math.PI, 0, 'YXZ');
+dashAnchor.scale.setScalar(0.0003);
+car.add(dashAnchor);
+
+// 225/45 R18 tyres on double-spoke rims; steer (y) is applied outside spin (x)
+const WHEEL_R = 0.33;
+const tyreGeo = new THREE.LatheGeometry([[0.235, -0.11], [0.315, -0.112], [0.33, -0.095], [0.33, 0.095], [0.315, 0.112], [0.235, 0.11]].map(([r, y]) => new THREE.Vector2(r, y)), 28).rotateZ(Math.PI / 2);
+const tyreMat = new THREE.MeshLambertMaterial({ color: 0x161616, side: THREE.DoubleSide });
+const rimGeo = new THREE.CylinderGeometry(0.235, 0.235, 0.2, 28).rotateZ(Math.PI / 2);
+const rimMat = new THREE.MeshLambertMaterial({ color: 0x2a2c30 });
+const spokeGeo = new THREE.BoxGeometry(0.21, 0.028, 0.21).translate(0, 0, 0.12);
+const spokeMat = new THREE.MeshStandardMaterial({ color: 0xc8ccd0, metalness: 0.85, roughness: 0.3 });
+const hubGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.215, 12).rotateZ(Math.PI / 2);
+const wheels = [];
+for (const [x, z] of [[0.75, 1.38], [-0.75, 1.38], [0.75, -1.38], [-0.75, -1.38]]) {
+  const w = new THREE.Group();
+  w.rotation.order = 'YXZ';
+  w.add(new THREE.Mesh(tyreGeo, tyreMat), new THREE.Mesh(rimGeo, rimMat), new THREE.Mesh(hubGeo, chromeMat));
+  for (let k = 0; k < 10; k++) { const s = new THREE.Mesh(spokeGeo, spokeMat); s.rotation.x = (k >> 1) * Math.PI * 2 / 5 + (k & 1 ? 0.11 : -0.11); w.add(s); } // 5 spoke pairs
+  w.position.set(x, WHEEL_R, z);
+  car.add(w);
+  wheels.push(w);
+}
+scene.add(car);
+
+// The car's model, once it loads; until then (or if it can't) the car built above stands in. Every mesh is baked into
+// car space (metres, front +Z, left +X) so it can be sized, its left-hand-drive cabin mirrored to right-hand drive, its
+// wheels hung on pivots that spin and steer, and its steering wheel turned about its own rim. CAR's patterns say which
+// part is which
+let usingModel = false;
+// glassPlain glass: darker and mirror-like from outside, so it reads as glass; from the seat a light tint that's
+// easy to see through (its inside face would reflect the sky over the road)
+const plainGlass = [], tintGlass = () => { for (const m of plainGlass) Object.assign(m, inCar ? { opacity: 0.3, specularIntensity: 0 } : { opacity: 0.6, specularIntensity: 1 }); };
+const modelLamps = { 1: [], [-1]: [] }, modelTail = [], modelTailGlow = [];
+new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
+  gltf.updateMatrixWorld(true);
+  const parts = [], all = new THREE.Box3(), v = new THREE.Vector3(), c = new THREE.Vector3();
+  gltf.traverse(o => o.isMesh && parts.push({ id: `${o.material.name}|${o.name}|${o.parent.name}`, mat: o.material, geo: o.geometry.clone().applyMatrix4(o.matrixWorld) }));
+  for (const p of parts) { p.geo.computeBoundingBox(); all.union(p.geo.boundingBox); }
+  const k = CAR.length / (all.max.z - all.min.z); // its real length; tyres on the ground, centred
+  const norm = new THREE.Matrix4().makeScale(k, k, k)
+    .multiply(new THREE.Matrix4().makeTranslation(-(all.min.x + all.max.x) / 2, -all.min.y, -(all.min.z + all.max.z) / 2));
+  const is = (p, re) => !!re && re.test(p.id);
+  for (const p of parts) {
+    p.geo.applyMatrix4(norm);
+    if (is(p, CAR.cabin)) { // right-hand drive: mirror the cabin, re-winding its faces so they still face out
+      p.geo.applyMatrix4(new THREE.Matrix4().makeScale(-1, 1, 1));
+      const ix = p.geo.index.array;
+      for (let i = 0; i < ix.length; i += 3) [ix[i + 1], ix[i + 2]] = [ix[i + 2], ix[i + 1]];
+    }
+    p.geo.computeBoundingBox();
+    if (is(p, CAR.paint)) p.mat = bodyMat;            // Black Sapphire, or its paintColor
+    if (p.mat.transmission) p.mat.transmission = 0;    // plain tinted glass: no second render pass every frame
+    if (p.mat.clearcoat) Object.assign(p.mat, { envMap: env, envMapIntensity: 0.2 }); // clear-coated paint/carbon: the studio lights would wash it white
+    if (is(p, CAR.glass)) { // tinted (its own copy: a lens may share the material)
+      p.mat = p.mat.clone();
+      p.mat.opacity = 0.45;
+      // glassPlain: a texture that's only the black frit round the edges (clear elsewhere, made for the transmission
+      // above) goes for an even tint, and black "metal" glass, which reflects nothing, becomes glass that reflects
+      // the sky through the transparency (tintGlass)
+      if (CAR.glassPlain) {
+        Object.assign(p.mat, { map: null, metalness: 0, ior: 2.33 });
+        p.mat.specularColor?.setScalar(2.5);
+        plainGlass.push(p.mat);
+      }
+    }
+  }
+  tintGlass();
+  const ofRole = re => parts.filter(p => is(p, re));
+  const subMesh = (p, triangles, mat = p.mat) => { // some of a part's triangles, sharing its vertex data
+    const g = new THREE.BufferGeometry();
+    for (const [name, attr] of Object.entries(p.geo.attributes)) g.setAttribute(name, attr);
+    g.setIndex(triangles);
+    return new THREE.Mesh(g, mat);
+  };
+  const centroid = (p, t) => {
+    c.set(0, 0, 0);
+    for (let i = 0; i < 3; i++) c.add(v.fromBufferAttribute(p.geo.attributes.position, p.geo.index.array[t + i]));
+    return c.divideScalar(3);
+  };
+  const split = (p, test) => { // a part's triangles, sorted by test(centroid)
+    const yes = [], no = [];
+    for (let t = 0, ix = p.geo.index.array; t < ix.length; t += 3) (test(centroid(p, t)) ? yes : no).push(ix[t], ix[t + 1], ix[t + 2]);
+    return [yes, no];
+  };
+  const sideBox = (re, s, end = 0, keep = () => true) => { // bounds of one side (and, given end, the front +1 or rear -1 60 cm) of a role
+    const b = new THREE.Box3();
+    for (const p of ofRole(re)) for (let i = 0, pos = p.geo.attributes.position; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      if (Math.sign(v.x) === s && (!end || v.z * end > CAR.length / 2 - 0.6) && keep(v)) b.expandByPoint(v);
+    }
+    return b;
+  };
+
+  // wheels: each part split by which corner its triangles are in, then hung on a pivot at that wheel's hub
+  const cornerOf = at => (at.x > 0) + 2 * (at.z > 0);
+  const hubs = [0, 1, 2, 3].map(() => new THREE.Box3());
+  for (const p of ofRole(CAR.tyre)) for (let t = 0, ix = p.geo.index.array; t < ix.length; t += 3) {
+    const corner = cornerOf(centroid(p, t));
+    for (let i = 0; i < 3; i++) hubs[corner].expandByPoint(v.fromBufferAttribute(p.geo.attributes.position, ix[t + i]));
+  }
+  const root = new THREE.Group(), pivots = hubs.map(b => {
+    const pivot = new THREE.Group();
+    pivot.position.copy(b.getCenter(new THREE.Vector3()));
+    pivot.rotation.order = 'YXZ'; // steer (y) outside spin (x), as for the built wheels
+    root.add(pivot);
+    return pivot;
+  });
+  const steerParts = ofRole(CAR.steering.re);
+  for (const p of parts) {
+    if (steerParts.includes(p)) continue; // below
+    if (is(p, CAR.wheels)) {
+      const ids = [[], [], [], []];
+      for (let t = 0, ix = p.geo.index.array; t < ix.length; t += 3) ids[cornerOf(centroid(p, t))].push(ix[t], ix[t + 1], ix[t + 2]);
+      ids.forEach((list, n) => {
+        if (!list.length) return;
+        const mesh = subMesh(p, list);
+        mesh.position.copy(pivots[n].position).negate();
+        pivots[n].add(mesh);
+      });
+    } else if (is(p, CAR.tail.re)) { // its rear half on a material of its own, so braking lights only the tail lights
+      const [rear, rest] = split(p, at => at.z < 0), glow = p.mat.clone();
+      if (CAR.tail.fromMap) { glow.emissiveMap = glow.map; glow.emissive.setHex(0xff2020); glow.emissiveIntensity = 1; }
+      modelTail.push([glow, glow.emissiveIntensity]);
+      root.add(subMesh(p, rest), subMesh(p, rear, glow));
+    } else root.add(new THREE.Mesh(p.geo, p.mat));
+  }
+
+  // steering wheel: its mesh carries more than the wheel (the column and stalks, or the whole cabin), so find the rim -
+  // the centre and tilt that put the most points on a ~0.17 m ring lying flat in one plane, its sides along x -
+  // starting from CAR.steering.near or the part's widest points; then turn what lies within the wheel's disc (rim,
+  // spokes, hub, airbag) about the rim's axis, leaving the column, stalks and dash
+  let pivot;
+  const swMeshes = [];
+  if (!steerParts.length) { // a model without one: the built wheel and column stand in, at CAR.steering.near
+    pivot = new THREE.Vector3(...CAR.steering.near);
+    column.position.copy(pivot);
+    root.add(column);
+    column.traverse(o => o.isMesh && swMeshes.push(o));
+  } else {
+    let pts = [];
+    for (const p of steerParts) for (let i = 0, pos = p.geo.attributes.position; i < pos.count; i += 3) pts.push(new THREE.Vector3().fromBufferAttribute(pos, i));
+    let seed;
+    if (CAR.steering.near) {
+      seed = new THREE.Vector3(...CAR.steering.near);
+      pts = pts.filter(p => p.distanceTo(seed) < 0.3);
+    } else {
+      const b = steerParts[0].geo.boundingBox, cx = (b.min.x + b.max.x) / 2, wide = pts.filter(p => Math.abs(p.x - cx) > 0.9 * (b.max.x - cx)); // 3 and 9 o'clock
+      seed = new THREE.Vector3(cx, wide.reduce((s, p) => s + p.y, 0) / wide.length, wide.reduce((s, p) => s + p.z, 0) / wide.length);
+    }
+    const rim = { n: -1 };
+    const tryRim = (cy, cz, a) => {
+      const ny = Math.sin(a), nz = Math.cos(a);
+      let n = 0;
+      for (const p of pts) {
+        const y = p.y - cy, z = p.z - cz;
+        if (Math.abs(y * ny + z * nz) > 0.02) continue; // off the plane
+        const r = Math.hypot(p.x - seed.x, y * nz - z * ny);
+        if (r > 0.15 && r < 0.2) n++;
+      }
+      if (n > rim.n) Object.assign(rim, { n, cy, cz, a });
+    };
+    for (let a = 0; a < Math.PI; a += Math.PI / 90) tryRim(seed.y, seed.z, a);
+    const a0 = rim.a;
+    for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) for (let d = -4; d <= 4; d++) tryRim(seed.y + i * 0.005, seed.z + j * 0.005, a0 + d * Math.PI / 360);
+    pivot = new THREE.Vector3(seed.x, rim.cy, rim.cz); const axis = new THREE.Vector3(0, Math.sin(rim.a), Math.cos(rim.a));
+    if (axis.z < 0) axis.negate(); // forward, like the built column, so the same sign turns it the same way
+    const colQ = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis), inv = colQ.clone().invert();
+    const swOuter = new THREE.Group();
+    swOuter.position.copy(pivot);
+    swOuter.quaternion.copy(colQ);
+    steeringWheel = new THREE.Group();
+    swOuter.add(steeringWheel);
+    for (const p of steerParts) {
+      const [turning, fixed] = split(p, at => {
+        const h = at.sub(pivot).dot(axis); // along the column, + into the dash
+        return h > -0.15 && h < 0.05 && Math.sqrt(at.lengthSq() - h * h) < 0.22;
+      });
+      root.add(subMesh(p, fixed));
+      if (is(p, CAR.steering.drop)) continue;
+      const m = subMesh(p, turning);
+      m.quaternion.copy(inv);
+      m.position.copy(pivot).negate().applyQuaternion(inv);
+      steeringWheel.add(m);
+      swMeshes.push(m);
+    }
+    root.add(swOuter);
+  }
+
+  // signal lamps on the face of the model's own headlights and tail lights, and its mirror caps (hidden when off)
+  const lampMat = new THREE.MeshBasicMaterial({ color: AMBER_ON });
+  for (const s of [1, -1]) {
+    const head = sideBox(CAR.lamps.head, s, 1), tail = sideBox(CAR.lamps.tail, s, -1, CAR.tail.keep), spots = [
+      [head.getCenter(new THREE.Vector3()).setZ(head.max.z + 0.01), [0.14, 0.03, 0.01]],
+      [tail.getCenter(new THREE.Vector3()).setZ(tail.min.z - 0.01), [0.12, 0.04, 0.01]]];
+    if (CAR.lamps.mirror) {
+      const mirror = sideBox(CAR.lamps.mirror, s);
+      spots.push([mirror.getCenter(new THREE.Vector3()).setX(s > 0 ? mirror.max.x : mirror.min.x), [0.012, 0.025, 0.12]]);
+    }
+    for (const [at, size] of spots) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(...size), lampMat);
+      lamp.position.copy(at);
+      lamp.visible = false;
+      root.add(lamp);
+      modelLamps[s].push(lamp);
+    }
+    if (CAR.tail.overlay) { // the brake glow, over the tail light (off until braking)
+      const size = tail.getSize(new THREE.Vector3()), glow = new THREE.Mesh(new THREE.PlaneGeometry(size.x * 1.6, size.y * 2.6),
+        new THREE.MeshBasicMaterial({ map: blob('rgba(255,40,30,1)'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, opacity: 0 }));
+      glow.position.copy(tail.getCenter(new THREE.Vector3())).setZ(tail.min.z - 0.02);
+      root.add(glow);
+      modelTailGlow.push(glow.material);
+    }
+  }
+
+  // mid-wheelbase at the car's origin; the eye, the cluster and the exhaust follow the model
+  const front = pivots.filter(p => p.position.z > 0), rear = pivots.filter(p => p.position.z <= 0);
+  const midZ = (front[0].position.z + rear[0].position.z) / 2;
+  root.position.z = -midZ;
+  const wheelAt = pivot.clone().setZ(pivot.z - midZ);
+  EYE.copy(wheelAt).add(new THREE.Vector3(0, 0.3, -0.55));
+  // the car page's cluster covers the model's own: whatever the driver sees through the top of the steering wheel
+  root.updateMatrixWorld(true); // root has no parent yet, so this is car space
+  const look = wheelAt.clone().add(new THREE.Vector3(0, CAR.steering.look ?? 0.1, 0)).sub(EYE).normalize();
+  const hit = new THREE.Raycaster(EYE, look).intersectObject(root, true).find(h => !swMeshes.includes(h.object));
+  const at = hit ? hit.point.addScaledVector(look, -0.01) : wheelAt.clone().add(new THREE.Vector3(0, 0.11, 0.32));
+  dashAnchor.position.copy(at);
+  dashAnchor.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(EYE, at, new THREE.Vector3(0, 1, 0))); // faces the driver
+  dashAnchor.scale.setScalar(0.36 * at.distanceTo(EYE) / 1100); // about as wide, to the eye, as the model's own cluster
+  EXHAUST.set(CAR.exhaustX, 0.3, -CAR.length / 2 - midZ + 0.05);
+
+  for (const c of car.children) c.visible = c === dashAnchor || c === shadow; // retire the built car
+  wheels.length = 0;
+  wheels.push(...pivots);
+  car.add(root);
+  usingModel = true;
+}).catch(e => console.warn(`${CAR.name} model not loaded - keeping the built car:`, e));
+
+const keys = new Set();
+// camera orbit: two-finger trackpad swipe arrives as wheel events; W swings it back behind the car
+const PITCH = 0.3, CAM_DIST = 8.4; // default chase: ~8 m behind, ~3.5 m up
+// and the car framed as high above the cluster panel as the M3 sits over its own (the shortest cluster), whatever this
+// car's cluster height: its middle this far (tan of the angle) above the panel's top
+const CHASE_GAP = 0.3;
+let orbitYaw = 0, orbitPitch = PITCH;
+addEventListener('wheel', e => {
+  e.preventDefault(); // stop the swipe from scrolling or navigating back
+  if (e.ctrlKey) return; // pinch, not a swipe
+  orbitYaw += e.deltaX * 0.005;
+  orbitPitch = Math.min(1.4, Math.max(0.05, orbitPitch - e.deltaY * 0.005));
+}, { passive: false });
+let inCar = false;
+function onKey(e) {
+  if (e.type === 'keyup') {
+    return keys.delete(e.code);
+  }
+  keys.add(e.code);
+  if (e.code === 'Tab' || e.code === 'ArrowUp' || e.code === 'ArrowDown') e.preventDefault(); // this page's keys, not focus or scrolling
+  if (e.repeat) return;
+  if (e.code === 'Tab') setPanel(!panelOpen);
+  if (e.code === 'KeyW') orbitYaw = 0, orbitPitch = PITCH;
+  if (e.code === 'KeyC') setView(!inCar);
+  if (LIMIT_KEYS[e.code]) setLimit(...LIMIT_KEYS[e.code]);
+  if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') signal.side = e.code === 'ArrowLeft' ? 1 : -1, signal.t = 0;
+}
+
+// turn signals: ← / → flash that side 3 times, then cancel themselves (BMW's one-touch signal). The bulbs, the
+// cluster's green arrows and a relay tick all follow what's lit
+const FLASH = 0.66; // s per on + off
+const signal = { side: 0, t: 0 }; // side: 1 = left, -1 = right
+let lit = 0, arrows = {}, actx;
+function showSignal(side) {
+  if (side === lit) return;
+  lit = side;
+  for (const s of [1, -1]) {
+    indMats[s].color.setHex(side === s ? AMBER_ON : AMBER_OFF);
+    arrows[s]?.classList.toggle('on-green', side === s);
+    for (const l of modelLamps[s]) l.visible = side === s;
+  }
+  relayTick(side !== 0);
+}
+function relayTick(on) { // a short blip: a higher tick as it lights, a lower tock as it goes out
+  actx ??= new AudioContext();
+  if (actx.state === 'suspended') actx.resume();
+  const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+  o.type = 'square';
+  o.frequency.value = on ? 2400 : 1600;
+  g.gain.setValueAtTime(0.06, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+  o.connect(g).connect(actx.destination);
+  o.start(t);
+  o.stop(t + 0.04);
+}
+function setView(seat) {
+  inCar = seat;
+  tintGlass();
+  camera.fov = inCar ? 50 : 65;
+  camera.updateProjectionMatrix();
+  if (usingModel) return; // the model's own cabin is the in-car view
+  for (const m of [bodyMesh, ...trims]) m.visible = !inCar;
+  hood.visible = inCar;
+}
+
+// The car page drives: its own I/W/S/R keys run the engine, gearbox and brakes, and every frame it hands its speed
+// to CarDyno.tick. It's same-origin, so this page can reach into it.
+const frame = document.getElementById('carpage');
+const carPage = { speed: 0, reverse: false, smoke: 0, braking: 0, ignition: false, gear: '', rpm: 0 };
+
+// throttle and brake limiters: ↑/↓ and O/P set how far W and S open (20-100% in 20% steps), linearly up to that.
+// The car page reads them (window.throttleLimit / brakeLimit); this browser remembers them between drives
+const limits = { throttle: 1, brake: 1 };
+try { const saved = JSON.parse(localStorage.getItem('drive-limits')); for (const k in limits) if (saved?.[k] >= 0.2 && saved[k] <= 1) limits[k] = saved[k]; } catch {}
+const LIMIT_KEYS = { ArrowUp: ['throttle', 0.2], ArrowDown: ['throttle', -0.2], KeyP: ['brake', 0.2], KeyO: ['brake', -0.2] };
+function setLimit(which, by) {
+  limits[which] = Math.min(1, Math.max(0.2, Math.round((limits[which] + by) * 5) / 5));
+  try { localStorage.setItem('drive-limits', JSON.stringify(limits)); } catch {}
+  showLimits();
+}
+function showLimits() {
+  for (const k of ['throttle', 'brake']) document.getElementById('lim-' + k).textContent = Math.round(limits[k] * 100) + '%';
+}
+showLimits();
+
+// phone pad (scripts/pad-relay.mjs, public/pad.html). From the phone: tilt steering (-1-1, + = left) and throttle /
+// brake sliders (0-1) at 30 Hz, taps of the car's keys and of its drive modes. To it: gear, speed and revs, this car's
+// key hints (the buttons it shows), its drive modes and the cluster's set-up pop-ups. The throttle opens the car page's accelerator directly; the brake
+// holds S with the brake limiter set to the slider (in the loop below), so the pedal ramps as S does
+const pad = { s: 0, t: 0, b: 0, at: 0 };
+let padWs, padHints = {}, padModes = [], padTicks = 0;
+function padInput(m) {
+  const w = frame.contentWindow, clamp = (v, lo) => Math.min(1, Math.max(lo, +v || 0));
+  const s = clamp(m.s, -1), t = clamp(m.t, 0), b = clamp(m.b, 0), accel = w.document.getElementById('throttle');
+  if (t !== pad.t && accel) { // only on a change, so W still works while the phone sits idle
+    accel.value = t * limits.throttle * 100;
+    accel.dispatchEvent(new w.Event('input'));
+  }
+  if (!b !== !pad.b) w.dispatchEvent(new w.KeyboardEvent(b ? 'keydown' : 'keyup', { key: 's', code: 'KeyS' }));
+  Object.assign(pad, { s, t, b, at: performance.now() });
+}
+// a tap of one of the car's keys, straight into the car page - so its C (chassis) and O (M Sound) get past this page's
+// own C and O - or into this page for its own keys (signals, view)
+function padTap({ key, code, shiftKey }, toDrive) {
+  const w = toDrive ? window : frame.contentWindow, init = { key: String(key), code: String(code), shiftKey: !!shiftKey };
+  for (const type of ['keydown', 'keyup']) w.dispatchEvent(new w.KeyboardEvent(type, init));
+}
+const padSend = m => padWs?.readyState === WebSocket.OPEN && padWs.send(JSON.stringify(m));
+setInterval(() => {
+  const dm = frame.contentDocument?.querySelector('.mode-btn.active')?.dataset.mode;
+  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm } };
+  if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes }; // once a second, for a phone that joins late
+  padSend(m);
+}, 66);
+function showPadLink(url) { // the relay copies the phone's link to the clipboard each time this page opens
+  const el = document.getElementById('padlink');
+  el.textContent = url ? `Phone controller link copied - paste it into Safari on your iPhone (${url})` : 'Phone controller: switch Tailscale on, then reopen this page';
+  el.hidden = false;
+  setTimeout(() => el.hidden = true, 10000);
+}
+(function padConnect() {
+  padWs = new WebSocket('ws://localhost:8765');
+  padWs.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.tap) padTap(m.tap, m.drive);
+    else if (m.mode) [...frame.contentDocument.querySelectorAll('.mode-btn')].find(b => b.dataset.mode === m.mode)?.click();
+    else if ('t' in m) padInput(m);
+    else if ('phone' in m) showPadLink(m.phone);
+  };
+  padWs.onclose = () => setTimeout(padConnect, 3000); // keeps trying, so the relay can start after this page (each miss logs a console line)
+})();
+
+// Its live cluster is a web page, so a CSS3D layer under the WebGL canvas draws it in 3D. A transparent "hole" mesh
+// in its exact place lets it show through the canvas, and anything nearer - the steering wheel - still covers it.
+const cssRenderer = new CSS3DRenderer();
+cssRenderer.setSize(innerWidth, innerHeight);
+Object.assign(cssRenderer.domElement.style, { position: 'fixed', inset: '0', zIndex: 0, pointerEvents: 'none' });
+document.body.appendChild(cssRenderer.domElement);
+const cluster = new CSS3DObject(frame);
+frame.style.pointerEvents = 'none';
+const hole = new THREE.Mesh(new THREE.PlaneGeometry(1100, 510),
+  new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0, blending: THREE.NoBlending, side: THREE.DoubleSide, fog: false }));
+scene.add(cluster, hole);
+cssRenderer.render(scene, camera); // adopts the iframe now, while it's blank: moving it after it loads would reload the car page
+// chase view: the cluster as a panel along the bottom of the screen, fixed to the camera
+const hudAnchor = new THREE.Object3D();
+hudAnchor.position.set(0, -0.42, -1);
+hudAnchor.scale.setScalar(0.00081);
+camera.add(hudAnchor);
+
+// fuel: stopped on the forecourt with the engine off, the car page's own pump runs (its refuel button, held: it fills
+// at its own rate and stops when full); starting the engine or driving off stops it
+const inPit = () => Math.abs(state.x - PIT.x) < 5 && Math.abs(state.z - PIT.z) < 7; // in the team's garage at the track
+const atPump = () => (Math.hypot(state.x - station.position.x, state.z - station.position.z) < 15 || inPit()) && Math.abs(state.speed) < 0.5;
+let fueling = false;
+function refuel(on) {
+  if (on === fueling) return;
+  fueling = on;
+  const w = frame.contentWindow;
+  w.document.getElementById('refuel-btn')?.dispatchEvent(new w.KeyboardEvent(on ? 'keydown' : 'keyup', { key: 'Enter' }));
+}
+
+// the garage: stop inside it and the car list opens; picking another car restarts the drive in it, here (at home, or
+// in the pit garage: ?at=pits)
+const garageEl = document.getElementById('garage');
+for (const id of ['garage-cars', 'pit-cars']) document.getElementById(id).innerHTML = Object.values(CARS).map(c =>
+  `<button data-car="${c.page}"${c === CAR ? ' class="on"' : ''}>${c.name}${c === CAR ? ' · driving now' : ''}</button>`).join('');
+const swapCar = (page, at) => { // the car page saves on its way out
+  query.set('car', page);
+  if (at) query.set('at', at); else query.delete('at');
+  location.search = query;
+};
+let garageClosed = false; // closed for this visit; reopens after driving out and back in
+garageEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b?.dataset.car && b.dataset.car !== CAR.page) swapCar(b.dataset.car);
+  else if (b) { garageClosed = true; garageEl.hidden = true; }
+});
+const inGarage = () => Math.abs(state.x - HOME.x) < 2.4 && Math.abs(state.z - HOME.z) < 4;
+// the mechanic: stop in its bay and its menu opens the car menu on the car's own servicing, tuning or dyno tab.
+// Servicing and engine repairs only show in the car menu here - the mechanic is where the car gets fixed
+const shopEl = document.getElementById('shop');
+let shopClosed = false, wasInShop = false;
+shopEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  shopClosed = true;
+  shopEl.hidden = true;
+  if (b.dataset.tab) setPanel(true, b.dataset.tab);
+});
+const inShop = () => Math.abs(state.x - SHOP.x) < 4 && Math.abs(state.z - SHOP.z) < 5;
+// the pit garage: the mechanic's menu and the car list in one, and the fuel rig (atPump)
+const pitEl = document.getElementById('pit');
+let pitClosed = false;
+pitEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.dataset.car === CAR.page) return;
+  if (b.dataset.car) return swapCar(b.dataset.car, 'pits');
+  pitClosed = true;
+  pitEl.hidden = true;
+  if (b.dataset.tab) setPanel(true, b.dataset.tab);
+});
+
+// Tab: the car menu - the car page itself, all of it, over the view at 1:1 and clickable: its controls, live data,
+// setup and tuning, dyno, diagnostics, history, and every button they have. The car keeps driving underneath; the
+// in-dash cluster comes back when it closes
+const panelAnchor = new THREE.Object3D();
+// the car menu's own camera, standing back from the origin so the menu lies on the screen plane. Under the view's
+// camera the CSS layer's camera plane lands wherever that camera is in the world - behind the eye facing most ways
+// (the pit lane) - and Chrome then drops the clicks to everything in it: drawn right, but they hit the canvas
+const panelCam = new THREE.PerspectiveCamera();
+panelCam.add(panelAnchor);
+const panelClose = document.getElementById('panel-close');
+let panelOpen = false, panelFit = 1, clusterH = 510;
+function setPanel(open, tab) {
+  const w = frame.contentWindow, doc = w?.document;
+  if (!doc?.querySelector('.cluster')) return; // still loading
+  panelOpen = open;
+  doc.documentElement.classList.toggle('drive-panel', open);
+  // as wide as the window; a page arranged wider than that (a free layout made on a bigger screen) is shrunk to
+  // fit its width rather than cut off, and scrolls for the rest
+  panelFit = 1;
+  if (open) {
+    frame.style.width = innerWidth + 'px';
+    panelFit = Math.min(1, innerWidth / doc.documentElement.scrollWidth);
+  }
+  frame.style.width = open ? innerWidth / panelFit + 'px' : '1100px';
+  frame.style.height = (open ? innerHeight / panelFit : clusterH) + 'px';
+  frame.style.pointerEvents = open ? 'auto' : 'none';
+  cssRenderer.domElement.style.zIndex = open ? 3 : 0; // over the canvas and the HUD while open
+  hole.visible = !open;
+  panelClose.hidden = !open;
+  document.body.classList.toggle('panel-open', open);
+  if (open && tab) { // the dyno panel's tabs (car-service.js), opened on the one asked for if the car has it
+    if (doc.querySelector('.dyno-panel.dyno-collapsed')) doc.getElementById('dyno-toggle-btn')?.click();
+    const btn = doc.querySelector(`.cs-tab[data-tab="${tab}"]`);
+    if (btn && !btn.hidden) btn.click();
+  }
+  w.focus();
+}
+panelClose.addEventListener('click', () => setPanel(false));
+// C (view), Tab (car menu), the arrows (signals, throttle limit) and O/P (brake limit) are this page's; the car page
+// never sees them - the M3's uses C itself
+const OWN = new Set(['KeyC', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyO', 'KeyP']);
+for (const type of ['keydown', 'keyup']) addEventListener(type, e => {
+  onKey(e);
+  if (OWN.has(e.code)) return;
+  const w = frame.contentWindow; // keys pressed while this page has focus still reach the car page
+  w.dispatchEvent(new w.KeyboardEvent(type, { key: e.key, code: e.code, repeat: e.repeat }));
+});
+addEventListener('blur', () => keys.clear()); // no stuck steering after alt-tab
+// typing in one of the car menu's fields (a tune's name, a note) doesn't steer
+const typing = e => e.target.isContentEditable || /^(TEXTAREA|SELECT)$/.test(e.target.tagName) || (e.target.tagName === 'INPUT' && e.target.type !== 'range');
+frame.addEventListener('load', () => {
+  const w = frame.contentWindow;
+  // in the dash only the cluster shows, whatever layout the car was saved with (and any save-failed alert);
+  // as the car menu (html.drive-panel) the whole page shows as laid out, over a dimmed view of the road. The
+  // servicing tab and engine repair show only at the mechanic, the refuel button only at the pump
+  w.document.head.insertAdjacentHTML('beforeend', `<style>
+    html, body { background: transparent !important; }
+    html:not(.drive-panel), html:not(.drive-panel) body { overflow: hidden !important; }
+    html:not(.drive-panel) body > :not(.page-layout):not([role=alert]), html:not(.drive-panel) .page-layout > :not(.rig),
+    html:not(.drive-panel) .rig > :not(.cluster), html:not(.drive-panel) .cs-grip { display: none !important; }
+    html:not(.drive-panel) .cluster.cluster.cluster { position: fixed !important; /* outranks car-layout's .cl-canvas .cl-area:not(.cs-in-tab) */ left: 0 !important; right: 0 !important; top: auto !important; bottom: 0 !important;
+      width: auto !important; max-width: none !important; height: auto !important; margin: 0 !important; transform: none !important; }
+    html.drive-panel body { background: rgba(9, 10, 12, .86) !important; min-height: 100vh; }
+    html:not(.drive-shop) .cs-tab[data-tab="service"], html:not(.drive-shop) #repair-btn { display: none !important; }
+    html:not(.drive-pump) #refuel-btn { visibility: hidden !important; }
+  </style>`);
+  const tick = w.CarDyno.tick;
+  w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = w.CarTune.ch.smoke; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; tick(i); };
+  const serviceTick = w.CarService.tick; // the brake pedal (0-100) only reaches CarService
+  w.CarService.tick = i => { carPage.braking = i.braking; carPage.ignition = i.ignition; return serviceTick.call(w.CarService, i); };
+  // the frame and its hole sized to this car's cluster (the CSS3D panel keeps its width), the chase panel kept on screen
+  clusterH = Math.ceil(w.document.querySelector('.cluster').getBoundingClientRect().height);
+  frame.style.height = clusterH + 'px';
+  hole.geometry.dispose();
+  hole.geometry = new THREE.PlaneGeometry(1100, clusterH);
+  hudAnchor.position.y = -0.637 + clusterH * 0.00081 / 2 + 0.008;
+  // green turn arrows on the cluster, in its own warning-light style: at the two ends of a row of lights (the M cars),
+  // or placed over a cluster that lays its lights out freely (the X1)
+  const wls = w.document.querySelector('.warning-lights'), row = w.getComputedStyle(wls).display.includes('flex');
+  const [al, ar, at] = CAR.arrows || [38.5, 61.5, 11];
+  for (const [s, x, d] of [[1, al, 'M2 12l9-8v5h11v6H11v5z'], [-1, ar, 'M22 12l-9-8v5H2v6h11v5z']]) wls.insertAdjacentHTML(s === 1 && row ? 'afterbegin' : 'beforeend',
+    `<div class="wl" data-turn="${s}"${row ? '' : ` style="left:${x}%;top:${at}%"`}><svg viewBox="0 0 24 24"><path fill="currentColor" d="${d}"/></svg></div>`);
+  for (const s of [1, -1]) arrows[s] = w.document.querySelector(`[data-turn="${s}"]`);
+  // keys typed while the car page has focus; the ones this page passes on (untrusted) were already handled here.
+  // This page's own keys are caught first (capture) and stopped before the car page's handlers
+  for (const type of ['keydown', 'keyup']) {
+    w.addEventListener(type, e => { if (e.isTrusted && OWN.has(e.code)) { onKey(e); e.stopImmediatePropagation(); } }, true);
+    w.addEventListener(type, e => e.isTrusted && !OWN.has(e.code) && !typing(e) && onKey(e));
+  }
+  w.addEventListener('blur', () => keys.clear());
+  // the phone pad's buttons: this car's own key hints ("<kbd>G</kbd>Drivelogic"), key -> label
+  padHints = {};
+  for (const span of w.document.querySelectorAll('.keys span')) {
+    const label = span.cloneNode(true);
+    label.querySelectorAll('kbd').forEach(k => k.remove());
+    for (const k of span.querySelectorAll('kbd')) padHints[k.textContent.trim().toLowerCase()] ??= label.textContent.replace(/^\W+/, '').trim();
+  }
+  // and its Driving Experience Control (Comfort / Sport / Eco Pro), which has no key: only buttons on its page
+  padModes = [...w.document.querySelectorAll('.mode-btn')].map(b => [b.dataset.mode, b.textContent.trim()]);
+  // and the cluster's set-up pop-up (the M cars: Drivelogic, engine, M1...), mirrored on the phone
+  const popItems = w.document.getElementById('pop-items');
+  if (popItems) new MutationObserver(() => {
+    const items = [...popItems.querySelectorAll('text')], sel = items.find(t => t.classList.contains('sel'));
+    padSend({ toast: { title: w.document.getElementById('pop-title').textContent, text: (sel ? [sel] : items).map(t => t.textContent).join(', ') } });
+  }).observe(popItems, { childList: true });
+  w.focus(); // its keys then work natively, and a key press there can start its engine sound
+});
+// set after the load hook is in, so a fast load can't slip past it. The car page saves the car as it does on its own
+// - odometer, fuel, wear, tune - and, as the latest page to open it, makes older tabs of it stop saving
+if (location.protocol === 'file:') document.getElementById('hud').textContent = 'Open this through the app (http://sim-app.test/drive.html) - the car runs from there.';
+else frame.src = `/car/${CAR.page}/raw${TEST_DRIVE ? '?test_drive=1' : ''}`;
+document.getElementById('credit').innerHTML = `${CAR.name.replace('BMW ', '')} model: <a href="${CAR.credit[1]}" target="_blank">${CAR.credit[0]}</a>
+  by <a href="${CAR.credit[4] || 'https://sketchfab.com/ddiaz-design'}" target="_blank">${CAR.credit[3] || 'Ddiaz Design'}</a>, <a href="http://creativecommons.org/licenses/${CAR.credit[2] || 'by-nc-sa'}/4.0/" target="_blank">CC ${(CAR.credit[2] || 'by-nc-sa').toUpperCase()} 4.0</a>`;
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  cssRenderer.setSize(innerWidth, innerHeight);
+  if (panelOpen) setPanel(true);
+});
+
+// every drive starts at home, on the drive just out of the garage, facing down it to the valley road - or, after a
+// swap in the pit garage, on the pit lane outside it, pointing to the exit
+const atPits = query.get('at') === 'pits', startHeading = atPits ? Math.PI / 2 : 0;
+const state = { x: atPits ? PIT.x : HOME.x, z: atPits ? -2380 : HOME.z + 14, heading: startHeading, speed: 0, steer: 0 };
+
+// mini map, north-up: +Z is up and +X is drawn on the left, so the map turns the same way the view does
+const mapEl = document.getElementById('map'), map = mapEl.getContext('2d');
+mapEl.width = mapEl.clientWidth * devicePixelRatio;
+mapEl.height = mapEl.clientHeight * devicePixelRatio;
+map.scale(devicePixelRatio, devicePixelRatio);
+const MAP_ROADS = [A, M, K1, K2, ...STREETS, T, TR, PL];
+const all = MAP_ROADS.flatMap(r => r.P), xs = all.map(p => p.x), zs = all.map(p => p.z);
+const [minX, maxX, minZ, maxZ] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+const mapS = Math.min((mapEl.clientWidth - 24) / (maxX - minX), (mapEl.clientHeight - 24) / (maxZ - minZ));
+const toMap = (x, z) => [mapEl.clientWidth / 2 - (x - (minX + maxX) / 2) * mapS, mapEl.clientHeight / 2 - (z - (minZ + maxZ) / 2) * mapS];
+const roadPath = new Path2D();
+for (const r of MAP_ROADS) {
+  roadPath.moveTo(...toMap(r.P[0].x, r.P[0].z));
+  for (let i = 20; i <= r.N; i += 20) roadPath.lineTo(...toMap(r.P[i].x, r.P[i].z));
+  roadPath.lineTo(...toMap(r.P[r.N].x, r.P[r.N].z)); // the last point (the loops close on themselves)
+}
+function drawMap() {
+  map.clearRect(0, 0, mapEl.clientWidth, mapEl.clientHeight);
+  map.lineWidth = 4;
+  map.strokeStyle = '#9a9a9a';
+  map.stroke(roadPath);
+  for (const [p, color] of [[station.position, '#2ecc71'], [HOME, '#4fa8ff'], [SHOP, '#ff8c1a'], [V.P[Math.round(V.N / 2)], '#ffd23f'], [T.P[ISF], '#ffffff'], [PIT, '#ff8c1a']]) { // fuel, home, mechanic, viewpoint, start line, pit garage
+    map.fillStyle = color;
+    map.beginPath(); map.arc(...toMap(p.x, p.z), 4.5, 0, Math.PI * 2); map.fill();
+  }
+  map.save();
+  map.translate(...toMap(state.x, state.z));
+  map.rotate(-state.heading); // the arrow's tip, drawn pointing up, then faces the car's heading
+  map.fillStyle = '#ff5a3c';
+  map.beginPath(); map.moveTo(0, -8); map.lineTo(5.5, 6); map.lineTo(-5.5, 6); map.closePath(); map.fill();
+  map.restore();
+}
+// exhaust smoke at the car page's own smoke opacity (CarTune.ch.smoke, 0-100 %): soft puffs left behind in the world
+const puffTex = blob('#fff');
+const puffs = Array.from({ length: 160 }, () => {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0x6a6a6a, transparent: true, depthWrite: false })); // diesel grey, still visible over asphalt
+  s.visible = false;
+  scene.add(s);
+  return { s, age: 1, alpha: 0, vel: new THREE.Vector3() };
+});
+let puffDue = 0, puffNext = 0;
+function smoke(dt, pct) {
+  for (puffDue += pct / 100 * 60 * dt; puffDue >= 1; puffDue--) { // up to 60 puffs a second at 100 %
+    const p = puffs[puffNext++ % puffs.length];
+    p.s.position.copy(EXHAUST).applyEuler(car.rotation).add(car.position);
+    p.vel.set(Math.random() - 0.5, 0.4 + Math.random() * 0.4, Math.random() - 0.5).multiplyScalar(0.8);
+    p.age = 0;
+    p.alpha = 0.2 + 0.6 * pct / 100;
+  }
+  for (const p of puffs) {
+    p.s.visible = p.age < 1;
+    if (!p.s.visible) continue;
+    p.age += dt / 2; // lives 2 s, growing and fading
+    p.s.position.addScaledVector(p.vel, dt);
+    p.s.scale.setScalar(0.4 + p.age * 3);
+    p.s.material.opacity = p.alpha * (1 - p.age);
+  }
+}
+
+const pumpEl = document.getElementById('pump'), rollersEl = document.getElementById('rollers');
+let camYaw = startHeading, camPitch = PITCH, wheelSpin = 0, steerIn = 0;
+const tilt = { pitch: 0, roll: 0 };
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  // on the rollers - in Dyno mode, or with the car menu open on its dyno or performance tab - the wheels turn at the
+  // car page's speed but the car stays put, so a pull or a timed run doesn't drive it off unseen
+  const roll = carPage.speed / 3.6 * (carPage.reverse ? -1 : 1), w = frame.contentWindow;
+  const tab = panelOpen && w.document.querySelector('.cs-tab[aria-selected="true"]')?.dataset.tab;
+  const dyno = !!w.CarDyno?.on, rollers = dyno || tab === 'dyno' || tab === 'perf';
+  state.speed = rollers ? 0 : roll;
+  rollersEl.hidden = !dyno || panelOpen;
+  if (pad.at && performance.now() - pad.at > 500) padInput({}), pad.at = 0; // the phone went quiet (locked, out of range): let go
+  steerIn = steerInput(steerIn, (keys.has('KeyA') - keys.has('KeyD')) || pad.s, dt);
+  step(state, steerIn, dt);
+
+  // on the ground: height from the surface under the axles and the sides, and the tilt eased over ~0.1 s so the
+  // corner where one 3 m road segment meets the next can't jolt it; the slope feeds the car page's physics
+  const sh = Math.sin(state.heading), ch = Math.cos(state.heading);
+  const hF = surfaceAt(state.x + sh * 1.38, state.z + ch * 1.38), hB = surfaceAt(state.x - sh * 1.38, state.z - ch * 1.38);
+  const hL = surfaceAt(state.x + ch * 0.8, state.z - sh * 0.8), hR = surfaceAt(state.x - ch * 0.8, state.z + sh * 0.8);
+  const settle = 1 - Math.exp(-dt * 10);
+  tilt.pitch += (Math.atan2(hF - hB, 2.76) - tilt.pitch) * settle;
+  tilt.roll += (Math.atan2(hL - hR, 1.6) - tilt.roll) * settle;
+  car.position.set(state.x, (hF + hB + hL + hR) / 4, state.z);
+  car.rotation.set(-tilt.pitch, state.heading, tilt.roll, 'YXZ');
+  frame.contentWindow.roadGrade = Math.sin(tilt.pitch); // + = uphill: slower on the climb, gathering speed downhill
+  wheelSpin += roll * dt / WHEEL_R;
+  for (const w of wheels) {
+    w.rotation.x = wheelSpin;
+    if (w.position.z > 0) w.rotation.y = state.steer;
+  }
+  steeringWheel.rotation.z = -state.steer * 15; // left (positive steer) turns it anticlockwise as the driver sees it
+  if (signal.side && (signal.t += dt) >= 3 * FLASH) signal.side = 0;
+  showSignal(signal.side && signal.t % FLASH < FLASH * 0.55 ? signal.side : 0);
+  const braking = carPage.braking > 2;
+  tailMat.emissive.setHex(braking ? 0xff1a1a : 0x500000);
+  hmbl.color.setHex(braking ? 0xff2a2a : 0x3a0606);
+  for (const [mt, full] of modelTail) mt.emissiveIntensity = full * (braking ? CAR.tail.brake : CAR.tail.idle);
+  for (const g of modelTailGlow) g.opacity = braking ? 1 : 0;
+  smoke(dt, carPage.smoke);
+  const pump = atPump();
+  refuel(pump && !carPage.ignition);
+  pumpEl.hidden = !pump;
+  pumpEl.textContent = fueling ? 'Refuelling - start the engine (I) to stop' : `${inPit() ? 'In the pit box' : 'At the pump'}: switch the engine off (I) to refuel`;
+  frame.contentWindow.throttleLimit = limits.throttle;
+  frame.contentWindow.brakeLimit = limits.brake * (pad.b || 1); // the phone's brake slider: how far its held S opens
+  const parked = inGarage(), pitted = inPit(), atShop = inShop() || pitted, html = frame.contentWindow.document.documentElement;
+  if (!parked) garageClosed = false;
+  garageEl.hidden = !parked || garageClosed || panelOpen || Math.abs(state.speed) > 0.6;
+  if (!inShop()) shopClosed = false;
+  shopEl.hidden = !inShop() || shopClosed || panelOpen || Math.abs(state.speed) > 0.6;
+  if (!pitted) pitClosed = false;
+  pitEl.hidden = !pitted || pitClosed || panelOpen || Math.abs(state.speed) > 0.6;
+  html?.classList.toggle('drive-pump', pump); // (no element while the car page is between documents)
+  html?.classList.toggle('drive-shop', atShop);
+  if (wasInShop && !atShop) frame.contentWindow.document.querySelector('.cs-tab[data-tab="service"][aria-selected="true"]')
+    ?.parentNode.querySelector('.cs-tab[data-tab="dyno"]')?.click(); // drove off on the servicing tab
+  wasInShop = atShop;
+
+  if (inCar) { // from the driver's seat, looking where the car points (so up and down hills too); swipes turn the head
+    camera.position.copy(EYE).applyEuler(car.rotation).add(car.position);
+    camera.up.set(0, 1, 0).applyQuaternion(car.quaternion);
+    const p = orbitPitch - PITCH - 0.1;
+    const look = new THREE.Vector3(Math.sin(orbitYaw) * Math.cos(p), Math.sin(p), Math.cos(orbitYaw) * Math.cos(p)).applyQuaternion(car.quaternion);
+    camera.lookAt(camera.position.clone().add(look));
+  } else {
+    // ease the angles, not the position, so swinging round circles the car instead of cutting through it
+    const k = 1 - Math.exp(-dt * 4), yawTarget = state.heading + orbitYaw;
+    camYaw += Math.atan2(Math.sin(yawTarget - camYaw), Math.cos(yawTarget - camYaw)) * k; // shortest way round
+    camPitch += (orbitPitch - camPitch) * k;
+    const flat = Math.cos(camPitch) * CAM_DIST, cx = state.x - Math.sin(camYaw) * flat, cz = state.z - Math.cos(camYaw) * flat;
+    camera.up.set(0, 1, 0);
+    camera.position.set(cx, Math.max(car.position.y + 1 + Math.sin(camPitch) * CAM_DIST, terrainAt(cx, cz) + 0.5), cz); // never under a hillside
+    camera.lookAt(state.x, car.position.y + 1, state.z);
+    camera.rotateX(-Math.atan(hudAnchor.position.y + clusterH * 0.00081 / 2 + CHASE_GAP)); // tipped down over a taller panel
+  }
+  // the cluster (and its hole) follows the dash from the seat, or the camera as a bottom panel; the car menu sits
+  // where the CSS3D camera's perspective is exactly 1:1, so it's as sharp as a flat page
+  panelCam.projectionMatrix.copy(camera.projectionMatrix);
+  panelAnchor.position.z = -camera.projectionMatrix.elements[5] * innerHeight / 2;
+  panelCam.position.z = -panelAnchor.position.z;
+  panelAnchor.scale.setScalar(panelFit);
+  const anchor = panelOpen ? panelAnchor : inCar ? dashAnchor : hudAnchor;
+  anchor.updateWorldMatrix(true, false);
+  anchor.matrixWorld.decompose(cluster.position, cluster.quaternion, cluster.scale);
+  hole.position.copy(cluster.position); hole.quaternion.copy(cluster.quaternion); hole.scale.copy(cluster.scale);
+
+  drawMap();
+  renderer.render(scene, camera);
+  cssRenderer.render(scene, panelOpen ? panelCam : camera);
+});
+</script>
+</body>
+</html>

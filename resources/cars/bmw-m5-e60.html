@@ -1420,7 +1420,9 @@
   const refuse = () => { if(!matchMedia('(prefers-reduced-motion: reduce)').matches) lcdGear.animate([{opacity:1},{opacity:.15},{opacity:1},{opacity:.15},{opacity:1}], {duration:500}); };
   // lever / paddles: in D a pull drops the box into S (as on the car) and shifts
   function paddle(dir){
-    if(!ignition || transmissionMode === 'R' || transmissionMode === 'N') return;
+    if(!ignition || transmissionMode === 'R') return;
+    // out of N, a paddle drops it into S in gear (1st standing) straight from whatever the revs are, as on the other cars
+    if(transmissionMode === 'N'){ setTransmission('S'); return; }
     if(transmissionMode === 'D') setSmgMode('S');
     if(gearIdx < 0){ gearIdx = 0; return; }
     const g = gearIdx + dir;
@@ -1561,7 +1563,7 @@
     }
     if(braking) a = Math.min(a, 0) - BRAKE_DECEL*(braking/100)*CarService.brakeMul();
     if(!running && !braking) a = Math.min(a, 0);
-    speed = Math.max(0, Math.min(360, speed + (a - dragA)*3.6*dt));
+    speed = Math.max(0, speed + (a - dragA)*3.6*dt); // no cap: drag and the rev limiter set the top speed
     if(braking && speed < 0.3) speed = 0;
 
     // ---- gear selection ----

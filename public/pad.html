@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#121417">
+<title>Drive Pad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600&family=Electrolize&display=swap" rel="stylesheet">
+<style>
+  /* served by scripts/pad-relay.mjs, not the app. An M wheel at night: graphite switchgear, the M colours only where
+     something is live - the shift lights, the selected gear, the red M1 / M2 */
+  :root {
+    --base: #121417; --panel: #1b1e22; --raised: #262a2f; --line: #353a41; --text: #eef1f5; --dim: #8c95a0;
+    --m-light: #4fa8ff; --m-dark: #5a52d6; --m-red: #e1262d;
+    --num: 'Electrolize', system-ui, sans-serif; --ui: 'Barlow', system-ui, sans-serif;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--base); color: var(--text); font: 500 15px/1.2 var(--ui);
+               -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; overscroll-behavior: none;
+               -webkit-tap-highlight-color: transparent; }
+  body { display: grid; grid-template-columns: minmax(96px, 128px) minmax(0, 1fr) minmax(96px, 128px); gap: 12px; box-sizing: border-box;
+         padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  button { font: inherit; color: inherit; border: 1px solid var(--line); background: var(--raised); border-radius: 12px; padding: 0; }
+  button.down { background: #343a42; transform: scale(.97); }
+  button:focus-visible { outline: 2px solid var(--m-light); outline-offset: 2px; }
+
+  /* the sides: a paddle over each pedal, as the wheel's paddles sit over your thumbs */
+  .side { display: grid; grid-template-rows: clamp(58px, 21vh, 84px) minmax(0, 1fr); gap: 10px; min-height: 0; }
+  .paddle { font: 400 40px/1 var(--num); border-radius: 22px 22px 12px 12px; background: linear-gradient(#30353c, #22262b);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
+  .pedal { position: relative; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); overflow: hidden; }
+  .pedal::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+                   background: repeating-linear-gradient(to top, transparent 0 calc(25% - 1px), rgba(255, 255, 255, .06) calc(25% - 1px) 25%); }
+  .pedal > * { pointer-events: none; } /* so a touch's offsetY is always the pedal's own, turned round or not */
+  .pedal i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(to top, var(--c), color-mix(in srgb, var(--c) 45%, transparent)); }
+  .pedal span { position: absolute; z-index: 2; top: 10px; left: 0; right: 0; text-align: center; color: var(--dim); font-weight: 600; }
+  .pedal b { position: absolute; z-index: 2; top: 30px; left: 0; right: 0; text-align: center; font: 400 24px var(--num); }
+  [data-k=b] { --c: var(--m-red); }
+  [data-k=t] { --c: var(--m-light); }
+
+  main { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+  header { display: flex; align-items: center; gap: 8px; height: 30px; flex: none; }
+  #dot { width: 8px; height: 8px; border-radius: 50%; background: var(--m-red); flex: none; }
+  #dot.wait { background: #e8a33a; }
+  #dot.live { background: var(--m-light); }
+  #car { flex: 1; min-width: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #ign { height: 30px; padding: 0 14px; border-radius: 15px; font-weight: 600; }
+  #ign.on { border-color: var(--m-red); box-shadow: 0 0 12px rgba(225, 38, 45, .45), inset 0 0 0 1px var(--m-red); }
+
+  /* the cluster: the one loud thing */
+  .cluster { position: relative; flex: none; display: grid; grid-template-columns: auto 1fr; align-items: end; column-gap: 12px;
+             padding: 8px 14px 10px; border-radius: 14px; border: 1px solid var(--line); overflow: hidden;
+             background: radial-gradient(130% 150% at 0% 0%, #1d2838 0%, var(--panel) 62%); }
+  #gear { font: 400 clamp(40px, 15vh, 64px)/.9 var(--num); min-width: 2ch; }
+  .speed { justify-self: end; font: 400 clamp(28px, 10vh, 40px)/1 var(--num); }
+  .speed small { margin-left: 4px; font: 500 13px var(--ui); color: var(--dim); }
+  #revs { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; height: 7px; margin-top: 8px; }
+  #revs b { border-radius: 2px; background: #2a2f36; }
+  #revs b.lit { background: var(--m-light); }
+  #revs b.lit:nth-child(n+10) { background: var(--m-dark); }
+  #revs b.lit:nth-child(n+13) { background: var(--m-red); }
+  #revs.flash b { animation: flash .12s steps(1) infinite alternate; }
+  @keyframes flash { to { background: #2a2f36; } }
+  @media (prefers-reduced-motion: reduce) { #revs.flash b { animation: none; } }
+  #toast { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+           padding: 0 14px; text-align: center; background: var(--panel); opacity: 0; transition: opacity .15s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+  #toast b { color: var(--dim); font-weight: 600; font-size: 13px; }
+  #toast span { font: 400 22px/1.15 var(--num); }
+
+  #steer { position: relative; flex: none; height: 6px; border-radius: 3px; background: var(--raised); overflow: hidden; }
+  #steer::after { content: ''; position: absolute; left: calc(50% - 1px); top: 0; bottom: 0; width: 2px; background: var(--dim); }
+  #steer i { position: absolute; top: 0; bottom: 0; background: var(--m-light); }
+
+  nav { display: flex; gap: 4px; flex: none; padding: 3px; border-radius: 11px; background: var(--panel); }
+  nav button { flex: 1; height: 30px; border: 0; background: none; color: var(--dim); font-weight: 600; }
+  nav button[aria-selected=true] { background: var(--raised); color: var(--text); box-shadow: inset 0 -2px 0 var(--m-light); }
+  .tab { flex: 1; min-height: 0; display: grid; gap: 8px; grid-auto-rows: minmax(0, 1fr); }
+  .tab[hidden] { display: none; }
+  #tab-drive { grid-template-columns: repeat(5, 1fr); }
+  #tab-setup { grid-template-columns: repeat(4, 1fr); }
+  #tab-car { grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(0, 64px); }
+  .key { min-height: 0; font-weight: 600; line-height: 1.1; }
+  .key.sel { font: 400 24px var(--num); }
+  .key.on { border-color: var(--m-light); box-shadow: inset 0 0 0 1px var(--m-light); }
+  .key.m { font: 400 22px var(--num); background: #2a1517; border-color: var(--m-red); }
+  .empty { grid-column: 1 / -1; align-self: center; text-align: center; color: var(--dim); }
+
+  .cover { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center;
+           gap: 12px; padding: 24px; text-align: center; background: var(--base); }
+  .cover[hidden] { display: none; }
+  .cover h1 { margin: 0; font-size: 24px; font-weight: 600; }
+  .cover p { margin: 0; max-width: 34ch; color: var(--dim); line-height: 1.4; }
+  #go { margin-top: 8px; height: 48px; padding: 0 28px; border: 0; border-radius: 24px; background: var(--m-light); color: #08111c; font-weight: 600; font-size: 17px; }
+  /* iOS won't let a page lock landscape, so if turning the wheel too far flips it to portrait, turn the pad back to
+     stay put in your hands: towards whichever side was up (onTilt), with the safe areas moved round to match */
+  @media (orientation: portrait) {
+    body { position: fixed; top: 50%; left: 50%; width: 100dvh; height: 100dvw; transform: translate(-50%, -50%) rotate(90deg);
+           padding: max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-top)); }
+    .ccw body { transform: translate(-50%, -50%) rotate(-90deg);
+                padding: max(10px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)); }
+  }
+</style>
+</head>
+<body>
+<section class="side">
+  <button class="paddle" id="down" aria-label="Shift down">−</button>
+  <div class="pedal" data-k="b" role="slider" aria-label="Brake" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span>Brake</span><b>0</b><i></i></div>
+</section>
+<main>
+  <header>
+    <span id="dot"></span><span id="car">Connecting to the Mac</span>
+    <button id="ign">Start / stop</button>
+  </header>
+  <div class="cluster">
+    <div id="gear">–</div>
+    <div class="speed"><span id="speed">0</span><small>km/h</small></div>
+    <div id="revs"></div>
+    <div id="toast" role="status"><b></b><span></span></div>
+  </div>
+  <div id="steer" role="img" aria-label="Steering"><i></i></div>
+  <nav role="tablist">
+    <button role="tab" data-tab="drive" aria-selected="true">Drive</button>
+    <button role="tab" data-tab="setup" aria-selected="false">Setup</button>
+    <button role="tab" data-tab="car" aria-selected="false">Car</button>
+  </nav>
+  <div class="tab" id="tab-drive" role="tabpanel"><p class="empty">Open the drive page on the Mac to get this car's controls</p></div>
+  <div class="tab" id="tab-setup" role="tabpanel" hidden></div>
+  <div class="tab" id="tab-car" role="tabpanel" hidden></div>
+</main>
+<section class="side">
+  <button class="paddle" id="up" aria-label="Shift up">+</button>
+  <div class="pedal" data-k="t" role="slider" aria-label="Throttle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span>Throttle</span><b>0</b><i></i></div>
+</section>
+<div class="cover" id="intro">
+  <h1>Hold your phone sideways, like a wheel</h1>
+  <p>Tilt to steer. Brake on the left, throttle on the right, with the shift paddles above them.</p>
+  <button id="go">Start driving</button>
+</div>
+<script>
+const FULL_LOCK = 40, DEAD = 2; // degrees the phone turns for full lock, and a still zone round straight ahead
+const pad = { s: 0, t: 0, b: 0 }; // s: -1-1, + = left (as A on the drive page); t, b: 0-1
+const $ = id => document.getElementById(id);
+let ws, car = null, carJson = '', lastTele = 0, pressed = { label: '', at: 0 };
+const send = m => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(m));
+
+// how far the phone is turned clockwise, like a wheel, from level in landscape (held either way round): world "up"
+// from its beta/gamma (W3C Z-X'-Y'' angles), taken in the screen's own plane so tipping it back doesn't steer. Lying
+// near flat that plane says nothing, so straight ahead
+function wheelAngle(beta, gamma) {
+  const b = beta * Math.PI / 180, g = gamma * Math.PI / 180, ux = -Math.cos(b) * Math.sin(g), uy = Math.sin(b);
+  if (Math.hypot(ux, uy) < 0.3) return 0;
+  return Math.atan2(-ux, uy) * 180 / Math.PI - (ux > 0 ? -90 : 90);
+}
+// self-check; failures show in the devtools console
+console.assert(Math.abs(wheelAngle(0, -90)) < 1e-6 && Math.abs(wheelAngle(0, 90)) < 1e-6, 'level in landscape should be straight ahead');
+console.assert(Math.abs(wheelAngle(20, -90) - 20) < 1e-6 && Math.abs(wheelAngle(-20, 90) - 20) < 1e-6, 'turned 20° clockwise should read 20');
+console.assert(Math.abs(wheelAngle(-20, -90) + 20) < 1e-6, 'turned 20° anticlockwise should read -20');
+console.assert(wheelAngle(3, 2) === 0, 'lying flat should be straight ahead');
+
+function onTilt(e) {
+  if (e.beta == null) return;
+  const r = wheelAngle(e.beta, e.gamma), ux = -Math.cos(e.beta * Math.PI / 180) * Math.sin(e.gamma * Math.PI / 180);
+  // which side is up while it's held sideways, kept through upright: where the pad turns to if iOS flips to portrait
+  if (Math.abs(ux) > 0.5) document.documentElement.classList.toggle('ccw', ux < 0);
+  pad.s = -Math.sign(r) * Math.min(1, Math.max(0, Math.abs(r) - DEAD) / (FULL_LOCK - DEAD));
+  drawSteer();
+}
+function drawSteer() {
+  const bar = $('steer').firstElementChild;
+  bar.style.left = 50 - Math.max(0, pad.s) * 50 + '%';
+  bar.style.width = Math.abs(pad.s) * 50 + '%';
+}
+
+// pedals: touch anywhere on one to set it, and it springs back when you let go
+for (const el of document.querySelectorAll('.pedal')) {
+  const k = el.dataset.k, draw = () => {
+    el.lastElementChild.style.height = pad[k] * 100 + '%';
+    el.querySelector('b').textContent = Math.round(pad[k] * 100);
+    el.setAttribute('aria-valuenow', Math.round(pad[k] * 100));
+  };
+  const set = e => { pad[k] = Math.min(1, Math.max(0, 1 - e.offsetY / el.clientHeight)); draw(); };
+  el.onpointerdown = e => { el.setPointerCapture(e.pointerId); set(e); };
+  el.onpointermove = e => el.hasPointerCapture(e.pointerId) && set(e);
+  el.onpointerup = el.onpointercancel = () => { pad[k] = 0; draw(); };
+}
+
+// buttons tap the car's own keys on the drive page; o.drive taps one of the drive page's (signals, view)
+const codeOf = k => /^[a-z]$/.test(k) ? 'Key' + k.toUpperCase() : /^\d$/.test(k) ? 'Digit' + k : { ',': 'Comma', '.': 'Period' }[k];
+function hook(b, o) {
+  const fire = shiftKey => {
+    pressed = { label: b.textContent, at: Date.now() };
+    send(o.mode ? { mode: o.mode } : o.drive ? { tap: o.drive, drive: 1 } : { tap: { key: o.key, code: codeOf(o.key), shiftKey } });
+  };
+  let held = null;
+  b.onpointerdown = () => {
+    b.classList.add('down');
+    if (!o.store) return fire(false);
+    held = setTimeout(() => { held = null; fire(true); }, 600); // hold M1 / M2 to store the set-up on it, as on the wheel
+  };
+  b.onpointerup = () => { b.classList.remove('down'); if (held) clearTimeout(held), held = null, fire(false); };
+  b.onpointercancel = () => { b.classList.remove('down'); clearTimeout(held); held = null; };
+  return b;
+}
+function key(o) {
+  const b = document.createElement('button');
+  b.className = 'key' + (o.cls ? ' ' + o.cls : '');
+  b.textContent = o.label;
+  if (o.aria) b.setAttribute('aria-label', o.aria);
+  if (o.gear) b.dataset.gear = o.gear;
+  if (o.mode) b.dataset.mode = o.mode;
+  return hook(b, o);
+}
+hook($('down'), { key: 'q' });
+hook($('up'), { key: 'e' });
+hook($('ign'), { key: 'i' });
+
+// this car's controls, from its own key hints: the drive keys in their places, then whatever set-up keys it has
+const KNOWN = new Set(['i', 'w', 's', 'space', 'shift', 'q', 'e', 'm', 'k', 'g', 'n', 'r', '1', '2', '3', 'f', ',', '.', 'l', 'h']);
+const nice = s => s.replace(/ gate$/, '').replace(/^./, c => c.toUpperCase());
+function build() {
+  const h = car.hints, isM = /M1/.test(h['1'] || ''), fill = (id, list) => $(id).replaceChildren(...list.filter(Boolean).map(key));
+  fill('tab-drive', [
+    { label: 'R', key: 'r', gear: 'R', cls: 'sel', aria: 'Reverse' },
+    { label: 'N', key: 'n', gear: 'N', cls: 'sel', aria: 'Neutral' },
+    { label: 'D', key: 'k', gear: 'D', cls: 'sel', aria: 'Drive' },
+    h.m && { label: nice(h.m), key: 'm', gear: 'M' },
+    h.g && { label: nice(h.g), key: 'g', gear: 'S' },
+    { label: '◀', drive: { key: 'ArrowLeft', code: 'ArrowLeft' }, aria: 'Indicate left' },
+    h.f && { label: 'Cruise', key: 'f' },
+    h[','] && { label: '−5', key: ',', aria: 'Cruise 5 km/h slower' },
+    h['.'] && { label: '+5', key: '.', aria: 'Cruise 5 km/h faster' },
+    { label: '▶', drive: { key: 'ArrowRight', code: 'ArrowRight' }, aria: 'Indicate right' },
+  ]);
+  const store = /store/.test(h['1'] || '');
+  fill('tab-setup', [
+    ...(car.modes || []).map(([mode, label]) => ({ label, mode })), // Comfort / Sport / Eco Pro
+    ...(isM ? [{ label: 'M1', key: '1', cls: 'm', store }, { label: 'M2', key: '2', cls: 'm', store }]
+            : ['1', '2', '3'].map(k => h[k] && { label: `Map ${k}`, key: k })),
+    ...Object.entries(h).filter(([k]) => !KNOWN.has(k)).map(([k, label]) => ({ label: nice(label), key: k })),
+  ]);
+  fill('tab-car', [
+    h.l && { label: 'Lights', key: 'l' },
+    h.h && { label: 'High beam', key: 'h' },
+    { label: 'Camera', drive: { key: 'c', code: 'KeyC' }, aria: 'Switch between the chase and in-car view' },
+  ]);
+  document.querySelector('[data-tab=setup]').textContent = isM ? 'M setup' : 'Setup';
+}
+
+const SEGS = 15;
+$('revs').append(...Array.from({ length: SEGS }, () => document.createElement('b')));
+function showTele({ g, v, r, on, dm }) {
+  const redline = car?.redline || 7000;
+  $('gear').textContent = g || '–';
+  $('speed').textContent = v;
+  const lit = Math.round(Math.min(1, r / redline) * SEGS);
+  [...$('revs').children].forEach((s, i) => s.classList.toggle('lit', i < lit));
+  $('revs').classList.toggle('flash', r >= redline * 0.97);
+  $('ign').classList.toggle('on', on);
+  for (const b of document.querySelectorAll('[data-gear]')) b.classList.toggle('on', b.dataset.gear === (g || '')[0]);
+  for (const b of document.querySelectorAll('[data-mode]')) b.classList.toggle('on', b.dataset.mode === dm);
+}
+let toastT;
+function toast(title, text, ms = 1800) {
+  const el = $('toast');
+  el.firstElementChild.textContent = title;
+  el.lastElementChild.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+for (const t of document.querySelectorAll('[role=tab]')) t.onpointerdown = () => {
+  for (const o of document.querySelectorAll('[role=tab]')) {
+    o.setAttribute('aria-selected', o === t);
+    $('tab-' + o.dataset.tab).hidden = o !== t;
+  }
+};
+
+const wake = () => navigator.wakeLock?.request('screen').catch(() => {}); // the screen sleeping mid-drive would drop the pad
+document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && wake());
+$('go').onclick = async () => {
+  wake();
+  $('intro').hidden = true;
+  if (!isSecureContext) return toast('Tilt steering is off', 'Open the https link to steer by tilting', 5000);
+  // iOS only hands out tilt after a tap and a yes; elsewhere it just flows
+  const ok = !window.DeviceOrientationEvent?.requestPermission || await DeviceOrientationEvent.requestPermission().catch(() => 'denied') === 'granted';
+  if (ok) addEventListener('deviceorientation', onTilt);
+  else toast('Tilt steering is off', 'Allow Motion & Orientation Access for Safari in Settings', 5000);
+};
+
+(function connect() {
+  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.car && JSON.stringify(m.car) !== carJson) { carJson = JSON.stringify(m.car); car = m.car; build(); }
+    if (m.tele) { lastTele = Date.now(); showTele(m.tele); }
+    // the set-up pop-ups for engine, chassis... have no title on the cluster: name the button just pressed instead
+    if (m.toast) toast(m.toast.title || (Date.now() - pressed.at < 1000 ? pressed.label : ''), m.toast.text);
+  };
+  ws.onclose = () => setTimeout(connect, 1000);
+})();
+// a steady 30 Hz: the drive page lets go of everything when it hears nothing for half a second
+setInterval(() => send(pad), 33);
+setInterval(() => {
+  const open = ws.readyState === WebSocket.OPEN, live = open && Date.now() - lastTele < 1500;
+  $('dot').className = live ? 'live' : open ? 'wait' : '';
+  $('car').textContent = live ? car?.name || 'Connected' : open ? 'Open the drive page on the Mac' : "Can't reach the Mac";
+}, 500);
+</script>
+</body>
+</html>

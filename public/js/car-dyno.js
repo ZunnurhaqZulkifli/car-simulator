@@ -5,12 +5,14 @@
 //        intercooler; rpmMax / hpMax / tqMax size the empty chart (a run that goes past them grows it)
 //   CarDyno.tick({ dt, ignition, rpm, throttle, hp, tq, gear, gearLabel, speed, coolant, boost, egt, oil, ambient })
 //        once per frame. throttle 0..1, gear 0-based (-1 = no drive gear). boost (bar) / egt / oil / ambient (°C)
-//        only if the car models them - every other dyno channel is simulated here
+//        only if the car models them - every other dyno channel is simulated here, unless the car runs car-tune.js,
+//        whose engine model supplies AFR, knock and intake temperature. Every frame is passed on to
+//        car-perf.js (the Performance tab's timing)
 //   CarDyno.on   - dyno mode: the car skips kickdown (a pull starts low in a tall gear) and Space runs the dyno
 //   CarDyno.hold - a run is armed or recording: the car's auto box holds the gear so the pull stays in it
 //
 // Flow: dyno mode on, roll into a gear, Space arms, the run records from the first touch of throttle, Space again
-// finalises it into the run list. Runs last for the session; Save PDF prints the selected run as a dyno sheet.
+// finalises it into the run list (and the car's history). Runs last for the session; Save PDF prints the selected run as a dyno sheet.
 // The car's name (nickname, defaults to the model) is edited in the panel title and saved per car.
 // Telemetry: the car's cards and the dyno channels are sorted - what can hurt the engine beside the chart (the car's
 // 2-column grid), fuel / trip / ambient below it; a narrow panel flows them all into one grid under the chart. The
@@ -73,6 +75,16 @@
       if (Math.random() < perSec * dt) { ch.knock = Math.max(ch.knock, 30 + Math.random() * 55); knockHit = true; }
     }
     ch.knock = ease(ch.knock, floor, 0.2, dt);
+    // a tuned car's engine model knows better: its mixture, knock and intake air
+    const tune = window.CarTune && CarTune.on ? CarTune.ch : null;
+    if (tune && on) {
+      ch.cut = tune.fuelCut;
+      ch.afr = tune.afr;
+      ch.iat = tune.iat;
+      ch.knock = tune.knock;
+      knockHit = tune.knockHit;
+      ch.oil = tune.oilT;
+    }
   }
 
   const CH = [
@@ -107,6 +119,10 @@
     const k = Math.round(i.rpm / BIN), prev = run.bins[k];
     const s = { rpm: i.rpm, hp: hpS, tq: tqS, afr: ch.cut ? null : ch.afr, boost: i.boost ?? null, iat: ch.iat,
       egt: ch.egt, oil: ch.oil, knock: ch.knock, speed: i.speed ?? null };
+    const tune = window.CarTune && CarTune.on ? CarTune.ch : null;
+    if (tune) Object.assign(s, CarTune.fuel === 'petrol'
+      ? { afrT: tune.afrT, timing: tune.timing, retard: tune.retard }
+      : { lambda: tune.lambda, iq: tune.iq, rail: tune.rail, smoke: tune.smoke });
     if (!prev || s.hp > prev.hp) run.bins[k] = s; // best pull at each rpm: a lift or a limiter bounce can't drag it down
     const m = run.max;
     m.egt = Math.max(m.egt, ch.egt); m.iat = Math.max(m.iat, ch.iat); m.oil = Math.max(m.oil, ch.oil); m.knock = Math.max(m.knock, ch.knock);
@@ -126,6 +142,10 @@
     run.peakTq = samples.reduce((a, b) => (b.tq > a.tq ? b : a));
     runs.push(run);
     msg(`Run ${run.n} saved - ${fmt(run.peakHp.hp)} hp @ ${fmt(run.peakHp.rpm)} rpm, ${fmt(run.peakTq.tq)} Nm @ ${fmt(run.peakTq.rpm)} rpm`);
+    if (window.CarAPI && CarAPI.log) {
+      CarAPI.log('dyno', `Dyno run ${run.n} (${run.gear}): ${fmt(run.peakHp.hp)} hp @ ${fmt(run.peakHp.rpm)}, ${fmt(run.peakTq.tq)} Nm @ ${fmt(run.peakTq.rpm)} rpm` +
+        (window.CarTune && CarTune.on ? ` · ${CarTune.label().split(' · ')[0]}` : ''));
+    }
     selected = run; run = null;
     renderRuns();
     paint();
@@ -630,6 +650,18 @@
       ['EGT °C', (s) => fmt(s.egt)],
       ['Oil °C', (s) => s.oil.toFixed(0)],
       ['Knock %', (s) => s.knock.toFixed(0)],
+      // a tuned car's ECU channels
+      ...(r.samples.some((s) => s.retard != null) ? [
+        ['AFR tgt', (s) => (s.afrT == null ? '–' : s.afrT.toFixed(1))],
+        ['Timing ±°', (s) => (s.timing >= 0 ? '+' : '') + s.timing.toFixed(1)],
+        ['Retard °', (s) => s.retard.toFixed(1)],
+      ] : []),
+      ...(r.samples.some((s) => s.rail != null) ? [
+        ['Lambda', (s) => (s.lambda == null ? '–' : s.lambda.toFixed(2))],
+        ['IQ mg', (s) => s.iq.toFixed(1)],
+        ['Rail bar', (s) => fmt(s.rail)],
+        ['Smoke %', (s) => s.smoke.toFixed(0)],
+      ] : []),
       ['Speed km/h', (s) => (s.speed == null ? '–' : fmt(s.speed))],
     ].filter(Boolean);
   }
@@ -723,6 +755,7 @@
   // ---- per frame ----
   let frameN = 0;
   function tick(i) {
+    if (window.CarPerf) CarPerf.tick(i);
     simulate(i);
     if (!built) return;
     if (state === 'armed' && i.ignition && i.gear >= 0 && i.throttle > 0.05) { start(i); paint(); }
@@ -754,6 +787,7 @@
   }
 
   api.init = (o) => { Object.assign(cfg, o); paint(); };
+  api.ch = ch; // read-only: car-tune.js takes the cell's ambient from here
   api.tick = tick;
   window.CarDyno = api;
 

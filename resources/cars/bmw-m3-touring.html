@@ -661,7 +661,7 @@
         <button class="m-btn" id="m1-btn" title="M1 (1)">M1</button>
         <button class="m-btn" id="m2-btn" title="M2 (2)">M2</button>
         <button class="mmode-btn" id="mmode-btn" title="M Mode: Road / Sport / Track (Y)">Road</button>
-        <button class="bm3-btn" id="bm3-btn" title="bootmod3 Stage 1 + TCU flash (B)" aria-pressed="false">BM3</button>
+        <button class="bm3-btn" id="bm3-btn" title="Engine map 1 / 2 (B)" aria-pressed="false">MAP 2</button>
       </div>
     </div>
     <div class="deck-col">
@@ -877,7 +877,8 @@
   /* ---------------- REV COUNTER: red chevron 0-8k, mirrored. Outer line top (1192,40) -> apex (1292,188) ->
      bottom (1168,410); a thin scale line with the ticks just inside it, the dark-red band, a bright inner rim.
      The variable redline (oil temperature) lights the outer edge from the limit up: orange cold, red warm. ---------------- */
-  const TACH_MAX = 8, NORMAL_REDLINE = 7.2;
+  const TACH_MAX = 8;
+  let NORMAL_REDLINE = 7.2; // the tune's rev limiter (car-tune.js)
   let REDLINE = 5.0; // live variable redline, set from oil temp in the render loop
   const tachOuterX = y => y < 188 ? 1192 + (y - 40)*(100/148) : 1292 - (y - 188)*(124/222);
   const tachY = v => 405 - Math.max(0, Math.min(v, 8.4))*42.5;
@@ -1040,7 +1041,8 @@
     };
   }
   const BOOST_MIN = -1, BOOST_MAX = 2;
-  let BOOST_PEAK = 1.7; // S58 Competition: ~1.7 bar; 1.95 on the BM3 map
+  let BOOST_PEAK = 1.7; // the map's peak boost (car-tune.js) - S58 Competition: ~1.7 bar
+  let SND_HW = { ex:1, intake:1, turbo:1 }, BURBLE_TUNE = 1; // louder hardware, the map's overrun burble (car-tune.js)
   const HP_MAX = 650, TQ_MAX = 800;
   const setBoostGauge = buildMiniGauge('mg-boost', { min:BOOST_MIN, max:BOOST_MAX, labels:[-1,0,1,2], color:'#2aa5e6', unit:'bar', digits:2, sign:true });
   const setCoolantGauge = buildMiniGauge('mg-coolant', { min:40, max:140, labels:[40,90,140], color:'#2aa5e6', unit:'°C' });
@@ -1349,13 +1351,13 @@
     const coldStart = oilC < 45;
     const flaps = setup.engine !== 'efficient' || coldStart || (rpm > 4500 && load > 0.6);
     flapFilter.frequency.setTargetAtTime(flaps ? 3000 + rev*5000 : 650 + rev*1300 + load*650, t, 0.12);
-    exhaustGain.gain.setTargetAtTime(comb * (0.085 + load*0.4 + rev*0.3) * (flaps ? 1 : 0.6), t, 0.05);
+    exhaustGain.gain.setTargetAtTime(comb * (0.085 + load*0.4 + rev*0.3) * (flaps ? 1 : 0.6) * SND_HW.ex, t, 0.05);
     raspGain.gain.setTargetAtTime(comb * (flaps ? 1 : 0.4) * (0.15 + 0.85*load) * Math.pow(rev, 1.2) * 0.25 + 0.0001, t, 0.05);
     bodyGain.gain.setTargetAtTime(comb * (0.36 - rev*0.12) * (0.55 + load*0.65) * (flaps ? 1 : 0.85), t, 0.06);
     roarFilter.frequency.setTargetAtTime(260 + rpm*0.3, t, 0.06);
     roarGain.gain.setTargetAtTime(comb * comb * (0.04 + load*0.26 + (wearPct/100)*0.06) * (0.35 + rev*0.65), t, 0.05); // a worn engine sounds rougher
     intakeFilter.frequency.setTargetAtTime(500 + thr*1600 + rev*1100, t, 0.08);
-    intakeGain.gain.setTargetAtTime(comb * Math.min(0.17, 0.008 + thr*(0.045 + rev*0.13)), t, 0.06);
+    intakeGain.gain.setTargetAtTime(comb * Math.min(0.17, 0.008 + thr*(0.045 + rev*0.13)) * SND_HW.intake, t, 0.06);
     asdGain.gain.setTargetAtTime(comb * comb * ASD_MODE[setup.engine] * (0.2 + 0.8*load) * (0.35 + 0.65*rev) * 0.05, t, 0.06);
 
     // ZF + transfer case: mesh pitch follows the output shaft (road speed), near-silent in P/N and the tall top gears
@@ -1388,7 +1390,7 @@
     const f = (2000 + rev*2400 + b*4200)*pitchMul;
     turboWhistles.forEach(([w,k]) => w.frequency.setTargetAtTime(f*k, t, 0.25));
     turboAirFilter.frequency.setTargetAtTime(f*0.6, t, 0.12);
-    turboGain.gain.setTargetAtTime(soundOn ? Math.max(0.0001, Math.min(0.06, 0.004*turboIdle + b*b*0.06)) : 0.0001, t, 0.08);
+    turboGain.gain.setTargetAtTime(soundOn ? Math.max(0.0001, Math.min(0.06, 0.004*turboIdle + b*b*0.06)*SND_HW.turbo) : 0.0001, t, 0.08);
   }
 
   // distorted noise burst through a falling bandpass - every pop, crack and bang uses it
@@ -1489,10 +1491,9 @@
 
   // S58B30T0 (LCI Competition): 650 Nm 2,750-5,730 rpm, 390 kW (530 hp) 5,730-6,250, fuel cut at 7,200
   const TORQUE_CURVE = [[0,0],[650,300],[1000,380],[1500,470],[2000,555],[2500,625],[2750,650],[5730,650],[6000,621],[6250,596],[6800,530],[7200,465],[7600,330]];
-  // bootmod3 Stage 1 + TCU flash: +12% (~730 Nm / ~590 hp), a touch more boost, quicker and later shifts
-  const BM3 = { tq:1.12, boost:1.95, shiftDur:0.65, upAdd:0.3 };
-  let bm3 = false; // restored from engine_map with the M setup below
-  const torqueAt = rpm => stockTorqueAt(rpm)*(bm3 ? BM3.tq : 1);
+  // the stock full-load curve; the tune (car-tune.js) scales it every frame. Map 1 / Map 2 are its calibration slots -
+  // the bootmod3 Stage 1 + TCU flash is one of its presets
+  const torqueAt = stockTorqueAt;
   function stockTorqueAt(rpm){
     for(let i=1;i<TORQUE_CURVE.length;i++){
       const [r1,t1] = TORQUE_CURVE[i];
@@ -1503,18 +1504,22 @@
   const frictionAt = rpm => 22 + rpm*0.009; // Nm the engine drags when fuel is cut - engine braking
   const NA_FRAC = 0.45; // share of the curve the six makes before the turbos are pushing
   const MASS = 1940, WHEEL_R = 0.3395; // EU kerb weight with driver (1,865 kg DIN); 285/30 R20 rear = 679 mm
-  const GEAR_RATIOS = [5.000, 3.200, 2.143, 1.720, 1.313, 1.000, 0.823, 0.640]; // ZF 8HP76 M Steptronic
-  const REVERSE_RATIO = 3.456, FINAL_DRIVE = 3.154, DRIVELINE_EFF = 0.86;
+  let GEAR_RATIOS = [5.000, 3.200, 2.143, 1.720, 1.313, 1.000, 0.823, 0.640]; // ZF 8HP76 M Steptronic - the tune's Gearbox map can change them
+  const REVERSE_RATIO = 3.456, DRIVELINE_EFF = 0.86;
+  let FINAL_DRIVE = 3.154; // a part (car-tune.js)
   const WHEEL_KMH_PER_KRPM = 2*Math.PI*WHEEL_R*60; // ≈ 128 km/h per 1000 wheel rpm
   const kmhPerKrpm = g => WHEEL_KMH_PER_KRPM/(GEAR_RATIOS[g]*FINAL_DRIVE); // 7.2k: ≈ [58, 92, 137, 170, 223, 292, 355, 457]
   const CDA = 0.79, AIR_RHO = 1.225, ROLL_DECEL = 0.13; // Cd 0.35 x 2.26 m^2 (Touring); real rolling resistance
   const BRAKE_DECEL = 15.5; // M Compound brakes, uprated: ~25 m from 100 km/h
-  const VMAX = 280; // M Driver's Package limiter
   // what the tyres can put down per M xDrive mode (m/s^2). 2WD is rear axle only
-  const GRIP = { '4wd':13.0, '4wdsport':12.7, '2wd':9.2 }; // sticky Cup-spec tyres
-  const IDLE_RPMK = 0.68, LAUNCH_RPM_K = 3.2;
+  const GRIP_BASE = { '4wd':13.0, '4wdsport':12.7, '2wd':9.2 }; // sticky Cup-spec tyres
+  let GRIP = { ...GRIP_BASE }; // cup tyres raise it (car-tune.js)
+  const IDLE_RPMK = 0.68;
+  let LAUNCH_RPM_K = 3.2;
   let REV_LIMIT_K = 5.0; // = REDLINE, follows oil temperature
-  const shiftPoint = () => REDLINE - 0.15;
+  // full-throttle upshift per gear (the tune's Gearbox map), never past the live redline; the TCU flash's shift speed
+  let SHIFT_K = [7.05], SHIFT_DUR_MUL = 1, UP_ADD = 0;
+  const shiftPoint = () => Math.min(REDLINE - 0.15, SHIFT_K[Math.max(0, gearIdx)] ?? 9);
 
   // ---- M Engine pedal maps: same 530 hp in every mode, only the pedal-to-torque curve and response change ----
   const PEDAL_CURVE = { efficient:1.5, sport:1.1, sportplus:0.85 };
@@ -1621,7 +1626,6 @@
   };
   const DSC_OPTS = [['on','DSC On'],['mdm','M Dynamic'],['off','DSC Off']];
   const ENGINE_MODES = SETUP.engine.opts.map(o=>o[0]);
-  bm3 = (savedState.engineMap || 1) > 3; // engine_map 4-6 = M Engine mode 1-3 on the BM3 map
   const setup = { engine: ENGINE_MODES[((savedState.engineMap||1)-1) % 3] || 'efficient', chassis:'comfort', steering:'comfort', brake:'comfort', xdrive:'4wd', mmode:'road' };
   let dsc = 'on', mtc = 5, drivelogic = 2, mActive = null, mRestore = null;
 
@@ -1723,15 +1727,33 @@
     showPop(id.toUpperCase(), [[1, SETUP.engine.opts.find(o=>o[0]===setup.engine)[1]], [2, DSC_OPTS.find(o=>o[0]===dsc)[1]], [3, (manualGate() ? DL_M : DL_D)[drivelogic-1].name], [4, 'M Mode ' + SETUP.mmode.opts.find(o=>o[0]===setup.mmode)[1]]], 0);
   }
   Object.entries(mBtns).forEach(([id,b])=> b.addEventListener('click', ()=>{ pressM(id); b.blur(); }));
+  // ---- the tune: Map 1 / Map 2 are its calibration slots, switched by the MAP 2 button (B) ----
   const bm3Btn = $('bm3-btn');
-  function setBm3(on, quiet){
-    bm3 = on;
-    BOOST_PEAK = on ? BM3.boost : 1.7;
-    bm3Btn.classList.toggle('active', on); bm3Btn.setAttribute('aria-pressed', on);
-    $('spec-power').textContent = on ? 'BM3 Stage 1: ~590 hp · 730 Nm · TCU flash' : '530 hp @ 6,250 · 650 Nm @ 2,750-5,730';
-    if(!quiet) showPop('BOOTMOD3', [[0,'Stock'],[1,'Stage 1 + TCU']], on ? 1 : 0);
+  let currentMap = (savedState.engineMap || 1) > 3 ? 2 : 1; // engine_map 4-6 = M Engine mode 1-3 on Map 2
+  function setMap(n, quiet){
+    currentMap = n;
+    CarTune.setSlot(n);
+    bm3Btn.classList.toggle('active', n === 2); bm3Btn.setAttribute('aria-pressed', n === 2);
+    if(!quiet) showPop('ENGINE MAP', [[0, 'Map 1 · ' + CarTune.label(1).split(' · ')[0]], [1, 'Map 2 · ' + CarTune.label(2).split(' · ')[0]]], n - 1);
   }
-  bm3Btn.addEventListener('click', ()=>{ setBm3(!bm3); bm3Btn.blur(); });
+  // spec line + button title: the slot's calibration and what it's predicted to make
+  function showMapNames(){
+    const [name, hp, tq] = CarTune.label(currentMap).split(' · ');
+    $('spec-power').textContent = `Map ${currentMap} · ${name}: ${hp} · ${tq}`;
+    bm3Btn.title = `Map 2: ${CarTune.label(2)} (B)`;
+  }
+  // a car without a saved tune yet: Map 2 is the bootmod3 flash it had
+  CarTune.init({ engine:'S58', torque:TORQUE_CURVE, rev:7200, shift:7050, launch:3200, vmax:280, finalDrive:3.154, gears:GEAR_RATIOS.slice(), wheelR:WHEEL_R,
+    slot: currentMap, slots: ['stock', 'bm3'], setMap:(n)=> setMap(n),
+    onChange(T){
+      NORMAL_REDLINE = T.rev; SHIFT_K = T.shiftK; LAUNCH_RPM_K = T.launch; FINAL_DRIVE = T.finalDrive; GEAR_RATIOS = T.gears;
+      GRIP = Object.fromEntries(Object.entries(GRIP_BASE).map(([k,v])=> [k, v*T.grip]));
+      SND_HW = T.sound; BURBLE_TUNE = T.burble;
+      SHIFT_DUR_MUL = T.shiftCut[0]/0.22; UP_ADD = Math.min(0.4, (1 - SHIFT_DUR_MUL)*0.9); // a quicker TCU also holds gears longer
+      BOOST_PEAK = Math.max(0.5, ...[2, 3, 4, 5, 6].map(k => CarTune.boostAt(k)));
+      showMapNames();
+    } });
+  bm3Btn.addEventListener('click', ()=>{ setMap(currentMap === 2 ? 1 : 2); bm3Btn.blur(); });
   tcBtn.addEventListener('click', ()=>{ setDsc(dsc === 'on' ? 'mdm' : dsc === 'mdm' ? 'off' : 'on'); tcBtn.blur(); });
   const cycleMtc = () => { if(dsc === 'mdm') setMtc(mtc % 10 + 1); };
   mtcBtn.addEventListener('click', ()=>{ cycleMtc(); mtcBtn.blur(); });
@@ -1789,15 +1811,15 @@
     if(req >= 0.15) liftArmed = true;
     if(ignition && liftArmed && req < 0.08){
       liftArmed = false;
-      if(liftLoad >= LIFT_LOAD_MIN && liftCooldown <= 0){ liftCooldown = 1.0; if(Math.random() < LIFT_CHANCE[setup.engine]) playLiftCrackle(liftLoad); }
-      overrunT = (rpmK > OVERRUN_MIN_K && Math.random() < BURBLE_CHANCE[setup.engine]) ? 0 : -1;
+      if(liftLoad >= LIFT_LOAD_MIN && liftCooldown <= 0){ liftCooldown = 1.0; if(Math.random() < LIFT_CHANCE[setup.engine]*BURBLE_TUNE) playLiftCrackle(liftLoad); }
+      overrunT = (rpmK > OVERRUN_MIN_K && Math.random() < BURBLE_CHANCE[setup.engine]*BURBLE_TUNE) ? 0 : -1;
     }
     if(overrunT < 0) return;
     overrunT += dt;
     if(!ignition || req >= 0.08 || rpmK < OVERRUN_END_K || overrunT > OVERRUN_MAX_S){ overrunT = -1; return; }
     const rpmF = clamp01((rpmK - OVERRUN_END_K) / (6 - OVERRUN_END_K));
     // busy straight after the lift, then a steady patter that lasts through a long coast-down
-    const popsPerSec = (2.5 + rpmF*7) * (0.35 + 0.65*Math.exp(-overrunT/3)) * (setup.engine === 'efficient' ? 0.5 : 1);
+    const popsPerSec = (2.5 + rpmF*7) * (0.35 + 0.65*Math.exp(-overrunT/3)) * (setup.engine === 'efficient' ? 0.5 : 1) * BURBLE_TUNE;
     if(Math.random() < popsPerSec*dt) playBurble(rpmF);
   }
   function playLiftCrackle(load){
@@ -1914,7 +1936,7 @@
     const lvl = (manualGate() ? DL_M : DL_D)[drivelogic-1];
     const up = g > gearIdx;
     if(up) playUpshiftCrack(rpmK, loadFrac); else playDownshiftPops(gearRpm(g, speed));
-    shift = { t:0, dur: (up ? lvl.dur : lvl.dur*0.8)*(bm3 ? BM3.shiftDur : 1), up, depth: up ? lvl.depth : 0.2, fromRpm: rpmK };
+    shift = { t:0, dur: (up ? lvl.dur : lvl.dur*0.8)*SHIFT_DUR_MUL, up, depth: up ? lvl.depth : 0.2, fromRpm: rpmK };
     gearIdx = g;
     shiftCooldown = shift.dur + 0.2;
     boostFrac *= up ? 0.85 : 1; // the cut bleeds a little boost
@@ -1922,7 +1944,9 @@
   const refuse = () => { if(!noMotion()) $('gear-g').animate([{opacity:1},{opacity:.15},{opacity:1},{opacity:.15},{opacity:1}], {duration:500}); };
   // paddles: in D they drop the box into a temporary M for 8 s, like the car
   function paddle(dir){
-    if(!ignition || transmissionMode === 'R' || transmissionMode === 'N') return;
+    if(!ignition || transmissionMode === 'R') return;
+    // out of N, a paddle drops it into the M gate in gear (1st standing) straight from whatever the revs are, as on the other cars
+    if(transmissionMode === 'N'){ setTransmission('M'); return; }
     if(transmissionMode === 'D'){ tempManual = 8; }
     if(gearIdx < 0){ gearIdx = 0; return; }
     const g = gearIdx + dir;
@@ -1978,7 +2002,7 @@
       for(let c=0; c<g; c++) if(gearRpm(c, speed) <= sp - 0.5) return c;
     }
     const kick = pedalRaw >= 0.97; // floored: hold every gear to the shift point
-    const upThr = Math.min(sp, kick ? sp : dl.up0 + torqueReq*(dl.up1 - dl.up0) + (bm3 ? BM3.upAdd : 0));
+    const upThr = Math.min(sp, kick ? sp : dl.up0 + torqueReq*(dl.up1 - dl.up0) + UP_ADD);
     if(torqueReq > 0.02 && cur >= upThr && g < 7) return g+1;
     // part-throttle squeeze below the gear's comfortable range: one down, if it lands under the upshift point
     if(torqueReq > 0.55 && cur < dl.part && g > 0 && gearRpm(g-1, speed) < upThr - 0.3) return g-1;
@@ -2024,7 +2048,7 @@
     const load01 = clamp01(loadFrac) * clamp01(rpmK/7);
     if(running) oilC += ((100 + load01*28) - oilC) * (0.012 + 0.035*load01) * dt; // ~80 s to warm at idle, much quicker driven
     else oilC += (20 - oilC) * 0.0004;
-    REDLINE = oilC >= 80 ? NORMAL_REDLINE : Math.round((5.0 + 2.2*clamp01((oilC - 30)/50))*10)/10;
+    REDLINE = oilC >= 80 ? NORMAL_REDLINE : Math.round((5.0 + (NORMAL_REDLINE - 5.0)*clamp01((oilC - 30)/50))*10)/10;
     REV_LIMIT_K = REDLINE;
     syncRedzone();
     // cold fast idle: ~1,000 rpm from a cold start, easing down to 680 as the oil passes 60C (about a minute at idle)
@@ -2034,22 +2058,24 @@
     const spool = clamp01((rpmK - 1.3)/1.3);
     const boostTarget = running ? clamp01((torqueReq - NA_FRAC)/(1 - NA_FRAC)) * spool : 0;
     boostFrac += (boostTarget - boostFrac) * (1 - Math.exp(-dt/(boostTarget > boostFrac ? 0.3 : 0.12)));
-    const boostShown = !running ? 0 : (torqueReq < NA_FRAC ? -0.75*(1 - torqueReq/NA_FRAC) : boostFrac*BOOST_PEAK);
+    // spooled, it makes the tune's boost map at this rpm, capped by what the fitted turbos can make
+    const boostShown = !running ? 0 : (torqueReq < NA_FRAC ? -0.75*(1 - torqueReq/NA_FRAC) : boostFrac*CarTune.boostAt(rpmK));
     boostBar += (boostShown - boostBar) * Math.min(1, dt*8);
     updateTurboSound(boostBar, rpmK, running, dt);
     recircCooldown = Math.max(0, recircCooldown - dt);
     if(running && throttleTrend > 0.55 && pedalRaw < 0.15 && boostBar > 0.5 && recircCooldown <= 0){ playRecirc(boostBar/BOOST_PEAK); recircCooldown = 0.6; } // sharp lift on boost
 
-    // ---- engine torque: the curve x what the turbos are delivering x the pedal; fuel cut at the rev limiter,
-    // eased off at the 280 km/h Vmax limiter ----
+    // ---- engine torque: the curve x the tune x what the turbos are delivering x the pedal; fuel cut at the rev
+    // limiter; the tune's cuts: its Vmax limiter (280 km/h stock), misfires ----
+    const tune = CarTune.tick({ dt, ignition: running, rpm: Math.max(rpmK, idleK)*1000, pedal: torqueReq, boost: boostBar, speed, gear: gearIdx, coolant: coolantC,
+      fuelCut: pedalRaw < 0.02 && rpmK > idleK + 0.3 && gearIdx >= 0 && speed > 8 });
     if(rpmK >= REV_LIMIT_K) limiterCut = true;
     else if(rpmK < REV_LIMIT_K - 0.12) limiterCut = false;
-    let frac = Math.min(torqueReq, NA_FRAC + (1 - NA_FRAC)*boostFrac);
-    if(speed > VMAX - 3) frac = Math.min(frac, clamp01((VMAX + 1 - speed)/4)*0.8);
+    let frac = Math.min(torqueReq, NA_FRAC + (1 - NA_FRAC)*boostFrac)*tune.cut;
     if(limiterCut || !running) frac = 0;
     const wearMul = 1 - (wearPct/100)*0.1;
     const rpm = rpmK*1000;
-    const engineTq = running ? torqueAt(rpm)*frac*wearMul - frictionAt(rpm)*Math.max(0, 1 - frac/0.05) : 0; // the ECU fuels to cover friction as soon as the pedal asks for torque - only a closed pedal engine-brakes
+    const engineTq = running ? torqueAt(rpm)*tune.tqMul*frac*wearMul - frictionAt(rpm)*Math.max(0, 1 - frac/0.05) : 0; // the ECU fuels to cover friction as soon as the pedal asks for torque - only a closed pedal engine-brakes
     loadFrac = frac;
 
     // ---- drivetrain ----
@@ -2063,6 +2089,9 @@
     }
     const v = speed/3.6;
     const dragA = (0.5*AIR_RHO*CDA*v*v)/MASS + (speed > 0.5 ? ROLL_DECEL : 0);
+    // gravity along the road: the driving page (drive.html) sets roadGrade = sin(slope), + = nose up; 0 everywhere else.
+    // Backing up a slope is going downhill, so reverse flips it
+    const gradeA = 9.81*(window.roadGrade || 0)*(transmissionMode === 'R' ? -1 : 1);
     const inGear = gearIdx >= 0 && (transmissionMode === 'D' || transmissionMode === 'M');
     let a = 0;
     if(inGear){
@@ -2078,7 +2107,7 @@
     }
     if(braking) a = Math.min(a, 0) - BRAKE_DECEL*(braking/100)*CarService.brakeMul();
     if(!running && !braking) a = Math.min(a, 0);
-    speed = Math.max(0, Math.min(330, speed + (a - dragA)*3.6*dt));
+    speed = Math.max(0, speed + (a - dragA - gradeA)*3.6*dt); // no cap: drag and the rev limiter set the top speed
     if(braking && speed < 0.3) speed = 0;
 
     // ---- gear selection ----
@@ -2160,7 +2189,7 @@
     const enginePowerKw = running ? Math.max(0, engineTq)*rpm/9549 : 0;
     const loadShare = clamp01(enginePowerKw/Math.max(25, torqueAt(rpm)*rpm/9549));
     const bsfc = 235 + 130*Math.pow(1 - loadShare, 2); // g/kWh - thirstiest at light load
-    const fuelFlowLph = running ? (0.75*Math.pow(rpmK/IDLE_RPMK, 0.7) + enginePowerKw*bsfc/1000/PETROL_KG_PER_L) * (1 + (wearPct/100)*0.06) : 0;
+    const fuelFlowLph = running ? (0.75*Math.pow(rpmK/IDLE_RPMK, 0.7) + enginePowerKw*bsfc/1000/PETROL_KG_PER_L*tune.fuelMul) * (1 + (wearPct/100)*0.06) : 0;
     const consumptionL100 = !running ? 0 : speed < 2 ? Math.min(40, fuelFlowLph*0.5) : Math.min(40, fuelFlowLph/speed*100);
     CarService.tick({ dt, speed, braking, slip: Math.max(wheelspinK, tcSlipK, launchState === 'go' ? 0.35 : 0), engineWear: wearPct, ignition, lowFuel: fuelFrac*TANK_SIZE_L <= RESERVE_L });
     if(ignition){
@@ -2212,6 +2241,7 @@
       coolantC += (20 - coolantC) * 0.0006;
       overheatBuildup = Math.max(0, overheatBuildup - dt*0.003);
     }
+    if(tune.coolant != null) coolantC = tune.coolant; // car-tune.js's cooling: heat from the fuel burned, out through the radiator, pump + thermostat
     coolantC = Math.max(15, Math.min(170, coolantC));
     updateFan();
     setCoolantGauge(coolantC);
@@ -2221,24 +2251,24 @@
 
     // ---- engine wear: overheating, and revving it hard before the oil is warm ----
     if(ignition){
-      const wearRate = Math.max(0, coolantC - 112)*0.01 + (oilC < 50 && rpmK > 4.5 ? 0.02 : 0);
+      const wearRate = Math.max(0, coolantC - 112)*0.01 + (oilC < 50 && rpmK > 4.5 ? 0.02 : 0) + tune.wear; // plus whatever the tune takes out of it
       if(wearRate > 0){ wearPct = Math.min(100, wearPct + wearRate*CarService.oilMul()*dt); updateWearDisplay(); }
     }
 
     // ---- boost / EGT / oil pressure ----
     setBoostGauge(boostBar);
     boostReadout.textContent = (boostBar>=0?'+':'') + boostBar.toFixed(2) + ' bar';
-    const egtTarget = running ? 320 + loadFrac*clamp01(rpmK/7)*640 + Math.max(0,boostBar)*40 : 23;
+    const egtTarget = running ? tune.egt : 23; // the tune's exhaust model: mixture, timing, boost
     egrC += (egtTarget - egrC) * (running ? 0.03 : 0.01);
     egrC = Math.max(23, Math.min(1000, egrC));
-    const oilTargetBar = running ? Math.min(6.5, (1.2 + rpmK*0.62 + Math.max(0,(60-oilC))*0.02) * (1 - (wearPct/100)*0.3)) : 0;
+    const oilTargetBar = running ? Math.min(6.5, (1.2 + rpmK*0.62 + Math.max(0,(60-oilC))*0.02) * (1 - (wearPct/100)*0.3) * tune.oilPress) : 0; // a worn or uprated pump
     oilPressureBar += (oilTargetBar - oilPressureBar) * (ignition ? 0.15 : 0.08);
 
     // ---- live power / torque gauges (damped while running; snap to 0 when off) ----
-    const liveHp = Math.min(HP_MAX, kwToHp(enginePowerKw)), liveTq = Math.min(TQ_MAX, Math.max(0, engineTq));
+    const liveHp = kwToHp(enginePowerKw), liveTq = Math.max(0, engineTq); // the gauges pin at their max, the dyno reads the real figure
     if(!running){ dispHp = 0; dispTq = 0; }
     else { dispHp += (liveHp - dispHp)*0.05; dispTq += (liveTq - dispTq)*0.05; }
-    setHpGauge(dispHp); setTqGauge(dispTq);
+    setHpGauge(Math.min(dispHp, HP_MAX)); setTqGauge(Math.min(dispTq, TQ_MAX));
     hpReadout.textContent = Math.round(dispHp) + ' hp';
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
@@ -2251,7 +2281,7 @@
       wlBattery.className = cranking ? 'wl on-red' : 'wl';
       wlBelt.className = 'wl';
       const overheating = coolantC > 112;
-      wlEngine.className = (overheating || wearPct > 50) ? 'wl on-red' : 'wl';
+      wlEngine.className = (overheating || wearPct > 50 || CarTune.warnLight()) ? 'wl on-red' : 'wl';
       wlTemp.className = overheating ? 'wl on-red blink' : (coolantC < 87 ? 'wl on-blue' : 'wl');
       wlOil.className = (engineOnTime > 2 && oilPressureBar < 0.5) ? 'wl on-red blink' : 'wl';
       wlAbs.className = (braking > 60 && speed > 5) ? 'wl on-amber blink' : 'wl';
@@ -2307,7 +2337,8 @@
     if(throttleKeyLastT === null) throttleKeyLastT = now;
     const dt = (now - throttleKeyLastT)/1000;
     throttleKeyLastT = now;
-    const target = wDown ? 100 : 0;
+    // the drive page's throttle limiter (window.throttleLimit, 0.2-1): W opens as fast as ever, but only that far
+    const lim = window.throttleLimit || 1, target = wDown ? 100*lim : 0;
     let current = parseFloat(throttleSlider.value);
     if(current < target) current = Math.min(target, current + THROTTLE_KEY_RATE*dt);
     else if(current > target) current = Math.max(target, current - THROTTLE_KEY_RATE*dt);
@@ -2322,7 +2353,8 @@
     if(brakeLastT === null) brakeLastT = now;
     const dt = (now - brakeLastT)/1000, rate = BRAKE_RAMP[setup.brake];
     brakeLastT = now;
-    const active = sDown || spaceDown || mouseBrakeDown, target = active ? 100 : 0;
+    // and its brake limiter (window.brakeLimit), the same way
+    const lim = window.brakeLimit || 1, active = sDown || spaceDown || mouseBrakeDown, target = active ? 100*lim : 0;
     if(braking < target) braking = Math.min(target, braking + rate*dt);
     else if(braking > target) braking = Math.max(target, braking - rate*dt);
     if(active || braking !== target) brakeRAF = requestAnimationFrame(brakeStep);
@@ -2382,7 +2414,7 @@
       case 'j': cycleMtc(); break;
       case '1': pressM('m1'); break;
       case '2': pressM('m2'); break;
-      case 'b': setBm3(!bm3); break;
+      case 'b': setMap(currentMap === 2 ? 1 : 2); break;
       case 'l': toggleLights(); break;
       case 'h': toggleHighBeam(); break;
       case 'f':
@@ -2411,7 +2443,7 @@
   setDsc('on', true);
   setMtc(5, true);
   setDrivelogic(2, true);
-  setBm3(bm3, true);
+  setMap(currentMap, true);
   syncRedzone();
   setSpeedBand(0); setTachBand(0);
   setFuelBar(gaugeFuelFrac());
@@ -2420,9 +2452,9 @@
   odoTotal.textContent = String(Math.floor(odometer));
   requestAnimationFrame(frame);
 
-  // autosave: periodically and on tab close; engine_map carries the M Engine mode (1 Efficient, 2 Sport, 3 Sport Plus), +3 on the BM3 map
+  // autosave: periodically and on tab close; engine_map carries the M Engine mode (1 Efficient, 2 Sport, 3 Sport Plus), +3 on Map 2
   function currentSaveData(){
-    return { odometer, fuel_level: fuelFrac, engine_wear_pct: wearPct, engine_map: ENGINE_MODES.indexOf(setup.engine) + 1 + (bm3 ? 3 : 0) };
+    return { odometer, fuel_level: fuelFrac, engine_wear_pct: wearPct, engine_map: ENGINE_MODES.indexOf(setup.engine) + 1 + (currentMap === 2 ? 3 : 0) };
   }
   setInterval(()=> CarAPI.save(currentSaveData()), 10000);
   window.addEventListener('pagehide', ()=> CarAPI.save(currentSaveData()));

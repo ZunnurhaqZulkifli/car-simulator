@@ -1,23 +1,29 @@
 // Arrangeable car page, injected into every car's raw HTML after car-service.js (whose resizable areas it moves).
 //
 // The page's areas - gauge cluster, control deck, tuning panel, dyno panel, whichever the car has (car-service.js
-// finds them by class) - follow one of three presets, picked from the floating Layout button:
+// finds them by class) - follow one of four presets, picked from the floating Layout button:
 //   classic - the car's own flow layout; the area grips resize it, as before
+//   drive   - just the gauge cluster and the control deck, as big as the window takes; tuning and dyno are off
 //   pitwall - the dyno panel as a full-height column on the right, the rest stacked on the left
 //   free    - the user's own arrangement: every area at its own rect on the page
 // Arrange mode overlays every area: drag to move, edges and corners to resize. Edges snap to the window and to
 // each other (flush, or a gutter apart), else to an 8px grid. Dragging anything outside Free starts a Free layout
-// from where everything stands. Saved per car as layout.arrange = { preset, cluster|controls|tuning|dyno: {x,y,w,h} }.
+// from where everything stands (from Driving, still without the panels it leaves off). Saved per car as
+// layout.arrange = { preset, cluster|controls|tuning|dyno: {x,y,w,h}, hide: [areas Free leaves off] }, and up to
+// three of those the owner saved as layout.slots = { 1|2|3: arrange }, loaded back from the picker.
 (function () {
   const M = 16, GAP = 16, GRID = 8, SNAP = 10;
   const LABELS = { cluster: 'Cluster', controls: 'Controls', tuning: 'Tuning', dyno: 'Dyno' };
   const KEYS = Object.keys(LABELS);
+  const OFF = ['tuning', 'dyno']; // the panels a layout can leave off - the cluster and controls always stay
+  const SLOTS = ['1', '2', '3'];
   const html = document.documentElement;
-  let CS = null, areas = [], preset = 'classic', editing = false, arrange = {};
+  let CS = null, areas = [], preset = 'classic', editing = false, arrange = {}, hide = [];
 
   const area = (k) => areas.find((a) => a.key === k);
-  // a closed dyno panel, or a tuning panel tucked into the dyno panel's tab, isn't on the page
-  const shown = (a) => a && !a.el.classList.contains('dyno-collapsed') && !a.el.classList.contains('cs-in-tab');
+  const hidden = (k) => (preset === 'drive' ? OFF : preset === 'free' ? hide : []).includes(k);
+  // a panel the layout leaves off, a closed dyno panel, or a tuning panel tucked into the dyno panel's tab, isn't on the page
+  const shown = (a) => a && !hidden(a.key) && !a.el.classList.contains('dyno-collapsed') && !a.el.classList.contains('cs-in-tab');
   const rectOf = (a) => {
     const r = a.el.getBoundingClientRect();
     return { x: Math.round(r.left + scrollX), y: Math.round(r.top + scrollY), w: Math.round(r.width), h: Math.round(r.height) };
@@ -59,10 +65,32 @@
     }
   }
 
+  // the cluster as big as the window allows with the control deck under it, both centred - clear of the
+  // floating buttons (44px, 16px off the bottom corners)
+  function drive() {
+    const W = html.clientWidth - 2 * M, H = innerHeight - 2 * M - 44 - GAP, cluster = area('cluster'), controls = area('controls');
+    if (!cluster) return;
+    const ratio = cluster.el.offsetHeight / Math.max(1, cluster.el.offsetWidth);
+    let w = W, ch = 0;
+    for (let i = 0; i < 2; i++) { // the deck's height follows its width, so settle the pair twice
+      if (controls) controls.apply(w, null);
+      ch = controls ? controls.el.offsetHeight + GAP : 0;
+      w = Math.max(cluster.minW, Math.min(W, Math.round((H - ch) / ratio)));
+    }
+    const x = M + Math.round((W - w) / 2), y = M + Math.max(0, Math.round((H - ch - w * ratio) / 2));
+    put(cluster, { x, y, w, h: null });
+    if (controls) put(controls, { x, y: y + cluster.el.offsetHeight + GAP, w, h: null });
+  }
+
   function layout() {
     const canvas = preset !== 'classic';
     html.classList.toggle('cl-canvas', canvas);
     html.classList.toggle('cl-nodock', canvas || editing);
+    // panels the layout leaves off go, with their floating buttons; a dyno panel left open shuts
+    OFF.forEach((k) => html.classList.toggle('cl-off-' + k, hidden(k)));
+    areas.forEach((a) => a.el.classList.toggle('cl-hidden', hidden(a.key)));
+    const dyno = area('dyno');
+    if (dyno && hidden('dyno') && !dyno.el.classList.contains('dyno-collapsed')) document.getElementById('dyno-toggle-btn')?.click();
     if (!canvas) { // back to the car's own flow, at the sizes its grips set
       areas.forEach((a) => {
         a.el.style.left = a.el.style.top = '';
@@ -70,6 +98,7 @@
         a.apply(s.w, s.h);
       });
     } else if (preset === 'pitwall') pitwall();
+    else if (preset === 'drive') drive();
     else {
       let bottom = M; // an area the free layout never placed (shown since) goes under the rest
       areas.forEach((a) => {
@@ -96,13 +125,28 @@
     });
   }
 
+  // what's saved: the preset, Free's rects and the panels it leaves off - also what a slot holds
+  const current = () => ({ preset: preset === 'classic' ? null : preset, ...Object.fromEntries(KEYS.map((k) => [k, arrange[k] || null])),
+    hide: hide.length ? [...hide] : null });
+  function adopt(st) {
+    preset = ['pitwall', 'free', 'drive'].includes(st.preset) ? st.preset : 'classic';
+    arrange = {};
+    KEYS.forEach((k) => { if (st[k]) arrange[k] = st[k]; });
+    hide = (st.hide || []).filter((k) => OFF.includes(k));
+  }
   function save() {
-    CS.setLayout('arrange', { preset: preset === 'classic' ? null : preset, ...Object.fromEntries(KEYS.map((k) => [k, arrange[k] || null])) });
+    CS.setLayout('arrange', current());
+  }
+  // an arranged page has a place for the dyno panel (the car opens with it shut), unless the layout leaves it off
+  function openDyno() {
+    const dyno = area('dyno');
+    if (preset !== 'classic' && !hidden('dyno') && dyno && dyno.el.classList.contains('dyno-collapsed')) document.getElementById('dyno-toggle-btn')?.click();
   }
 
-  // freeze every area where it stands and go absolute - nothing visibly moves
+  // freeze every area where it stands and go absolute - nothing visibly moves; what the preset left off stays off
   function toFree() {
     const rects = areas.filter(shown).map((a) => [a, rectOf(a)]);
+    hide = OFF.filter(hidden);
     arrange = {};
     rects.forEach(([a, r]) => { arrange[a.key] = saved(a, r); });
     preset = 'free';
@@ -118,6 +162,20 @@
       if (p === 'pitwall' && dyno && dyno.el.classList.contains('dyno-collapsed')) document.getElementById('dyno-toggle-btn')?.click();
       layout();
     });
+    save();
+    renderPicker();
+  }
+
+  // ---- slots: the current layout saved under 1-3, loaded back with a click ----
+  const slots = () => CS.layout.slots || {};
+  function saveSlot(n) {
+    CS.setLayout('slots', { [n]: current() });
+    renderPicker();
+  }
+  function loadSlot(n) {
+    if (!slots()[n]) return;
+    adopt(slots()[n]);
+    flip(() => { openDyno(); layout(); });
     save();
     renderPicker();
   }
@@ -229,7 +287,7 @@
     editing = on;
     html.classList.toggle('cl-edit', on);
     const dyno = area('dyno');
-    if (on && dyno && dyno.el.classList.contains('dyno-collapsed')) document.getElementById('dyno-toggle-btn')?.click(); // so it can be placed
+    if (on && dyno && !hidden('dyno') && dyno.el.classList.contains('dyno-collapsed')) document.getElementById('dyno-toggle-btn')?.click(); // so it can be placed
     layout();
     bar.hidden = !on;
   }
@@ -265,6 +323,7 @@
   // ---- picker: a thumbnail of each preset, drawn with placeholder blocks ----
   const SCHEMA = {
     classic: { cluster: [3, 4, 71, 52], controls: [3, 59, 71, 9], tuning: [77, 4, 20, 64], dyno: [3, 71, 94, 25] },
+    drive: { cluster: [10, 8, 80, 62], controls: [10, 74, 80, 14] },
     pitwall: { cluster: [3, 5, 55, 43], controls: [3, 51, 55, 9], tuning: [3, 63, 55, 32], dyno: [61, 5, 36, 90] },
     free: { cluster: [26, 8, 50, 38], controls: [26, 49, 50, 9], dyno: [5, 63, 44, 31], tuning: [53, 63, 42, 31] },
   };
@@ -274,9 +333,9 @@
     grip: '<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>',
   };
   const svgIcon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
-  function freeSchema() { // the saved free layout, scaled into the thumbnail
-    const rs = areas.filter((a) => arrange[a.key]).map((a) => {
-      const r = arrange[a.key];
+  function freeSchema(rects = arrange) { // a saved free layout, scaled into the thumbnail
+    const rs = areas.filter((a) => rects[a.key]).map((a) => {
+      const r = rects[a.key];
       return [a.key, { ...r, h: r.h || Math.round(r.w * a.el.offsetHeight / Math.max(1, a.el.offsetWidth)) }];
     });
     if (!rs.length) return null;
@@ -284,12 +343,13 @@
     const ph = Math.max(innerHeight, ...rs.map(([, r]) => r.y + r.h + M));
     return Object.fromEntries(rs.map(([k, r]) => [k, [r.x / pw * 100, r.y / ph * 100, r.w / pw * 100, r.h / ph * 100]]));
   }
-  const thumb = (schema, empty) => `<div class="cl-thumb${empty ? ' cl-thumb-empty' : ''}">` +
+  const thumb = (schema, empty, icon = empty) => `<div class="cl-thumb${empty ? ' cl-thumb-empty' : ''}">` +
     Object.entries(schema).filter(([k]) => area(k)).map(([k, [x, y, w, h]]) =>
       `<i class="cl-b cl-b-${k}" style="left:${x.toFixed(1)}%;top:${y.toFixed(1)}%;width:${w.toFixed(1)}%;height:${h.toFixed(1)}%"></i>`).join('') +
-    (empty ? `<em>${svgIcon('move')}</em>` : '') + '</div>';
+    (icon ? `<em>${svgIcon('move')}</em>` : '') + '</div>';
   const PRESETS = [
     ['classic', 'Classic', "The car's own layout"],
+    ['drive', 'Driving', 'Just the gauges and controls'],
     ['pitwall', 'Pit Wall', 'Dyno docked on the right'],
     ['free', 'Free', 'Drag and snap anything'],
   ];
@@ -301,6 +361,16 @@
       `<button class="cl-preset" data-p="${p}" aria-pressed="${p === preset}">` +
       thumb(p === 'free' ? free || SCHEMA.free : SCHEMA[p], p === 'free' && !free) +
       `<b>${name}</b><small>${p === 'free' && !free ? 'Start from where things are' : sub}</small></button>`).join('');
+    const now = JSON.stringify(current());
+    menu.querySelector('.cl-slots').innerHTML = SLOTS.map((n) => {
+      const s = slots()[n], p = s && (s.preset || 'classic');
+      const look = s && (p === 'free' ? freeSchema(s) || SCHEMA.free : SCHEMA[p]);
+      return '<div class="cl-slot">' +
+        `<button class="cl-preset" data-load="${n}" aria-pressed="${!!s && JSON.stringify(s) === now}"${s ? '' : ' disabled'}>` +
+        thumb(look || {}, !s, false) +
+        `<b>Slot ${n}</b><small>${s ? PRESETS.find(([k]) => k === p)[1] : 'Empty'}</small></button>` +
+        `<button class="cl-btn cl-save" data-save="${n}">${s ? 'Save over' : 'Save here'}</button></div>`;
+    }).join('');
   }
 
   const CSS = `
@@ -309,6 +379,7 @@
     .cl-canvas .rig{display:contents !important;}
     .cl-canvas .cl-area:not(.cs-in-tab){position:absolute !important;margin:0 !important;box-sizing:border-box;}
     .cl-canvas .cs-grip,.cl-edit .cs-grip{display:none;}
+    .cl-hidden,.cl-off-dyno #dyno-toggle-btn,.cl-off-tuning #tuning-toggle-btn{display:none !important;}
     /* a wide tuning panel reads across: identity + setup in a side column, live data and diagrams beside it -
        gauges in one row, the digital readout as a strip under them */
     .cl-across > .cs-scroller{display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr);gap:0 26px;align-items:start;}
@@ -353,12 +424,17 @@
     .cl-btn:hover{border-color:#e8402a;}
     .cl-btn svg{width:13px;height:13px;}
     .cl-btn-main{background:#e8402a;border-color:#e8402a;}
-    .cl-menu{inset:auto;margin:0;width:min(540px,calc(100vw - 32px));padding:14px;box-sizing:border-box;background:#121418;color:#c7cbd0;
+    .cl-menu{inset:auto;margin:0;width:min(620px,calc(100vw - 32px));padding:14px;box-sizing:border-box;background:#121418;color:#c7cbd0;
       border:1px solid #2a2d33;border-radius:14px;box-shadow:0 18px 44px -12px rgba(0,0,0,.9);font:.72rem/1.3 "Segoe UI",system-ui,Arial,sans-serif;}
     .cl-head{display:flex;align-items:baseline;justify-content:space-between;margin:0 2px 12px;}
     .cl-head b{color:#f4f6f8;font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;}
     .cl-head span{color:#6f757d;font-size:.66rem;}
-    .cl-presets{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+    .cl-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+    .cl-slots{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+    .cl-head-slots{margin-top:16px;padding-top:14px;border-top:1px solid #1f2227;}
+    .cl-slot{display:flex;flex-direction:column;gap:6px;min-width:0;}
+    .cl-slot .cl-preset:disabled{cursor:default;opacity:.5;}
+    .cl-slot .cl-btn{justify-content:center;padding:8px 10px;}
     .cl-preset{display:flex;flex-direction:column;gap:3px;padding:8px;border-radius:12px;border:1px solid #23262c;background:#0d0e10;color:#c7cbd0;
       cursor:pointer;text-align:left;font:inherit;text-transform:none;letter-spacing:0;transition:border-color .15s,background .15s;}
     .cl-preset:hover{border-color:#3a3f48;}
@@ -387,9 +463,7 @@
     const style = document.createElement('style');
     style.textContent = CSS;
     document.head.appendChild(style);
-    const st = (CS.layout.arrange) || {};
-    preset = ['pitwall', 'free'].includes(st.preset) ? st.preset : 'classic';
-    KEYS.forEach((k) => { if (st[k]) arrange[k] = st[k]; });
+    adopt(CS.layout.arrange || {});
 
     areas.forEach((a) => {
       a.el.classList.add('cl-area');
@@ -439,6 +513,7 @@
     menu.className = 'cl-menu';
     menu.popover = 'auto';
     menu.innerHTML = '<div class="cl-head"><b>Layout</b><span>Saved for this car</span></div><div class="cl-presets"></div>' +
+      '<div class="cl-head cl-head-slots"><b>My layouts</b><span>Save the current layout, click one to load it</span></div><div class="cl-slots"></div>' +
       `<div class="cl-foot"><span>Dragging anything switches to Free</span><button class="cl-btn">${svgIcon('move')}Arrange</button></div>`;
     fab.popoverTargetElement = menu;
     fab.addEventListener('click', () => fab.blur());
@@ -449,8 +524,10 @@
       Object.assign(menu.style, { left: r.left + 'px', bottom: innerHeight - r.top + 10 + 'px', top: 'auto' });
     });
     menu.addEventListener('click', (e) => {
-      const p = e.target.closest('[data-p]');
+      const p = e.target.closest('[data-p]'), load = e.target.closest('[data-load]'), keep = e.target.closest('[data-save]');
       if (p) choose(p.dataset.p);
+      if (load) loadSlot(load.dataset.load);
+      if (keep) saveSlot(keep.dataset.save);
       if (e.target.closest('.cl-foot button')) { menu.hidePopover(); setEditing(true); }
     });
     ['keydown', 'keyup'].forEach((t) => menu.addEventListener(t, (e) => e.stopPropagation())); // no driving from the menu
@@ -476,12 +553,10 @@
     watched.forEach((a) => seen.observe(a.el, { attributes: true, attributeFilter: ['class'] }));
     let pending = 0;
     addEventListener('resize', () => {
-      if (preset !== 'pitwall' || pending) return;
+      if (!['pitwall', 'drive'].includes(preset) || pending) return;
       pending = requestAnimationFrame(() => { pending = 0; layout(); });
     });
-    // the car opens with its dyno panel shut; an arranged page has a place for it, so it opens there
-    const dyno = area('dyno');
-    if (preset !== 'classic' && dyno && dyno.el.classList.contains('dyno-collapsed')) document.getElementById('dyno-toggle-btn')?.click();
+    openDyno();
     layout();
   }
 

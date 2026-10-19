@@ -722,11 +722,11 @@
 
   /* ---------------- SPEEDOMETER (single km/h scale, fixed 0-260 dial - BMW F20 style) ---------------- */
   const SPD_MIN=0;
-  let SPD_MAX=260; // dial face scale - stock map's printed scale; stage 2 redraws it further out (see setMap)
+  let SPD_MAX=260; // dial face scale - the stock printed scale; a tune without the 250 km/h limiter redraws it further out
   const speedTicksKmh = document.getElementById('speed-ticks-kmh');
   function buildSpeedoTicks(){
     speedTicksKmh.innerHTML = '';
-    // major step always divides SPD_MAX evenly, so the printed max (260 stock, 330 stage 2) lands
+    // major step always divides SPD_MAX evenly, so the printed max (260 stock, 330 derestricted) lands
     // on a real labeled tick instead of falling in the gap after the last round number
     const majorStep = SPD_MAX <= 260 ? 20 : 30;
     const minorStep = majorStep/10, halfStep = majorStep/2;
@@ -1017,6 +1017,7 @@
     src.connect(g).connect(masterGain); src.start();
   }
   const layerVol = { chime:0.8, fan:0.7, master:1, i6exhaust:0.25, i6body:0.25, i6roar:0.22, i6intake:0.1, turbo:1, turboJet:0.75, zf:1, bov:1, limiter:0.75, shiftPop:0.7, liftCrackle:0.8, screech:0.7 };
+  let SND_HW = { ex:1, intake:1, turbo:1 }; // louder hardware (downpipe, intake, turbo) - set by car-tune.js
 
   function makeDistortionCurve(amount){
     const n = 2048;
@@ -1281,12 +1282,12 @@
     // the flap opens in Sport, and on its own high up under load in the other modes
     const flaps = currentMode === 'sport' || (rpm > 4500 && load > 0.6);
     flapFilter.frequency.setTargetAtTime(flaps ? 2800 + rev*4600 : 700 + rev*1500 + load*700, t, 0.12);
-    exhaustGain.gain.setTargetAtTime((0.2 + load*0.34 + rev*0.24) * (flaps ? 1 : 0.65), t, 0.05);
+    exhaustGain.gain.setTargetAtTime((0.2 + load*0.34 + rev*0.24) * (flaps ? 1 : 0.65) * SND_HW.ex, t, 0.05);
     bodyGain.gain.setTargetAtTime((0.45 - rev*0.2) * (0.7 + load*0.5), t, 0.06);
     roarFilter.frequency.setTargetAtTime(260 + rpm*0.3, t, 0.06);
     roarGain.gain.setTargetAtTime((0.04 + load*0.26 + (wearPct/100)*0.06) * (0.35 + rev*0.65), t, 0.05); // a worn engine sounds rougher
     intakeFilter.frequency.setTargetAtTime(500 + thr*1600 + rev*1000, t, 0.08);
-    intakeGain.gain.setTargetAtTime(Math.min(0.16, 0.008 + thr*(0.04 + rev*0.13)), t, 0.06);
+    intakeGain.gain.setTargetAtTime(Math.min(0.16, 0.008 + thr*(0.04 + rev*0.13))*SND_HW.intake, t, 0.06);
 
     // ZF 8HP gear whine: mesh pitch follows the output shaft (= engine rpm / gear ratio, i.e. road
     // speed), so at the same rpm a taller gear whines higher and it rises smoothly across upshifts.
@@ -1330,7 +1331,7 @@
     const jetHz = (900 + boostNorm*2600)*pitchMul;
     turboJet1.frequency.setTargetAtTime(jetHz, t, 0.35); // slower than the air - the "spooling up" glide
     // a faint idle whir (so the wake-up spool is audible) + squared boost - stays quiet at low boost, whistles hard near full
-    const vol = Math.max(0.0001, Math.min(0.045, 0.004*turboIdle + boostNorm*boostNorm*0.06));
+    const vol = Math.max(0.0001, Math.min(0.045, 0.004*turboIdle + boostNorm*boostNorm*0.06)*SND_HW.turbo);
     turboGain.gain.setTargetAtTime(vol, t, 0.07);
   }
 
@@ -1509,9 +1510,10 @@
   // DSC cuts drive past the limit (light flickers), DTC allows a controlled slide, off lets the excess spin the tyres.
   // Launch control: at a standstill in gear, hold W + S - revs hold at LAUNCH_RPM_K on the brake;
   // let go of S with W still held and it launches with optimal slip and no TC cut, until 100 km/h.
-  const GRIP = { '4wd':11.0, '4wdsport':10.6, '2wd':8.0 };
+  const GRIP_BASE = { '4wd':11.0, '4wdsport':10.6, '2wd':8.0 };
+  let GRIP = { ...GRIP_BASE }; // cup tyres raise it (car-tune.js)
   const XDRIVE_LABEL = { '4wd':'', '4wdsport':'4WD SPORT', '2wd':'2WD' };
-  const LAUNCH_RPM_K = 4.0, LAUNCH_BOOST = 1.08;
+  let LAUNCH_RPM_K = 4.0; const LAUNCH_BOOST = 1.08;
   let xdrive = '4wd', dsc = 'on', tcIntervening = false, wheelspinK = 0, launchState = 'idle'; // idle | armed | engage | go
   let launchTimer = 0; const LAUNCH_ENGAGE_S = 0.35; // brake off -> drive engaging: revs held, no pull yet
   const tcBtn = document.getElementById('tc-btn');
@@ -1568,6 +1570,7 @@
   // a little rarer; Sport does it on every lift. Both share the 'liftCrackle' mixer layer. ----
   const LIFT_CHANCE = { eco:0.5, comfort:0.8, sport:1 }, BURBLE_CHANCE = { eco:0.65, comfort:0.9, sport:1 };
   const MODE_POP_VOL = { eco:0.65, comfort:1, sport:1.15 };
+  let BURBLE_TUNE = 1; // the tune's overrun burble: 0 off, 1 stock, more on the Sport / Max maps (car-tune.js)
   const LIFT_LOAD_MIN = 0.45, OVERRUN_MIN_K = 1.8, OVERRUN_END_K = 1.1, OVERRUN_MAX_S = 10;
   const [CRK_LO, CRK_SPAN, BANG_LO, BANG_SPAN] = [850, 1300, 260, 240];
   let liftLoad = 0, liftArmed = false, liftCooldown = 0, overrunT = -1; // overrunT < 0: no overrun session
@@ -1578,15 +1581,15 @@
     if(thr >= 0.15) liftArmed = true;
     if(ignition && liftArmed && thr < 0.08){
       liftArmed = false;
-      if(liftLoad >= LIFT_LOAD_MIN && liftCooldown <= 0){ liftCooldown = 1.0; if(Math.random() < LIFT_CHANCE[currentMode]) playLiftCrackle(liftLoad); }
-      overrunT = (rpmK > OVERRUN_MIN_K && Math.random() < BURBLE_CHANCE[currentMode]) ? 0 : -1;
+      if(liftLoad >= LIFT_LOAD_MIN && liftCooldown <= 0){ liftCooldown = 1.0; if(Math.random() < LIFT_CHANCE[currentMode]*BURBLE_TUNE) playLiftCrackle(liftLoad); }
+      overrunT = (rpmK > OVERRUN_MIN_K && Math.random() < BURBLE_CHANCE[currentMode]*BURBLE_TUNE) ? 0 : -1;
     }
     if(overrunT < 0) return;
     overrunT += dt;
     if(!ignition || thr >= 0.08 || rpmK < OVERRUN_END_K || overrunT > OVERRUN_MAX_S){ overrunT = -1; return; }
     const rpmF = Math.max(0, Math.min(1, (rpmK - OVERRUN_END_K) / (AUTO_SHIFT_RPM_MAX - OVERRUN_END_K)));
     // busy straight after the lift, then a steady patter that lasts through a long coast-down
-    const popsPerSec = (2.5 + rpmF*7) * (0.35 + 0.65*Math.exp(-overrunT/3));
+    const popsPerSec = (2.5 + rpmF*7) * (0.35 + 0.65*Math.exp(-overrunT/3)) * BURBLE_TUNE;
     if(Math.random() < popsPerSec*dt) playBurble(rpmF);
   }
   function playLiftCrackle(load){
@@ -1659,7 +1662,6 @@
 
   const MASS = 1525; // xDrive: transfer case + front driveshafts add ~70 kg over the RWD car
   const HP_WATTS = 335*735.5; // ~246 kW
-  const TORQUE_NM = 500;
 
   // ---- drivetrain physics (same model as the M5 CS): the engine's own torque curve (RPM_TORQUE_TABLE, scaled to
   // the map), x what the turbo has built, x the pedal, goes through the real gear + final drive to the tyres, less
@@ -1669,12 +1671,12 @@
   const engineFrictionNm = rpm => 22 + rpm*0.010; // what it drags when it isn't fuelling - engine braking
   // drive modes change the pedal map (Sport sharper, ECO PRO softer), not the power - full power is always there
   const PEDAL_EXP = { comfort:1.2, sport:1.0, eco:1.5 };
-  // the map's curve: the stock table scaled to the map's power, capped at the map's rated torque
+  // the stock full-load curve; the tune (car-tune.js) scales it every frame
   function engineTorqueAt(rpm){
     const t = RPM_TORQUE_TABLE;
     let v = t[t.length-1][1];
     for(let i=1;i<t.length;i++) if(rpm <= t[i][0]){ v = t[i-1][1] + (t[i][1]-t[i-1][1])*(rpm-t[i-1][0])/(t[i][0]-t[i-1][0]); break; }
-    return Math.min(v*MAP_POWER_MUL[currentMap-1], TORQUE_NM*MAP_TORQUE_MUL[currentMap-1]);
+    return v;
   }
 
   // shiftBaseK/shiftFullK: the D-mode upshift rpm at light throttle / full throttle - comfort and
@@ -1766,12 +1768,8 @@
     throttleVal.textContent = throttleSlider.value+'%';
     throttleSlider.style.setProperty('--pct', throttleSlider.value+'%');
   });
-  // Map 1 is the stock tune, Map 2 a built tune with its own hp/Nm figures. HP/Nm/consumption
-  // gauge faces are fixed constants below - the speedo gets a 330 face on Map 2, the rev counter is the same on both.
-  const MAP_POWER_MUL = [1.00, 400/335];
-  const MAP_TORQUE_MUL = [1.00, 600/500];
-  const MAP_HP_LABEL = [335, 400];
-  const MAP_NM_LABEL = [500, 600];
+  // Map 1 / Map 2 are the two calibration slots of the Tuning tab (car-tune.js). HP/Nm/consumption gauge faces are
+  // fixed - the speedo gets a 330 face once the tune lifts the 250 km/h limiter, the rev counter never changes.
   let currentMap = 1; // default Map 1
   const wearPctTxt = document.getElementById('wear-pct');
   const wearBarFill = document.getElementById('wear-bar-fill');
@@ -1790,22 +1788,25 @@
   function setMap(n){
     currentMap = n;
     mapBtns.forEach((b,i)=> b.classList.toggle('active', i+1===n));
-    mapName.textContent = `${MAP_HP_LABEL[n-1]} HP \u00B7 ${MAP_NM_LABEL[n-1]} Nm`;
-    // stage 2 gets a 330 speedo face; both maps keep the stock rev counter and its 7.4k fuel cut
-    SPD_MAX = n===2 ? 330 : 260;
-    buildSpeedoTicks();
+    CarTune.setSlot(n);
+    showMapNames();
+  }
+  // map readout + button titles: the slot's calibration and what it's predicted to make
+  function showMapNames(){
+    mapName.textContent = CarTune.label(currentMap);
+    mapBtns.forEach((b,i)=> { b.title = `Map ${i+1}: ${CarTune.label(i+1)} (${i+1})`; });
   }
   mapBtns.forEach((b,i)=> b.addEventListener('click', ()=> setMap(i+1)));
 
   // ---- ZF 8HP transmission: real BMW M140i gear ratios + final drive ----
-  const GEAR_RATIO    = [5.000, 3.200, 2.143, 1.720, 1.314, 1.000, 0.822, 0.640]; // 1st..8th
+  let GEAR_RATIO      = [5.000, 3.200, 2.143, 1.720, 1.314, 1.000, 0.822, 0.640]; // 1st..8th - the tune's Gearbox map can change them
   const REVERSE_RATIO = 3.456;
-  const FINAL_DRIVE   = 2.813;
+  let FINAL_DRIVE     = 2.813; // a part (car-tune.js)
   const WHEEL_RADIUS  = 0.315; // m, rolling radius (~245/40 R18)
   const GEAR_COUNT    = GEAR_RATIO.length;
   // engine rpm (in thousands) per km/h of road speed, before applying the gear ratio:
   //   rpm = (v_ms / (2*pi*r)) * 60 * FINAL_DRIVE * gearRatio
-  const RPM_K_PER_KMH = (60 / (3.6 * 2 * Math.PI * WHEEL_RADIUS)) * FINAL_DRIVE / 1000;
+  let RPM_K_PER_KMH = (60 / (3.6 * 2 * Math.PI * WHEEL_RADIUS)) * FINAL_DRIVE / 1000;
   // pure mechanical engine rpm for a road speed in a given forward gear (converter fully locked)
   function gearRpmK(g, spd){ return spd * RPM_K_PER_KMH * GEAR_RATIO[g]; }
   // highest gear that keeps the engine off the lug limit at this speed - used when coming out of P/N
@@ -1814,14 +1815,34 @@
     for(let i=1;i<GEAR_COUNT;i++){ if(gearRpmK(i, spd) >= 1.7) g = i; }
     return g;
   }
-  const IDLE_RPMK = 0.6, AUTO_SHIFT_RPM_MAX = 6.6; // AUTO_SHIFT_RPM_MAX is where D shifts at full throttle
-  const REV_LIMIT_K = 7.4; // the true absolute ceiling (M-mode over-rev) - the fuel cut, same on both maps
+  // AUTO_SHIFT_RPM_MAX is where D shifts at full throttle, REV_LIMIT_K the true absolute ceiling (M-mode over-rev) -
+  // the fuel cut; both from the tune. Over-rev wear still starts past the stock shift point.
+  const IDLE_RPMK = 0.6, OVERREV_FROM_K = 6.6;
+  let AUTO_SHIFT_RPM_MAX = 6.6, REV_LIMIT_K = 7.4;
+  let SHIFT_K = GEAR_RATIO.map(()=> AUTO_SHIFT_RPM_MAX); // full-throttle upshift per gear (the Gearbox map)
+  let SHIFT_CUT = [0.22, 0.3], heatTuneMul = 1; // upshift torque dip [s, depth]; how much more heat the tune makes
+  CarTune.init({ engine:'B58', torque:RPM_TORQUE_TABLE, rev:7400, shift:6600, launch:4000, vmax:250, finalDrive:2.813, gears:GEAR_RATIO.slice(), wheelR:WHEEL_RADIUS, setMap:(n)=> setMap(n),
+    onChange(T){
+      REV_LIMIT_K = T.rev; AUTO_SHIFT_RPM_MAX = T.shift; LAUNCH_RPM_K = T.launch; FINAL_DRIVE = T.finalDrive;
+      GEAR_RATIO = T.gears; SHIFT_K = T.shiftK;
+      RPM_K_PER_KMH = (60 / (3.6 * 2 * Math.PI * WHEEL_RADIUS)) * FINAL_DRIVE / 1000;
+      GRIP = Object.fromEntries(Object.entries(GRIP_BASE).map(([k,v])=> [k, v*T.grip]));
+      SHIFT_CUT = T.shiftCut; SND_HW = T.sound; BURBLE_TUNE = T.burble;
+      heatTuneMul = 1 + Math.max(0, T.powerRatio - 1)*2.5;
+      // the speedo gets its 330 face once the 250 km/h limiter is lifted
+      const face = !T.vmax || T.vmax > 255 ? 330 : 260;
+      if(face !== SPD_MAX){ SPD_MAX = face; buildSpeedoTicks(); }
+      showMapNames();
+    } });
   // rpm a gear settles to at a given road speed, capped at the ceiling (the 550d Mk2's model).
   // After an upshift the rpm falls on its own because the next gear's ratio is numerically lower.
+  // Stall: unlocked in 1st / 2nd the converter lets a full pedal flare the revs to ~2,400 (the ZF 8HP's), not the
+  // diesel 550d's ~1,500 - off the line that is where the turbo starts making boost
+  const STALL_K = 1.8;
   function computeGearRpm(g, spd, throttle){
     // torque converter: below its lock-up speed the engine can't drop under idle + stall slip,
     // which is also the launch formula, so the 0-8 km/h blend in the render loop stays seamless
-    const raw = Math.max(IDLE_RPMK + throttle*0.9, gearRpmK(g, spd) + throttle*0.35);
+    const raw = Math.max(IDLE_RPMK + throttle*(g <= 1 ? STALL_K : 0.9), gearRpmK(g, spd) + throttle*0.35);
     return Math.min(REV_LIMIT_K, Math.max(0, raw));
   }
   let gearIdx = -1; // -1 = P
@@ -1888,27 +1909,23 @@
 
     // ---- turbo boost: real lag - needs sustained high throttle before it even starts building,
     // and light/mid throttle barely registers at all (steeply non-linear, not a slow creep) ----
-    // spool curve: half boost at 2400rpm, full boost (of whatever the current map allows) at 4200rpm
-    let spoolFactor;
-    if(rpmK <= 0.8) spoolFactor = 0;
-    else if(rpmK <= 2.4) spoolFactor = ((rpmK-0.8)/(2.4-0.8)) * 0.5;
-    else if(rpmK <= 4.2) spoolFactor = 0.5 + ((rpmK-2.4)/(4.2-2.4)) * 0.5;
-    else spoolFactor = 1.0;
+    // the full-pedal target at this rpm comes from the tune's boost map, capped by what its turbo can make
+    const boostFull = ignition ? CarTune.boostAt(rpmK) : -0.3;
     // genuine lag: only builds toward "spooled" once throttle has been meaningfully open for a bit,
     // and decays quickly the moment you lift - this is the actual delay before boost responds at all
     if(throttlePct > 0.01){ boostThrottleHighTime += dt; } else { boostThrottleHighTime = Math.max(0, boostThrottleHighTime - dt*2.5); }
     const lagFactor = Math.max(0, Math.min(1, (boostThrottleHighTime - 0.05)/0.18));
     const throttleForBoost = throttlePct * lagFactor; // part throttle builds part boost, same as a real turbo
     const desiredBoost = ignition
-      ? (-0.3 + throttleForBoost*spoolFactor*MAP_POWER_MUL[currentMap-1]*(BOOST_MAX+0.3))
+      ? (-0.3 + throttleForBoost*(boostFull+0.3))
       : -0.3;
     const boostRate = desiredBoost > boostBar ? 0.06 : 0.09; // still has some lag, but responds noticeably quicker now
     boostBar += (desiredBoost - boostBar) * boostRate;
-    boostBar = Math.max(BOOST_MIN, Math.min(BOOST_MAX, boostBar));
+    boostBar = Math.max(BOOST_MIN, Math.min(3.5, boostBar)); // physical boost - the gauge needle pins at its own max
     updateTurboSound(boostBar, ignition && rpmK > 0.4, dt);
     // how far the turbo has got toward the boost it can make at THIS rpm (0..1). The torque table is already the
     // fully-spooled curve, so only genuine lag - boost still building after you open the throttle - takes torque away
-    const boostAvail = spoolFactor*Math.min(BOOST_MAX+0.3, MAP_POWER_MUL[currentMap-1]*(BOOST_MAX+0.3));
+    const boostAvail = Math.max(0, boostFull+0.3);
     const boostDemand = throttlePct*boostAvail; // what this pedal asks for once spooled - only lag short of it costs torque
     const boost01 = boostDemand < 0.05 ? 1 : Math.max(0, Math.min(1, (boostBar + 0.3)/boostDemand));
 
@@ -1922,18 +1939,22 @@
     prevThrottleForBov = throttlePct;
     // cold engine makes less power - rich warm-up mixture, high oil/friction drag, the ECU holds it
     // back until the coolant is warm. 70% by 30C, full power only at ~90C operating temp.
-    const coldPowerMul = 0.7 + 0.3 * Math.max(0, Math.min(1, (coolantC - 30) / 60));
+    // warmShift: operating temp follows the fitted thermostat (92C stock, 82C with the low-temp one)
+    const warmShift = CarTune.tstat() - 92;
+    const coldPowerMul = 0.7 + 0.3 * Math.max(0, Math.min(1, (coolantC - 30) / (60 + warmShift)));
     const wearPowerMul = (1 - (wearPct/100)*0.1) * coldPowerMul; // wear: up to 10% loss at 100%; combined with the cold-engine penalty
     // cold fast idle: the ECU holds a raised idle through the whole warm-up, only dropping to normal
     // idle once the engine reaches operating temp (~82C -> 88C)
-    const idleK = IDLE_RPMK + Math.max(0, Math.min(1, (88 - coolantC) / 6)) * 0.5;
+    const idleK = IDLE_RPMK + Math.max(0, Math.min(1, (88 + warmShift - coolantC) / 6)) * 0.5;
 
     // real drag physics instead of an artificial speed governor: acceleration tapers naturally
     // toward the point where engine force = aerodynamic drag + rolling resistance
     const AIR_RHO = 1.225, DRAG_CDA = 0.70;
-    // Map 2 runs 35% less drag - 400 hp alone stalls out around 303-327 km/h, this lets it run on past 333 km/h
-    const dragDecel_ms2 = (0.5*AIR_RHO*DRAG_CDA*(currentMap===2 ? 0.65 : 1)*v_ms*v_ms)/MASS;
+    const dragDecel_ms2 = (0.5*AIR_RHO*DRAG_CDA*v_ms*v_ms)/MASS;
     const rollA = speed > 0.5 ? ROLL_RES : 0;
+    // gravity along the road: the driving page (drive.html) sets roadGrade = sin(slope), + = nose up; 0 everywhere else.
+    // Backing up a slope is going downhill, so reverse flips it
+    const gradeA = 9.81*(window.roadGrade || 0)*(transmissionMode === 'R' ? -1 : 1);
     upshiftCutT = Math.max(0, upshiftCutT - dt);
     upshiftDropT = Math.max(0, upshiftDropT - dt);
     // top speed achievable in the current gear is capped by rpm, same as a real car - once holding a
@@ -1942,13 +1963,16 @@
     const revLimiterHit = gearIdx>=0 && gearRpmNow >= REV_LIMIT_K - 0.1;
     // engine torque: the curve at the current rpm x boost x pedal; cut at the limiter; unfuelled, its friction brakes
     const rpmNow = Math.max(rpmK, idleK)*1000;
-    const tqFrac = (ignition && !revLimiterHit) ? throttlePct*(NA_TORQUE_FRAC + (1 - NA_TORQUE_FRAC)*boost01) : 0;
-    const engineTq = ignition ? engineTorqueAt(rpmNow)*tqFrac*wearPowerMul - engineFrictionNm(rpmNow)*Math.max(0, 1 - tqFrac/0.05) : 0; // the ECU fuels to cover friction as soon as the pedal asks for torque - only a closed pedal engine-brakes
+    // the tune: torque multiplier on the stock curve, its cuts (speed limiter, misfires), exhaust temp, fuel use
+    const tune = CarTune.tick({ dt, ignition, rpm: rpmNow, pedal: throttlePct, boost: boostBar, speed, gear: gearIdx, coolant: coolantC,
+      fuelCut: throttlePct < 0.02 && rpmK > idleK + 0.3 && gearIdx >= 0 && speed > 8 });
+    const tqFrac = (ignition && !revLimiterHit) ? throttlePct*(NA_TORQUE_FRAC + (1 - NA_TORQUE_FRAC)*boost01)*tune.cut : 0;
+    const engineTq = ignition ? engineTorqueAt(rpmNow)*tune.tqMul*tqFrac*wearPowerMul - engineFrictionNm(rpmNow)*Math.max(0, 1 - tqFrac/0.05) : 0; // the ECU fuels to cover friction as soon as the pedal asks for torque - only a closed pedal engine-brakes
 
     if(!ignition){
       speed = Math.max(0, speed - 40*dt);
     } else if(braking){
-      const decel_ms2 = BRAKE_DECEL*(braking/100)*CarService.brakeMul() + dragDecel_ms2 + rollA;
+      const decel_ms2 = BRAKE_DECEL*(braking/100)*CarService.brakeMul() + dragDecel_ms2 + rollA + gradeA;
       speed = Math.max(0, speed - decel_ms2*3.6*dt);
     } else if(transmissionMode === 'R' && throttlePct > 0.02){
       // reverse gear: short ratio like a real reverse - weak relative to the forward gears and capped
@@ -1956,7 +1980,7 @@
       const REVERSE_MAX_SPEED = 30; // km/h - electronically limited, like the real car
       const revSpeedFrac = Math.min(1, speed/REVERSE_MAX_SPEED);
       let a_ms2 = 3.2 * throttlePct * cfg.accelFeel * wearPowerMul * (1 - revSpeedFrac*0.85);
-      a_ms2 -= (dragDecel_ms2 + rollA);
+      a_ms2 -= (dragDecel_ms2 + rollA + gradeA);
       speed = Math.max(0, Math.min(REVERSE_MAX_SPEED, speed + a_ms2 * 3.6 * dt));
     } else if(transmissionMode !== 'N' && transmissionMode !== 'R' && gearIdx >= 0){
       // in gear: wheel force = engine torque x gear x final drive / tyre radius (x converter multiplication off
@@ -1965,12 +1989,12 @@
       let a_ms2 = engineTq*GEAR_RATIO[gearIdx]*FINAL_DRIVE*(engineTq > 0 ? DRIVELINE_EFF*tcMul : 1)/WHEEL_RADIUS/MASS;
       if(engineTq < 0 && gearIdx <= 1) a_ms2 *= Math.min(1, speed/(gearIdx === 0 ? 18 : 30));
       if(a_ms2 > 0) a_ms2 = applyTraction(a_ms2, throttlePct);
-      if(upshiftCutT > 0 && a_ms2 > 0) a_ms2 *= 1 - 0.3*Math.sin(Math.PI*(1 - upshiftCutT/0.22)); // drive eases off slightly and back through the upshift
-      a_ms2 -= dragDecel_ms2 + rollA;
+      if(upshiftCutT > 0 && a_ms2 > 0) a_ms2 *= 1 - SHIFT_CUT[1]*Math.sin(Math.PI*(1 - upshiftCutT/SHIFT_CUT[0])); // drive eases off slightly and back through the upshift
+      a_ms2 -= dragDecel_ms2 + rollA + gradeA;
       speed = Math.max(0, speed + a_ms2*3.6*dt);
     } else {
       // N / P: disconnected - it just rolls against aero and rolling resistance
-      speed = Math.max(0, speed - (dragDecel_ms2 + rollA)*3.6*dt);
+      speed = Math.max(0, speed - (dragDecel_ms2 + rollA + gradeA)*3.6*dt);
     }
     speed = Math.max(0, Math.min(speed, 400)); // sanity ceiling only - physics are never clamped to the printed dial max - physics are never clamped to the printed dial max
 
@@ -2032,7 +2056,7 @@
         let fullK = cfg.shiftFullK;
         if(sBox) fullK = REV_LIMIT_K - 0.25;
         const baseK = sBox ? 2.6 : cfg.shiftBaseK;
-        const upshiftThreshold = throttleRaw >= 0.97 ? AUTO_SHIFT_RPM_MAX : baseK + throttlePct*(fullK-baseK); // floored: any mode holds to the shift point
+        const upshiftThreshold = throttleRaw >= 0.97 ? SHIFT_K[g] : baseK + throttlePct*(fullK-baseK); // floored: any mode holds to the shift point
         const holdGears = sBox || currentMode === 'sport';
         if(throttlePct > 0.02 && curRpm >= upshiftThreshold && g < GEAR_COUNT-1){
           g = g+1;
@@ -2053,7 +2077,7 @@
       newGearIdx = g;
     }
     if(newGearIdx !== gearIdx){
-      if(gearIdx >= 0 && newGearIdx > gearIdx){ upshiftCutT = 0.22; upshiftDropT = 0.5; } // gear-to-gear upshift: brief torque interruption, then the revs drop quickly into the new gear
+      if(gearIdx >= 0 && newGearIdx > gearIdx){ upshiftCutT = SHIFT_CUT[0]; upshiftDropT = 0.5; } // gear-to-gear upshift: brief torque interruption (the TCU's shift speed), then the revs drop quickly into the new gear
       const isUpshift = gearIdx >= 0 && newGearIdx > gearIdx; // real gear-to-gear upshift only, not engaging from P/N
       const isDownshift = newGearIdx >= 0 && newGearIdx < gearIdx; // real gear-to-gear downshift only, not disengaging to P/N (gear -1 has no ratio - its rpm is NaN)
       if(isUpshift) playUpshiftPop(computeGearRpm(gearIdx, speed, throttlePct), throttlePct);
@@ -2084,7 +2108,7 @@
       // in gear (as the 550d Mk2): blend smoothly from the idle-ish launch formula (at a dead stop) into the
       // gear-ratio formula (once actually rolling) over 0-8 km/h, instead of a hard cutoff - a hard switch
       // shows as a rev-hang-then-jump right at the cutoff speed, worst at low throttle where the two disagree most
-      const idleFormula = idleK + throttlePct*0.9;
+      const idleFormula = idleK + throttlePct*(gearIdx <= 1 ? STALL_K : 0.9);
       const gearFormula = computeGearRpm(gearIdx, speed, throttlePct);
       const blend = Math.max(0, Math.min(1, speed/8));
       targetRpmK = Math.min(REV_LIMIT_K, idleFormula*(1-blend) + gearFormula*blend);
@@ -2135,7 +2159,7 @@
     const currentPowerW = ignition ? Math.max(0, engineTq)*rpmNow*Math.PI/30 : 0; // what the engine is actually making
     const currentPowerHp = currentPowerW/735.5;
     const rpmLossMul = 1 + Math.max(0, rpmK - 2)*0.08; // friction + pumping losses climb with revs - why ECO PRO's early shifts save fuel and Sport's held gears cost it
-    const fuelFlowLph = ignition ? (IDLE_FLOW_LPH + currentPowerHp*PETROL_BSFC_LPH_PER_HP*rpmLossMul) * (1 + (wearPct/100)*0.06) : 0;
+    const fuelFlowLph = ignition ? (IDLE_FLOW_LPH + currentPowerHp*PETROL_BSFC_LPH_PER_HP*rpmLossMul*tune.fuelMul) * (1 + (wearPct/100)*0.06) : 0;
     let consumptionL100;
     if(!ignition){ consumptionL100 = 0; }
     else if(speed < 2){
@@ -2205,7 +2229,7 @@
     // Map 2 generates real heat - the more power unlocked, the much faster it climbs.
     // Coasting (off throttle) under 3k rpm cools much faster and can dip below normal operating temp -
     // no combustion heat being generated, just airflow through the radiator. ----
-    const heatMul = currentMap >= 2 ? (2 + Math.max(0, MAP_POWER_MUL[currentMap-1]-1)*1.4) : 1.0;
+    const heatMul = heatTuneMul;
     // coast-cooling needs actual airflow through the radiator (moving, off throttle) AND an already-warm
     // engine - at a standstill idle there's no airflow, so the engine must warm to and hold 92C
     const isCoastCooling = throttlePct < 0.05 && rpmK < 3.0 && speed > 15 && coolantC > 88;
@@ -2241,57 +2265,59 @@
       coolantC += (20 - coolantC) * 0.0006; // cools slowly back to ambient once shut off
       overheatBuildup = Math.max(0, overheatBuildup - dt*0.003);
     }
+    if(tune.coolant != null) coolantC = tune.coolant; // car-tune.js's cooling: heat from the fuel burned, out through the radiator, pump + thermostat
     coolantC = Math.max(15, Math.min(170, coolantC)); // sanity ceiling only - the gauge itself pins at 120 (tempCToFrac clamps the needle), same pattern as the speedo/tach reading past their printed max
     updateFan();
     updateScreech();
     const coolantFrac = tempCToFrac(coolantC);
     engTempNeedle.style.transform = `rotate(${roundGaugeAngle(coolantFrac)}deg)`;
 
-    // ---- engine wear: accumulates from sustained over-rev past the normal redline and from
-    // overheating past 112C. Persists until repaired from the Tuning panel. ----
+    // ---- engine wear: accumulates from sustained over-rev past the normal redline, overheating past 112C and a
+    // tune pushed past what the engine was built for. Persists until repaired. ----
     if(ignition){
-      const overRevAmount = Math.max(0, rpmK - AUTO_SHIFT_RPM_MAX); // 0 up to ~4.3k over
+      const overRevAmount = Math.max(0, rpmK - OVERREV_FROM_K); // 0 up to ~4.3k over
       const overheatAmount = Math.max(0, coolantC - 112); // 0 up to ~10C over
-      const wearRate = overRevAmount*0.03 + overheatAmount*0.01; // %/sec - even more reliable, very slow to actually wear now
+      const wearRate = overRevAmount*0.03 + overheatAmount*0.01 + tune.wear; // %/sec - plus whatever the tune takes out of it (car-tune.js)
       if(wearRate > 0){ wearPct = Math.min(100, wearPct + wearRate*CarService.oilMul()*dt); updateWearDisplay(); }
     }
     engTempReadout.textContent = '+' + coolantC.toFixed(1) + '\u00B0C';
 
     // ---- turbo boost gauge ----
-    boostNeedle.style.transform = `rotate(${angleFor(boostBar,BOOST_MIN,BOOST_MAX)}deg)`;
+    boostNeedle.style.transform = `rotate(${angleFor(Math.min(boostBar, BOOST_MAX*1.08),BOOST_MIN,BOOST_MAX)}deg)`;
     boostReadout.textContent = (boostBar>=0?'+':'') + boostBar.toFixed(2) + ' bar';
 
     // ---- exhaust gas temp: rises with load (throttle+rpm) and boost, cools back to ambient once the
     // engine's off. A turbo petrol runs hotter EGTs than a diesel - up toward 900C under sustained load. ----
-    const egrTargetC = ignition ? (200 + throttlePct*(rpmK/REV_LIMIT_K)*640 + Math.max(0,boostBar)*55) : 23;
+    const egrTargetC = ignition ? tune.egt : 23; // the tune's exhaust model: AFR, timing, boost, burble
     egrC += (egrTargetC - egrC) * (ignition ? 0.03 : 0.01);
-    egrC = Math.max(23, Math.min(950, egrC));
+    egrC = Math.max(23, Math.min(1150, egrC));
 
     // ---- oil pressure: rpm-driven like a real oil pump, with a mild cold-oil bonus (thicker oil
     // when the coolant hasn't warmed up yet) and a wear penalty for a worn pump/bearings ----
     const oilTargetBar = ignition
-      ? Math.max(0, 0.8 + rpmK*0.62 + Math.max(0,(60-coolantC))*0.015) * (1 - (wearPct/100)*0.3)
+      ? Math.max(0, 0.8 + rpmK*0.62 + Math.max(0,(60-coolantC))*0.015) * (1 - (wearPct/100)*0.3) * tune.oilPress // hot thin oil / a worn or uprated pump
       : 0;
     oilPressureBar += (oilTargetBar - oilPressureBar) * (ignition ? 0.15 : 0.08);
     oilPressureBar = Math.max(0, oilPressureBar);
 
     // ---- live HP / Torque gauges (damped while running - real gauges have inertia; snap instantly to 0 when off) ----
     const livePowerW = currentPowerW;
-    const livePowerHp = Math.min(HP_MAX, livePowerW/735.5);
-    const liveTorqueNm = (ignition && rpmK>0.3) ? Math.min(TQ_MAX, (livePowerW/1000)*9549/(rpmK*1000)) : 0;
+    const livePowerHp = livePowerW/735.5; // the needles pin at their dial max, the dyno reads the real figure
+    const liveTorqueNm = (ignition && rpmK>0.3) ? (livePowerW/1000)*9549/(rpmK*1000) : 0;
     if(!ignition){
       dispHp = 0; dispTq = 0;
     } else {
       dispHp += (livePowerHp - dispHp) * 0.025;
       dispTq += (liveTorqueNm - dispTq) * 0.025;
     }
-    hpNeedle.style.transform = `rotate(${angleFor(dispHp,0,HP_MAX)}deg)`;
-    tqNeedle.style.transform = `rotate(${angleFor(dispTq,0,TQ_MAX)}deg)`;
+    hpNeedle.style.transform = `rotate(${angleFor(Math.min(dispHp, HP_MAX*1.05),0,HP_MAX)}deg)`;
+    tqNeedle.style.transform = `rotate(${angleFor(Math.min(dispTq, TQ_MAX*1.05),0,TQ_MAX)}deg)`;
     hpReadout.textContent = Math.round(dispHp) + ' hp';
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
+    // gearLabel R: the driving page (drive.html) rolls the car backwards on it
     CarDyno.tick({ dt, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
-      gearLabel: `${transmissionMode==='M' ? 'M' : (transmissionMode==='S' ? 'S' : 'D')}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
+      gearLabel: transmissionMode==='R' ? 'R' : `${transmissionMode==='M' ? 'M' : (transmissionMode==='S' ? 'S' : 'D')}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
 
     // ---- warning lights: startup bulb-check, then live conditions ----
     if(!ignition){
@@ -2302,8 +2328,8 @@
       wlBattery.className = 'wl';
       wlBelt.className = 'wl';
       const overheating = coolantC > 112;
-      wlEngine.className = (overheating || wearPct > 50) ? 'wl on-red' : 'wl';
-      wlTemp.className = overheating ? 'wl on-red blink' : (coolantC < 87 ? 'wl on-blue' : 'wl'); // blue until the engine reaches operating temp
+      wlEngine.className = (overheating || wearPct > 50 || CarTune.warnLight()) ? 'wl on-red' : 'wl';
+      wlTemp.className = overheating ? 'wl on-red blink' : (coolantC < CarTune.tstat() - 5 ? 'wl on-blue' : 'wl'); // blue until the engine reaches operating temp
       wlOil.className = (engineOnTime > 2 && oilPressureBar < 0.5) ? 'wl on-red blink' : 'wl';
       wlAbs.className = (braking && speed > 5) ? 'wl on-amber blink' : 'wl';
       wlTc.className = tcIntervening ? 'wl on-amber blink' : (dsc !== 'on' ? 'wl on-amber' : 'wl'); // flicker = DSC/DTC cutting power, solid = DTC or DSC off
@@ -2367,7 +2393,8 @@
     if(throttleKeyLastT === null) throttleKeyLastT = now;
     const dt = (now - throttleKeyLastT)/1000;
     throttleKeyLastT = now;
-    const target = wDown ? 100 : 0;
+    // the drive page's throttle limiter (window.throttleLimit, 0.2-1): W opens as fast as ever, but only that far
+    const lim = window.throttleLimit || 1, target = wDown ? 100*lim : 0;
     let current = parseFloat(throttleSlider.value);
     if(current < target) current = Math.min(target, current + THROTTLE_KEY_RATE*dt);
     else if(current > target) current = Math.max(target, current - THROTTLE_KEY_RATE*dt);
@@ -2393,8 +2420,8 @@
     if(brakeLastT === null) brakeLastT = now;
     const dt = (now - brakeLastT)/1000;
     brakeLastT = now;
-    const active = sDown || spaceDown || mouseBrakeDown;
-    const target = active ? 100 : 0;
+    // and its brake limiter (window.brakeLimit), the same way
+    const lim = window.brakeLimit || 1, active = sDown || spaceDown || mouseBrakeDown, target = active ? 100*lim : 0;
     if(braking < target) braking = Math.min(target, braking + BRAKE_RATE*dt);
     else if(braking > target) braking = Math.max(target, braking - BRAKE_RATE*dt);
     if(active || braking !== target){
