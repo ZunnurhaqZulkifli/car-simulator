@@ -43,7 +43,7 @@
   <div id="pump" hidden></div>
   <div id="rollers" hidden>On the dyno rollers - Dyno mode is on (<kbd>Tab</kbd> car menu, Dyno) - switch it off to drive</div>
   <div id="padlink" hidden></div>
-  <div>Home: drive into the garage to change car · straight over the valley road is the city, its avenue running on to the mountains' direct road · the mechanic is just east of home, the racetrack down the road south 400 m past it (its pit garage, at the start line: service, tuning, dyno, fuel and a change of car) · the valley road runs west to the autobahn, east to the mountains</div></div>
+  <div>Home: drive into the garage to change car · straight over the valley road is the city, its avenue running on to the mountains' direct road · the mechanic is just east of home, the racetrack down the road south 400 m past it (its pit garage, at the start line: service, tuning, dyno, fuel and a change of car) · the valley road runs west to the autobahn, east to the mountains · U-turn flyovers off the autobahn's left lane: north of the valley road (back south), and 250 m past the fuel station (back north to it) · winding country roads from the mountain loop (its second west hairpin, its eastern valley, its southern run) lead to an old stone village in the hills between</div></div>
 <div id="garage" class="menu" hidden>
   <h2>Garage</h2>
   <div id="garage-cars"></div>
@@ -256,14 +256,15 @@ function makeRoad(points, closed, half, dip = 1.5) {
   const L = P.map((_, i) => { const t = curve.getTangentAt(i / N); return new THREE.Vector3(t.z, 0, -t.x).normalize(); });
   return { curve, N, P, L, half, dip }; // half: centre line to the shoulder's outer edge; dip: the ditch beside it
 }
-// autobahn: ~28.6 km, 3 lanes each way - two 8 km straights joined by 2 km-radius bends (~2.4 m/s² at 250 km/h)
-const autobahnPts = [];
+// autobahn: ~17.1 km, 3 lanes each way - two 4.8 km straights joined by 1.2 km-radius bends (~4 m/s² at 250 km/h).
+// Its eastern straight runs north along x 2000 from z -3600 (dead straight from -3300 to 900), past the second U-turn,
+// the fuel station, the valley road, the first U-turn and the direct road
+const autobahnPts = [], BEND_R = 1200, XC = 2000 - BEND_R, Z0 = -3600, Z1 = Z0 + 4800; // the oval's middle: x XC
 for (const s of [1, -1]) { // a straight, then the bend after it
-  const STRAIGHT = 8000, BEND_R = 2000;
-  for (let z = -STRAIGHT / 2; z < STRAIGHT / 2; z += 500) autobahnPts.push([s * BEND_R, 0, s * z]);
+  for (let k = 0; k < 16; k++) autobahnPts.push([XC + s * BEND_R, 0, s > 0 ? Z0 + k * 300 : Z1 - k * 300]);
   for (let i = 0; i < 13; i++) {
     const a = (s > 0 ? 0 : Math.PI) + i / 13 * Math.PI;
-    autobahnPts.push([BEND_R * Math.cos(a), 0, s * STRAIGHT / 2 + BEND_R * Math.sin(a)]);
+    autobahnPts.push([XC + BEND_R * Math.cos(a), 0, (s > 0 ? Z1 : Z0) + BEND_R * Math.sin(a)]);
   }
 }
 const A = makeRoad(autobahnPts, true, 16.75, 0);
@@ -301,6 +302,28 @@ const nearestSample = (r, x, z) => {
   for (let i = 1; i < r.N; i++) if (Math.hypot(r.P[i].x - x, r.P[i].z - z) < Math.hypot(r.P[b].x - x, r.P[b].z - z)) b = i;
   return b;
 };
+// the U-turn flyovers: off a left lane, up alongside the autobahn to 7.3 m, a 26 m right-hander over both
+// carriageways (its middle, mid, over the median), then down alongside the other side into its left lane. One lane;
+// laid out for northbound traffic as [metres left of the autobahn's centre line, height, metres north of mid], and
+// turned round (dir -1) for southbound. One between the links for northbound traffic; one 250 m past the fuel station
+// for southbound traffic, back to it
+const UP = [[11.9, 0, -340], [16, 0, -280], [22, 0, -230], [26, 0, -190], [26, 1.2, -160], [26, 4, -120], [26, 6.4, -80], [26, 7.3, -45]];
+const uturn = (mid, dir) => Object.assign(makeRoad([...UP, ...Array.from({ length: 13 }, (_, k) => [26 * Math.cos(k * Math.PI / 12), 7.3, 26 * Math.sin(k * Math.PI / 12)]),
+  ...UP.map(([o, y, z]) => [-o, y, z]).reverse()].map(([o, y, z]) => [2000 + dir * o, y, mid + dir * z]), false, 4.5, 0), { mid, dir });
+const UTURNS = [uturn(-600, 1), uturn(-3240, -1)];
+// the village: old stone houses round a church square at 80 m, on flattened land in the middle of the mountain loop.
+// Winding country roads lead to it from three places on the loop: one through it from the second west hairpin to the
+// eastern valley (CR), one from its square down to the southern run (SL); a little lane loops round its upper end (VL)
+const VIL = { x: 5240, z: 320, y: 80, r: 170 };
+const atM = (x, z) => { const p = M.P[nearestSample(M, x, z)]; return [p.x, p.y, p.z]; };
+const CR = makeRoad([atM(4632, 290), [4700, 75, 300], [4800, 77, 270], [4890, 80, 300], [4960, 84, 360], [5040, 82, 350], [5110, 80, 315],
+  [5160, 80, 320], [5230, 80, 330], [5300, 80, 325], [5370, 80, 345], [5450, 83, 400], [5520, 88, 480], [5600, 92, 520], [5700, 89, 590],
+  [5780, 85, 690], [5850, 82, 760], [5920, 80.5, 840], atM(5985, 905)], false, 4.2, 1);
+const onCR = (x, z) => { const p = CR.P[nearestSample(CR, x, z)]; return [p.x, p.y, p.z]; };
+const SL = makeRoad([onCR(5240, 330), [5241, 80, 300], [5243, 80, 250], [5250, 80, 200], [5230, 80, 130], [5185, 75, 50], [5172, 67, -40],
+  [5215, 59, -130], [5295, 51, -200], [5340, 43, -290], [5322, 35, -390], [5282, 27, -470], [5298, 19, -570], [5370, 12, -660],
+  [5440, 7, -750], atM(5480, -890)], false, 4.2, 1);
+const VL = makeRoad([onCR(5178, 321), [5170, 80, 360], [5190, 80, 410], [5240, 80, 440], [5295, 80, 428], [5322, 80, 390], [5318, 80, 352], onCR(5310, 326)], false, 3, 0.05);
 // home: a driveway south off the valley road to the garage, and a yard round the house (only there to flatten the land)
 const HOME = { x: 2700, z: -1290 }; // the middle of the garage; its door faces north, down the drive
 const D = makeRoad([[2700, 0, -1229], [2700, 0, -1250], [2700, 0, -1270], [2700, 0, -1288]], false, 3, 0.05);
@@ -376,11 +399,26 @@ const PL = makeRoad([[2730, 0, -2352], [2800, 0, -2362], [2870, 0, -2376], [2930
   [3730, 0, -2376], [3800, 0, -2362], [3870, 0, -2352]], false, 6, 0);
 const PG = makeRoad([[2990, 0, -2395], [3100, 0, -2395], [3210, 0, -2395]], false, 8, 0); // the garages' floors (not drawn)
 const PIT = { x: 3100, z: -2396 };
-const ROADS = [A, M, K1, K2, D, Y, V, S, ...STREETS, T, TR, PL, PG];
+const ROADS = [A, M, K1, K2, D, Y, V, S, ...STREETS, T, TR, PL, PG, ...UTURNS, CR, SL, VL];
 
-const IS = 450; // the fuel station's autobahn sample: 750 m past the start, on the keep-left side
+const IS = nearestSample(A, 2000, -2650); // the fuel station's autobahn sample: 650 m past the start, on the keep-left side
 
-// ribbon along a road between two (offset, height) edges; flat for paint, upright for walls; `on` picks the samples
+// Collisions: what stands in the car's way - walls, guardrails, buildings, posts, trees - kept as capsules (a segment
+// a-b and r round it; a = b for a post or a tree) standing from y0 to y1, in 40 m cells, each in every cell that a car
+// circle touching it could be centred in. The car is three circles along its length (collide, below)
+const CELL = 40, CAR_R = 0.95, solids = new Map();
+function solid(ax, az, bx, bz, r = 0, y0 = -Infinity, y1 = Infinity) {
+  const m = r + CAR_R, cell = v => Math.floor(v / CELL);
+  for (let i = cell(Math.min(ax, bx) - m); i <= cell(Math.max(ax, bx) + m); i++)
+    for (let j = cell(Math.min(az, bz) - m); j <= cell(Math.max(az, bz) + m); j++) {
+      const k = i + ',' + j;
+      if (!solids.has(k)) solids.set(k, []);
+      solids.get(k).push(ax, az, bx, bz, r, y0, y1);
+    }
+}
+
+// ribbon along a road between two (offset, height) edges; flat for paint, upright for walls (solid if they stand
+// above bumper height); `on` picks the samples
 function strip(r, o1, y1, o2, y2, color, on = () => true) {
   const v = [];
   const at = (i, o, y) => [r.P[i].x + r.L[i].x * o, r.P[i].y + y, r.P[i].z + r.L[i].z * o];
@@ -388,6 +426,7 @@ function strip(r, o1, y1, o2, y2, color, on = () => true) {
     if (!on(i)) continue;
     const a = at(i, o1, y1), b = at(i, o2, y2), c = at(i + 1, o1, y1), d = at(i + 1, o2, y2);
     v.push(...a, ...b, ...c, ...b, ...d, ...c);
+    if (o1 === o2 && Math.max(y1, y2) > 0.3) solid(a[0], a[2], c[0], c[2], 0, Math.min(a[1], b[1], c[1], d[1]), Math.max(a[1], b[1], c[1], d[1]));
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
@@ -408,17 +447,42 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.1; // just under the terrain, which takes over round the mountains
 scene.add(ground);
 
-// autobahn: asphalt, median wall, lines, guardrails - the outer one open at the fuel station and both exits
+// autobahn: asphalt, median wall, lines, guardrails - the outer one open at the fuel station and both exits, both
+// (and the hard shoulder lines) where the U-turns' slip roads leave and join
 strip(A, -16.75, 0.01, 16.75, 0.01, 0x3a3a3c);
 strip(A, 0, 0, 0, 0.9, 0xb0b0a8);
 strip(A, 16.75, 0.012, 46, 0.012, 0x4a4a4c, i => nearStation(i, 22)); // fuel station forecourt
-const exits = i => awayFrom(A, EXIT1, 280)(i) && awayFrom(A, EXIT2, 240)(i);
+const exits = i => awayFrom(A, EXIT1, 280)(i) && awayFrom(A, EXIT2, 240)(i), slips = i => UTURNS.every(u => awayFrom(A, { x: 2000, z: u.mid - 280 * u.dir }, 70)(i));
 for (const s of [1, -1]) {
   paint(A, s * 2.5, 0.3);           // inner edge line
   paint(A, s * 6.25, 0.15, dashed); // lane lines
   paint(A, s * 10, 0.15, dashed);
-  paint(A, s * 13.75, 0.3);         // hard shoulder line
-  strip(A, s * 17.5, 0, s * 17.5, 0.75, 0x9aa0a6, i => s < 0 || (!nearStation(i, 24) && exits(i)));
+  paint(A, s * 13.75, 0.3, slips);  // hard shoulder line
+  strip(A, s * 17.5, 0, s * 17.5, 0.75, 0x9aa0a6, i => slips(i) && (s < 0 || (!nearStation(i, 24) && exits(i))));
+}
+// the U-turns: asphalt, edge lines, parapets and the deck's edges (down to the ground where it's low) once clear of
+// the autobahn's carriageways, the deck's underside, and piers - every ~20 m, either side of the autobahn and in its
+// median under the loop's middle - each a column and a cap
+for (const U of UTURNS) {
+  const clear = (i, m) => U.P[i].y > 1 || Math.abs(U.P[i].x - 2000) > m, concrete = new THREE.MeshLambertMaterial({ color: 0xc4c1b9 });
+  strip(U, -4.2, 0.013, 4.2, 0.013, 0x3a3a3c);
+  for (const s of [1, -1]) {
+    paint(U, s * 3.4, 0.2, i => clear(i, 17));
+    strip(U, s * 4.2, 0, s * 4.2, 1, 0xd6d4ce, i => clear(i, 21.7));
+    strip(U, s * 4.2, -1.5, s * 4.2, 0, 0xb8b5ad, i => clear(i, 21.7));
+  }
+  strip(U, -4.2, -1.5, 4.2, -1.5, 0xb8b5ad, i => U.P[i].y > 1.5);
+  const pier = i => {
+    const p = U.P[i], h = p.y - 1.5, turn = Math.atan2(-U.L[i].z, U.L[i].x); // its cap across the deck
+    for (const [w, y0, y1] of [[1.2, -0.1, h], [7.6, h - 0.7, h]]) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, y1 - y0, w > 2 ? 1.6 : 1.2), concrete);
+      b.position.set(p.x, (y0 + y1) / 2, p.z);
+      b.rotation.y = turn;
+      scene.add(b);
+    }
+  };
+  for (let i = 0; i < U.N; i += 7) if (U.P[i].y > 1.8 && Math.abs(U.P[i].x - 2000) > 22) pier(i);
+  for (const o of [20, 0, -20]) pier(nearestSample(U, 2000 + o, U.mid + U.dir * Math.sqrt(26 ** 2 - o ** 2)));
 }
 // two-lane roads: dashed centre line, gravel shoulders, guardrails, and skirts down their edges into the ditch beside
 // them; open(i, side) says where an edge opens for a road joining it
@@ -432,7 +496,7 @@ function twoLane(r, open = () => false, rails = () => true) {
     strip(r, s * 5.2, 0, s * 5.2, 0.75, 0x9aa0a6, i => rails(i) && !open(i, s));
   }
 }
-twoLane(M, opens(M, [spot(K1, K1.N - 6, 24), spot(K2, 6, 24), spot(V, 5, 75)]));
+twoLane(M, opens(M, [spot(K1, K1.N - 6, 24), spot(K2, 6, 24), spot(V, 5, 75), spot(CR, 6, 24), spot(CR, CR.N - 6, 24), spot(SL, SL.N - 6, 24)]));
 // the links have no rails where they run over the autobahn or into the loop
 twoLane(K1, opens(K1, [spot(D, 3, 12), spot(S, 0, 14), spot(AV, 3, 12), spot(TR, 3, 12)]), i => K1.P[i].x > 2170 && awayFrom(K1, K1.P[K1.N], 25)(i));
 twoLane(K2, opens(K2, [spot(AV, AV.N, 24)]), i => K2.P[i].x > 2170 && awayFrom(K2, K2.P[0], 25)(i));
@@ -452,6 +516,18 @@ strip(V, 8.5, 0, 8.5, 0.9, 0x8d8579);
   vBox(0.12, 2.4, 0.12, 0x555a60, -7.5, 1.2, -20); vBox(0.08, 0.9, 1.6, 0x7a5a2a, -7.5, 2.2, -20);              // sign
   scene.add(view);
 }
+// the village's roads: the country road and the south lane in worn asphalt with gravel verges and skirts into the
+// ditch - no lines or rails, but dry-stone field walls either side for a stretch out of the village; its loop in
+// setts, under the road where they meet
+for (const r of [CR, SL]) {
+  strip(r, -3.2, 0.01, 3.2, 0.01, 0x4a4846);
+  for (const s of [1, -1]) {
+    strip(r, s * 3.2, 0.008, s * 4.2, 0.008, 0x77706a);
+    strip(r, s * 4.2, -2.5, s * 4.2, 0.008, 0x5f574d);
+    strip(r, s * 4.8, -1.2, s * 4.8, 0.9, 0x8f8778, i => Math.abs(Math.hypot(r.P[i].x - VIL.x, r.P[i].z - VIL.z) - VIL.r - 120) < 110);
+  }
+}
+strip(VL, -2.6, 0.006, 2.6, 0.006, 0x8c857a);
 
 // the city's streets: asphalt, a dashed centre line, kerbs, pavements and zebra crossings, all open where streets
 // meet. gapOf(r)(i): how far a sample is from the nearest junction. The roundabout: no centre line, its pavement
@@ -502,6 +578,7 @@ for (const r of STREETS) {
   island.position.set(ROUND.x, 0.02, ROUND.z);
   const basin = new THREE.Mesh(new THREE.CylinderGeometry(11, 11.5, 0.9, 40), new THREE.MeshLambertMaterial({ color: 0xbdb8ad }));
   basin.position.set(ROUND.x, 0.45, ROUND.z);
+  solid(ROUND.x, ROUND.z, ROUND.x, ROUND.z, 11.5);
   const water = new THREE.Mesh(new THREE.CircleGeometry(10.4, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x4f9cc9, roughness: 0.1, metalness: 0.2 }));
   water.position.set(ROUND.x, 0.92, ROUND.z); // just over the basin's rim
   const sculpture = new THREE.Mesh(new THREE.TorusGeometry(8, 0.8, 14, 64), new THREE.MeshStandardMaterial({ color: 0xdfe3e8, metalness: 1, roughness: 0.15 }));
@@ -527,6 +604,7 @@ for (const r of STREETS) {
   };
   const building = (x0, x1, z0, z1, h, color) => {
     if (![[x0, z0], [x1, z0], [x0, z1], [x1, z1]].every(([x, z]) => insideRing(x, z))) return;
+    solid(x0, z0, x1, z0); solid(x1, z0, x1, z1); solid(x1, z1, x0, z1); solid(x0, z1, x0, z0);
     const w = x1 - x0, d = z1 - z0, b = new THREE.BoxGeometry(w, h + 0.5, d).translate((x0 + x1) / 2, h / 2 - 0.25, (z0 + z1) / 2), uv = b.attributes.uv;
     for (let v = 0; v < 24; v++) { // faces +x, -x, +y, -y, +z, -z: the walls in window bays, the roof plain
       const f = v >> 2;
@@ -565,6 +643,7 @@ for (const r of STREETS) {
       }
       // the observation tower on the plaza where the paths cross: a flared foot, a 200 m shaft, the glass pod, a mast
       const [tx, tz] = [(x0 + x1) / 2, (z0 + z1) / 2];
+      solid(tx, tz, tx, tz, 14);
       piece(new THREE.CylinderGeometry(6, 14, 30, 16).translate(tx, 15, tz), 0xd9d6cf);
       piece(new THREE.CylinderGeometry(5.5, 6, 200, 16).translate(tx, 130, tz), 0xd9d6cf);
       drum(12, 18, 230, 252, tx, tz, 0x8fb0c4, 24);
@@ -572,6 +651,7 @@ for (const r of STREETS) {
       piece(new THREE.CylinderGeometry(1.2, 2.5, 80, 8).translate(tx, 298, tz), 0xc9cdd2);
     } else if (k === 2 && j === 2) { // the twin towers: eight tapering tiers each, spires, and the skybridge at 170 m
       for (const tx of [3035, 3125]) {
+        solid(tx, -375, tx, -375, 21);
         let y = 0;
         for (const [r, h] of [[21, 110], [20, 40], [19, 30], [17.5, 30], [16, 25], [14, 20], [11.5, 15], [9, 12]]) { drum(r, r, y, y + h, tx, -375, 0xb9c6cf); y += h; }
         piece(new THREE.ConeGeometry(2.4, 75, 8).translate(tx, y + 37.5, -375), 0xdfe3e8);
@@ -598,7 +678,7 @@ for (const r of STREETS) {
   }
   scene.add(new THREE.Mesh(mergeGeometries(parts), new THREE.MeshLambertMaterial({ map: windows, vertexColors: true })));
   const pt = new THREE.InstancedMesh(new THREE.ConeGeometry(2.2, 9, 6).translate(0, 4.5, 0), new THREE.MeshLambertMaterial({ color: 0x2f5a2a }), parkTrees.length);
-  parkTrees.forEach(([x, z], k) => pt.setMatrixAt(k, new THREE.Matrix4().makeTranslation(x, 0, z)));
+  parkTrees.forEach(([x, z], k) => { pt.setMatrixAt(k, new THREE.Matrix4().makeTranslation(x, 0, z)); solid(x, z, x, z, 2); });
   scene.add(pt);
   const lamps = [];
   for (const r of STREETS) {
@@ -608,8 +688,9 @@ for (const r of STREETS) {
   const lamp = new THREE.InstancedMesh(mergeGeometries([new THREE.CylinderGeometry(0.09, 0.12, 8, 6).translate(0, 4, 0), new THREE.BoxGeometry(0.35, 0.18, 1.4).translate(0, 8, 0.6)]),
     new THREE.MeshLambertMaterial({ color: 0x50555b }), lamps.length);
   lamps.forEach(([r, i, s], k) => { // on the pavement, its head out over the road
-    const p = r.P[i], o = s * 6.8;
-    lamp.setMatrixAt(k, new THREE.Matrix4().makeRotationY(Math.atan2(-s * r.L[i].x, -s * r.L[i].z)).setPosition(p.x + r.L[i].x * o, p.y, p.z + r.L[i].z * o));
+    const p = r.P[i], o = s * 6.8, x = p.x + r.L[i].x * o, z = p.z + r.L[i].z * o;
+    lamp.setMatrixAt(k, new THREE.Matrix4().makeRotationY(Math.atan2(-s * r.L[i].x, -s * r.L[i].z)).setPosition(x, p.y, z));
+    solid(x, z, x, z, 0.12);
   });
   scene.add(lamp);
 }
@@ -686,10 +767,8 @@ for (const r of STREETS) {
   sign.position.set(PIT.x, 5.3, -2386.7); // faces the pit lane (+z)
   scene.add(sign);
 }
-// shortcut: walls, guardrails and trees have no collision, the car drives through them.
-
 // Road samples in 40 m cells, so any point finds the roads near it: [road, sample index]
-const CELL = 40, cells = new Map();
+const cells = new Map();
 for (const r of ROADS) for (let i = 0; i < r.N; i++) {
   const k = Math.floor(r.P[i].x / CELL) + ',' + Math.floor(r.P[i].z / CELL);
   if (!cells.has(k)) cells.set(k, []);
@@ -702,24 +781,29 @@ function eachNear(x, z, reach, fn) { // every sample within `reach` cells of (x,
     if (list) for (let k = 0; k < list.length; k += 2) fn(list[k], list[k + 1]);
   }
 }
-// the road under (x, z): its nearest centre-line segment, with the height interpolated along it - smooth and exact,
-// so the car rides the slope without stepping from one 3 m sample to the next
-function onRoad(x, z) {
-  let d = Infinity, y = 0, half = 0;
+// the road under (x, z): d, how far the nearest centre line is; out, how far outside the nearest road's edge (< 0 on
+// one); on, whether a road covers it; y, the height of the covering road's nearest centre-line segment, interpolated
+// along it - smooth and exact, so the car rides the slope without stepping from one 3 m sample to the next. Given the
+// car's height (near), a road over 2 m above or below it is another level - the flyover overhead, the autobahn under
+// it - and doesn't count
+function onRoad(x, z, near) {
+  let d = Infinity, out = Infinity, y = 0, on = false, best = Infinity;
   eachNear(x, z, 1, (r, i) => {
     const a = r.P[i], b = r.P[i + 1], dx = b.x - a.x, dz = b.z - a.z;
     const t = Math.min(1, Math.max(0, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz)));
-    const e = Math.hypot(a.x + dx * t - x, a.z + dz * t - z);
-    if (e < d) { d = e; y = a.y + (b.y - a.y) * t; half = r.half; }
+    const e = Math.hypot(a.x + dx * t - x, a.z + dz * t - z), h = a.y + (b.y - a.y) * t;
+    d = Math.min(d, e);
+    out = Math.min(out, e - r.half);
+    if (e < r.half && e < best && (near === undefined || Math.abs(h - near) <= 2)) { best = e; y = h; on = true; }
   });
-  return { d, y, half };
+  return { d, out, y, on };
 }
 
 // The land round the mountains: a terrain mesh over the box below, flat at its edges where it meets the plain (y 0).
 // Near a road it follows the road (a ditch alongside, so the coarse grid never pokes through the asphalt); away from
 // it, the roads' general height plus peaks and valleys that grow with distance; valley floors stop at the plain
 const LAND = { x0: 2100, x1: 6700, z0: -2000, z1: 2400 };
-const coarse = ROADS.filter(r => r !== T && !STREETS.includes(r)).flatMap(r => r.P.filter((_, i) => i % 25 === 0)), noise = new ImprovedNoise(); // (the flat city and track don't shape the hills)
+const coarse = ROADS.filter(r => r !== T && !UTURNS.includes(r) && !STREETS.includes(r)).flatMap(r => r.P.filter((_, i) => i % 25 === 0)), noise = new ImprovedNoise(); // (the flat city and track, and the flyover, don't shape the hills)
 function terrainAt(x, z) {
   const edge = Math.min(x - LAND.x0, LAND.x1 - x, z - LAND.z0, LAND.z1 - z);
   if (edge <= 0) return -0.1; // the plain
@@ -734,10 +818,11 @@ function terrainAt(x, z) {
   const far = fy / fw + n * (40 + 220 * THREE.MathUtils.smoothstep(Math.sqrt(fd), 60, 900));
   const h = sw ? THREE.MathUtils.lerp(sy / sw, far, THREE.MathUtils.smoothstep(Math.sqrt(near), 10, 70)) : far;
   const town = THREE.MathUtils.smoothstep(Math.min(x - CITY.x0, CITY.x1 - x, z - CITY.z0, CITY.z1 - z), -120, 0); // the city's flat
-  return THREE.MathUtils.lerp(-0.1, Math.max(-0.1, THREE.MathUtils.lerp(h, -0.05, town)), THREE.MathUtils.smoothstep(edge, 0, 300)); // floors meet the plain
+  const vil = THREE.MathUtils.smoothstep(VIL.r + 90 - Math.hypot(x - VIL.x, z - VIL.z), 0, 90); // and the village's
+  return THREE.MathUtils.lerp(-0.1, Math.max(-0.1, THREE.MathUtils.lerp(THREE.MathUtils.lerp(h, VIL.y - 0.05, vil), -0.05, town)), THREE.MathUtils.smoothstep(edge, 0, 300)); // floors meet the plain
 }
-// what the car rests on: the road itself on a road, the land off it
-const surfaceAt = (x, z) => { const r = onRoad(x, z); return r.d < r.half ? r.y : terrainAt(x, z); };
+// what the car rests on: the road itself on a road, the land off it (near: the car's height, see onRoad)
+const surfaceAt = (x, z, near) => { const r = onRoad(x, z, near); return r.on ? r.y : terrainAt(x, z); };
 
 { // the terrain mesh, ~15 m grid, coloured grass, then rock where steep or high, then snow
   const w = LAND.x1 - LAND.x0, h = LAND.z1 - LAND.z0;
@@ -756,27 +841,31 @@ const surfaceAt = (x, z) => { const r = onRoad(x, z); return r.d < r.half ? r.y 
 }
 
 // trees: along the autobahn, round the racetrack outside its walls, and on gentle grass slopes round the mountains
-// (not in town) - clear of every road and the forecourt
+// and the village's roads (not in town or the village) - clear of every road (3 m past its edge) and the forecourt; one that runs out of tries by a road isn't
+// planted
 const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(2, 8, 6).translate(0, 4, 0), new THREE.MeshLambertMaterial({ color: 0x2f5a2a }), 10000);
 const m = new THREE.Matrix4();
 for (let k = 0; k < trees.count; k++) {
-  const hills = k >= 6000 && k < 9200, track = k >= 9200, r = track ? T : hills ? [M, M, K1, K2][k % 4] : A;
-  let x, z, y, i, o, tries = 0;
+  const hills = k >= 6000 && k < 9200, track = k >= 9200, r = track ? T : hills ? [M, M, K1, K2, CR, SL][k % 6] : A;
+  let x, z, y, i, o, g, tries = 0;
   do {
     i = Math.floor(Math.random() * r.N);
     o = (track ? 85 + Math.random() * 200 : hills ? 14 + Math.random() * 300 : 25 + Math.random() * 120) * (Math.random() < 0.5 ? -1 : 1);
-    x = r.P[i].x + r.L[i].x * o; z = r.P[i].z + r.L[i].z * o; y = terrainAt(x, z);
-  } while (tries++ < 20 && (onRoad(x, z).d < (track ? 55 : 14) || (r === A && o > 0 && nearStation(i, 30)) || inCity(x, z, 20) ||
+    x = r.P[i].x + r.L[i].x * o; z = r.P[i].z + r.L[i].z * o; y = terrainAt(x, z); g = onRoad(x, z);
+  } while (tries++ < 20 && (g.d < (track ? 55 : 14) || g.out < 3 || (r === A && o > 0 && nearStation(i, 30)) || inCity(x, z, 20) || Math.hypot(x - VIL.x, z - VIL.z) < VIL.r + 30 ||
     (hills && (y > 200 || Math.abs(terrainAt(x + 4, z) - y) > 3 || Math.abs(terrainAt(x, z + 4) - y) > 3))));
+  if (g.d < (track ? 55 : 14) || g.out < 3) { trees.setMatrixAt(k, m.makeScale(0, 0, 0)); continue; }
   trees.setMatrixAt(k, m.makeTranslation(x, y, z));
+  solid(x, z, x, z, 1.8); // the cone, at bumper height
 }
 scene.add(trees);
 
-// self-checks: the car rests exactly on the mountain and link roads, the drive and the lay-by, and no climb is
-// steeper than 12%
-for (const r of [M, K1, K2, D, V, S, ...STREETS, T, TR]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z) - r.P[i].y) < 0.05, 'the car should rest on the road', i);
+// self-checks: the car rests exactly on the mountain and link roads, the drive and the lay-by, the village's roads, the
+// flyovers and the autobahn under them, and no climb is steeper than 12%
+for (const r of [M, K1, K2, D, V, S, ...STREETS, T, TR, CR, SL, VL]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z) - r.P[i].y) < 0.05, 'the car should rest on the road', i);
+for (const r of [...UTURNS, A]) for (let i = 0; i < r.N; i++) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z, r.P[i].y) - r.P[i].y) < 0.05, 'the car should rest on the road, not the one over or under it', i);
 let steepest = 0;
-for (const r of [M, K2, AV]) for (let i = 0; i < r.N; i++) steepest = Math.max(steepest, Math.abs(r.P[i + 1].y - r.P[i].y) / Math.hypot(r.P[i + 1].x - r.P[i].x, r.P[i + 1].z - r.P[i].z));
+for (const r of [M, K2, AV, CR, SL]) for (let i = 0; i < r.N; i++) steepest = Math.max(steepest, Math.abs(r.P[i + 1].y - r.P[i].y) / Math.hypot(r.P[i + 1].x - r.P[i].x, r.P[i + 1].z - r.P[i].z));
 console.assert(steepest < 0.12, 'mountain grades should stay under 12%', steepest);
 
 // fuel station: canopy, two pump islands, a shop and a sign. Local +Z runs along the road, +X away from it
@@ -856,6 +945,164 @@ scene.add(station);
   sign.rotation.y = Math.PI; // faces the road
   shop.add(sign);
   scene.add(shop);
+}
+
+// the village's buildings, the same every drive (a seeded random): stone houses along its lanes, one or two
+// storeys, each turned to face its lane with a door and small windows front and back, a chimney and a gabled roof of
+// old tiles or slate; the church on the square's far side from the road, its bell tower by the south lane; the
+// square, paved, a fountain in its middle
+{
+  let seed = 1873;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32, pick = a => a[Math.floor(rnd() * a.length)];
+  const c = document.createElement('canvas'), g = c.getContext('2d'); // stone: courses of uneven blocks in mortar, tiling
+  c.width = c.height = 128;
+  g.fillStyle = '#6f6960'; g.fillRect(0, 0, 128, 128);
+  for (let y = 0; y < 128; y += 16) {
+    const ws = Array.from({ length: 5 + Math.floor(rnd() * 3) }, () => 0.6 + rnd()), sum = ws.reduce((a, b) => a + b);
+    let x = rnd() * 128;
+    for (const k of ws) {
+      const w = k / sum * 128, v = 180 + rnd() * 60;
+      g.fillStyle = `rgb(${v | 0},${(v - 6) | 0},${(v - 16) | 0})`;
+      for (const dx of [0, -128]) g.fillRect(x + dx + 1.5, y + 1.5, w - 3, 13); // (a block past the edge wraps round)
+      x = (x + w) % 128;
+    }
+  }
+  const stone = Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
+  const STONE = [0xe8dcc4, 0xd9cdb5, 0xcfc6b8, 0xe2d2b0, 0xc8bfae], TILES = [0xa0583c, 0x8f4e37, 0xb0674a, 0x5d6166, 0x6a5f58];
+  const walls = [], roofs = [], bits = [], col = new THREE.Color();
+  const tint = (geo, hex) => {
+    col.setHex(hex);
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: geo.attributes.position.count }, () => [col.r, col.g, col.b]).flat(), 3));
+    return geo;
+  };
+  // on m (local y up from the foot, x along the front, z back from it): a stone block, its faces in 2.5 m tiles of
+  // stone and solid round its sides; a gabled roof, its eaves at y; a detail
+  const block = (m, w, h, d, hex) => {
+    const b = new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0), uv = b.attributes.uv;
+    for (let v = 0; v < 24; v++) { const f = v >> 2; uv.setXY(v, uv.getX(v) * (f < 2 ? d : w) / 2.5, uv.getY(v) * (f === 2 || f === 3 ? d : h) / 2.5); }
+    walls.push(tint(b.applyMatrix4(m), hex));
+    const k = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => new THREE.Vector3(sx * w / 2, 0, sz * d / 2).applyMatrix4(m));
+    k.forEach((p, j) => solid(p.x, p.z, k[(j + 1) % 4].x, k[(j + 1) % 4].z));
+  };
+  const gable = (m, w, d, y, hex) => roofs.push(tint(new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(-d / 2 - 0.35, 0), new THREE.Vector2(d / 2 + 0.35, 0),
+    new THREE.Vector2(0, d * 0.32)]), { depth: w + 0.5, bevelEnabled: false }).rotateY(Math.PI / 2).translate(-(w + 0.5) / 2, y, 0).applyMatrix4(m), hex));
+  const bit = (m, w, h, d, x, y, z, hex) => bits.push(tint(new THREE.BoxGeometry(w, h, d).translate(x, y, z).applyMatrix4(m), hex));
+  const house = (m, w, d, n) => {
+    const h = 3.1 * n + 0.4;
+    block(m, w, h, d, pick(STONE));
+    gable(m, w, d, h, pick(TILES));
+    for (let k = 0; k < n; k++) for (const sx of [-1, 1]) for (const sz of [-1, 1]) bit(m, 0.9, 1.1, 0.12, sx * w / 4, 1.9 + 3.1 * k, sz * (d / 2 + 0.03), 0x2b2f33);
+    bit(m, 1.1, 2.1, 0.14, 0, 1.55, -d / 2 - 0.04, pick([0x5a3b22, 0x3f4a3a, 0x4a3a2c]));
+    bit(m, 0.6, 1.6, 0.6, w * 0.3, h + d * 0.2 + 0.6, d * 0.12, 0x6b645a);
+  };
+  const at = (x, z, turn = 0) => new THREE.Matrix4().makeRotationY(turn).setPosition(x, VIL.y - 0.5, z);
+  // the church: nave, roof, tall windows, its door to the square; the tower, open belfry, slate spire and cross
+  const nave = at(5272, 265.5), tower = at(5257, 265.5);
+  block(nave, 24, 9.5, 11, 0xd9cdb5);
+  gable(nave, 24, 11, 9.5, 0x8f4e37);
+  for (const x of [-7, 0, 7]) for (const z of [-5.53, 5.53]) bit(nave, 0.8, 3, 0.1, x, 5.5, z, 0x2b2f33);
+  bit(nave, 2, 3.4, 0.16, 4, 2.2, 5.56, 0x4a3020);
+  block(tower, 6.5, 22, 6.5, 0xcfc6b8);
+  for (const [x, z, w, d] of [[0, 3.27, 1.4, 0.1], [0, -3.27, 1.4, 0.1], [3.27, 0, 0.1, 1.4], [-3.27, 0, 0.1, 1.4]]) bit(tower, w, 2.4, d, x, 19, z, 0x1d2024);
+  roofs.push(tint(new THREE.ConeGeometry(4.9, 7, 4).rotateY(Math.PI / 4).translate(0, 25.5, 0).applyMatrix4(tower).toNonIndexed(), 0x5d6166));
+  bit(tower, 0.15, 1.6, 0.15, 0, 29.8, 0, 0x3a3d40);
+  bit(tower, 0.9, 0.15, 0.15, 0, 30.1, 0, 0x3a3d40);
+  // the houses: along each side of each lane in turn, wherever one fits - in the village, clear of every road (and the
+  // square, the church and the other houses)
+  const placed = [[5268.5, 298, 33], [5268.5, 265.5, 17]]; // [x, z, r]
+  for (const r of [CR, VL, SL]) for (const s of [1, -1]) for (let i = 1; i < r.N;) {
+    const w = 6.5 + rnd() * 4, d = 7 + rnd() * 3, n = rnd() < 0.55 ? 2 : 1, o = s * (r.half + 0.8 + rnd() * 1.5 + d / 2), R = Math.hypot(w, d) / 2;
+    const x = r.P[i].x + r.L[i].x * o, z = r.P[i].z + r.L[i].z * o, m = at(x, z, Math.atan2(s * r.L[i].x, s * r.L[i].z) + (rnd() - 0.5) * 0.08);
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => new THREE.Vector3(sx * w / 2, 0, sz * d / 2).applyMatrix4(m));
+    if (Math.hypot(x - VIL.x, z - VIL.z) < VIL.r - R && placed.every(([px, pz, pr]) => Math.hypot(px - x, pz - z) > pr + R) && corners.every(p => onRoad(p.x, p.z).out > 0.5)) {
+      house(m, w, d, n);
+      placed.push([x, z, R]);
+      i += Math.ceil((w + 1 + rnd() * 3) / 3);
+    } else i += 2;
+  }
+  scene.add(new THREE.Mesh(mergeGeometries(walls), new THREE.MeshLambertMaterial({ map: stone, vertexColors: true })),
+    new THREE.Mesh(mergeGeometries(roofs), new THREE.MeshLambertMaterial({ vertexColors: true })), new THREE.Mesh(mergeGeometries(bits), new THREE.MeshLambertMaterial({ vertexColors: true })));
+  // the square: paving from the south lane to the road, and the fountain - a basin, its water, a column and a bowl
+  const square = (geo, color, y) => { const p = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color })); p.position.set(5268.5, VIL.y + y, 298); scene.add(p); };
+  square(new THREE.PlaneGeometry(43, 52).rotateX(-Math.PI / 2), 0x9b9488, 0.004);
+  square(new THREE.CylinderGeometry(3, 3.2, 0.8, 24), 0xbdb3a2, 0.4);
+  square(new THREE.CircleGeometry(2.75, 24).rotateX(-Math.PI / 2), 0x4f8fb3, 0.72);
+  square(new THREE.CylinderGeometry(0.35, 0.45, 2.4, 10), 0xbdb3a2, 1.2);
+  square(new THREE.CylinderGeometry(1.1, 0.5, 0.4, 16), 0xbdb3a2, 2.4);
+  solid(5268.5, 298, 5268.5, 298, 3.2);
+}
+// every box built above that stands at bumper height is solid round its four sides: the garages' and the workshop's
+// walls, the lift, pumps, canopy legs, the gantry's legs, the grandstand, benches (not floors, roofs or lintels)
+scene.updateMatrixWorld();
+scene.traverse(o => {
+  if (o.geometry?.type !== 'BoxGeometry') return;
+  const b = new THREE.Box3().setFromObject(o), ground = surfaceAt((b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2, b.min.y);
+  if (b.min.y - ground > 1.2 || b.max.y - ground < 0.3) return;
+  const { width: w, depth: d } = o.geometry.parameters;
+  const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => new THREE.Vector3(sx * w / 2, 0, sz * d / 2).applyMatrix4(o.matrixWorld));
+  c.forEach((p, k) => solid(p.x, p.z, c[(k + 1) % 4].x, c[(k + 1) % 4].z, 0, b.min.y, b.max.y));
+});
+// the car's three circles, each pushed out of whatever it overlaps - the deepest overlap first, then again for what's
+// left (a corner), so the joints along a wall can't tilt its push. Driven in steeper than 30° the car stops dead; a
+// glancing blow turns it along the wall with the part of its speed that was along it
+const CAR_AT = [-1, 0, 1].map(k => k * (CAR.length / 2 - CAR_R));
+function collide(car) {
+  let nx = 0, nz = 0;
+  for (const at of CAR_AT) for (let pass = 0; pass < 3; pass++) {
+    const px = car.x + Math.sin(car.heading) * at, pz = car.z + Math.cos(car.heading) * at;
+    const s = solids.get(Math.floor(px / CELL) + ',' + Math.floor(pz / CELL)) || [];
+    let pen = 0, ux = 0, uz = 0;
+    for (let k = 0; k < s.length; k += 7) {
+      if (s[k + 5] > (car.y || 0) + 1.5 || s[k + 6] < (car.y || 0) + 0.3) continue; // over or under its body
+      const ax = s[k], az = s[k + 1], dx = s[k + 2] - ax, dz = s[k + 3] - az, l2 = dx * dx + dz * dz;
+      const t = l2 ? Math.min(1, Math.max(0, ((px - ax) * dx + (pz - az) * dz) / l2)) : 0;
+      const ox = px - ax - dx * t, oz = pz - az - dz * t, d = Math.hypot(ox, oz);
+      if (CAR_R + s[k + 4] - d > pen && d > 1e-6) { pen = CAR_R + s[k + 4] - d; ux = ox / d; uz = oz / d; }
+    }
+    if (!pen) break;
+    car.x += ux * pen; car.z += uz * pen;
+    nx += ux; nz += uz;
+  }
+  const n = Math.hypot(nx, nz), dir = Math.sign(car.speed);
+  if (!n || !dir) return;
+  const mx = Math.sin(car.heading) * dir, mz = Math.cos(car.heading) * dir, into = (mx * nx + mz * nz) / n; // -1: head-on
+  if (into >= 0) return; // moving away from it
+  car.hit = Math.max(car.hit || 0, -into * Math.abs(car.speed)); // how hard, m/s into it (the crash sound)
+  if (into < -0.5) { car.speed = 0; return; }
+  const tx = mx - nx / n * into, tz = mz - nz / n * into; // along it
+  car.heading = Math.atan2(tx * dir, tz * dir);
+  car.speed *= Math.hypot(tx, tz);
+}
+// a frame's move, in steps of under 0.4 m so nothing thin is driven clean through at speed
+function move(car, steer, dt) {
+  const n = Math.ceil(Math.abs(car.speed) * dt / 0.4) || 1;
+  for (let k = 0; k < n; k++) { step(car, steer, dt / n); collide(car); }
+}
+// collision self-checks: head-on into the home garage's back wall the car stops short of it; glancing the autobahn's
+// median wall at 10° it runs on along the wall, clear of it, at cos 10° of its speed; into it at 45° it stops, wherever
+// along the wall's 3 m pieces it hits
+{
+  for (let z = 0; z < 3; z += 0.25) {
+    const h = { x: 2003, z, heading: -Math.PI / 4, speed: 83, steer: 0 };
+    for (let i = 0; i < 60 && h.speed; i++) move(h, 0, 1 / 60);
+    console.assert(h.speed === 0 && Math.abs(h.heading + Math.PI / 4) < 1e-9, 'into the median at 45° the car should stop', h);
+  }
+  const g = { x: HOME.x, z: HOME.z, heading: Math.PI, speed: 10, steer: 0 };
+  for (let i = 0; i < 60; i++) move(g, 0, 1 / 60);
+  console.assert(g.speed === 0 && g.z - CAR.length / 2 > HOME.z - 4 - 0.05, 'the car should stop at the garage wall', g);
+  const a = { x: 2002, z: 0, heading: -10 * Math.PI / 180, speed: 50, steer: 0 };
+  for (let i = 0; i < 60; i++) move(a, 0, 1 / 60);
+  console.assert(a.x > 2000 + CAR_R - 0.05 && Math.abs(a.heading) < 0.01 && Math.abs(a.speed - 50 * Math.cos(10 * Math.PI / 180)) < 0.5, 'the car should glance along the median', a);
+}
+// and the roads connect clear of every wall, pier and house: a car anywhere in a lane of the autobahn (under the
+// flyovers too), the links, the flyovers (at their height) or the village's roads touches nothing
+for (const [r, lanes, name] of [[A, [-11.9, -8.1, -4.4, 4.4, 8.1, 11.9], 'autobahn'], [K1, [-2.25, 2.25], 'valley road'], [K2, [-2.25, 2.25], 'direct road'],
+  ...UTURNS.map(u => [u, [0], 'U-turn']), [CR, [-1.6, 1.6], 'country road'], [SL, [-1.6, 1.6], 'south lane'], [VL, [0], 'village loop']]) for (const o of lanes) {
+  for (let i = 0; i < r.N; i++) {
+    const t = r.curve.getTangentAt(i / r.N), x = r.P[i].x + r.L[i].x * o, z = r.P[i].z + r.L[i].z * o, c = { x, z, y: r.P[i].y, heading: Math.atan2(t.x, t.z) };
+    collide(c);
+    console.assert(c.x === x && c.z === z, 'the lane should be clear', name, o, i);
+  }
 }
 
 // BMW X1 xDrive20d (E84) from primitives at real size: 4.45 m long, 1.80 wide, 1.55 tall.
@@ -1285,6 +1532,42 @@ function relayTick(on) { // a short blip: a higher tick as it lights, a lower to
   o.start(t);
   o.stop(t + 0.04);
 }
+// a crash (hit: m/s into it): a thud through the body, the crunch of panels folding - noise in uneven grains - and,
+// in a hard one, bits of glass and trim pinging off; louder and longer the harder the hit. Hits within 0.2 s of a
+// harder one are part of it
+let crashAt = -1, crashHit = 0;
+function crash(hit) {
+  actx ??= new AudioContext();
+  if (actx.state === 'suspended') actx.resume();
+  const t = actx.currentTime, k = Math.min(1, hit / 15), rate = actx.sampleRate;
+  if (t - crashAt < 0.2 && hit <= crashHit) return;
+  crashAt = t; crashHit = hit;
+  const out = actx.createGain();
+  out.gain.value = 0.1 + 0.8 * k;
+  out.connect(actx.destination);
+  const thud = actx.createOscillator(), tg = actx.createGain();
+  thud.frequency.setValueAtTime(110, t);
+  thud.frequency.exponentialRampToValueAtTime(38, t + 0.3);
+  tg.gain.setValueAtTime(0.7, t);
+  tg.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  thud.connect(tg).connect(out);
+  thud.start(t);
+  thud.stop(t + 0.4);
+  const play = (len, fill, filter, freq, at = t) => { // a buffer of len s, filled by fill(sample index, its count)
+    const buf = actx.createBuffer(1, Math.ceil(rate * len), rate), d = buf.getChannelData(0), src = actx.createBufferSource(), f = actx.createBiquadFilter();
+    for (let i = 0; i < d.length; i++) d[i] = fill(i, d.length);
+    src.buffer = buf;
+    f.type = filter;
+    f.frequency.value = freq;
+    src.connect(f).connect(out);
+    src.start(at);
+  };
+  let grain = 1;
+  play(0.2 + 0.7 * k, (i, n) => { if (i % 256 === 0) grain = Math.random() ** 2; return (Math.random() * 2 - 1) * grain * Math.exp(-5 * i / n); }, 'bandpass', 1800);
+  if (k < 0.4) return;
+  const pings = Array.from({ length: Math.round(12 * k) }, () => [Math.random() * 0.6 * rate, 2 * Math.PI * (3000 + Math.random() * 4000) / rate]);
+  play(0.75, i => pings.reduce((s, [at, w]) => i < at ? s : s + 0.15 * Math.sin(w * (i - at)) * Math.exp(-(i - at) / (0.02 * rate)), 0), 'highpass', 2500, t + 0.05);
+}
 function setView(seat) {
   inCar = seat;
   tintGlass();
@@ -1564,7 +1847,7 @@ const mapEl = document.getElementById('map'), map = mapEl.getContext('2d');
 mapEl.width = mapEl.clientWidth * devicePixelRatio;
 mapEl.height = mapEl.clientHeight * devicePixelRatio;
 map.scale(devicePixelRatio, devicePixelRatio);
-const MAP_ROADS = [A, M, K1, K2, ...STREETS, T, TR, PL];
+const MAP_ROADS = [A, M, K1, K2, ...STREETS, T, TR, PL, CR, SL, VL];
 const all = MAP_ROADS.flatMap(r => r.P), xs = all.map(p => p.x), zs = all.map(p => p.z);
 const [minX, maxX, minZ, maxZ] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
 const mapS = Math.min((mapEl.clientWidth - 24) / (maxX - minX), (mapEl.clientHeight - 24) / (maxZ - minZ));
@@ -1580,7 +1863,7 @@ function drawMap() {
   map.lineWidth = 4;
   map.strokeStyle = '#9a9a9a';
   map.stroke(roadPath);
-  for (const [p, color] of [[station.position, '#2ecc71'], [HOME, '#4fa8ff'], [SHOP, '#ff8c1a'], [V.P[Math.round(V.N / 2)], '#ffd23f'], [T.P[ISF], '#ffffff'], [PIT, '#ff8c1a']]) { // fuel, home, mechanic, viewpoint, start line, pit garage
+  for (const [p, color] of [[station.position, '#2ecc71'], [HOME, '#4fa8ff'], [SHOP, '#ff8c1a'], [V.P[Math.round(V.N / 2)], '#ffd23f'], [T.P[ISF], '#ffffff'], [PIT, '#ff8c1a'], [VIL, '#c08a5a']]) { // fuel, home, mechanic, viewpoint, start line, pit garage, village
     map.fillStyle = color;
     map.beginPath(); map.arc(...toMap(p.x, p.z), 4.5, 0, Math.PI * 2); map.fill();
   }
@@ -1633,17 +1916,21 @@ renderer.setAnimationLoop(() => {
   rollersEl.hidden = !dyno || panelOpen;
   if (pad.at && performance.now() - pad.at > 500) padInput({}), pad.at = 0; // the phone went quiet (locked, out of range): let go
   steerIn = steerInput(steerIn, (keys.has('KeyA') - keys.has('KeyD')) || pad.s, dt);
-  step(state, steerIn, dt);
+  const v = state.speed;
+  state.hit = 0;
+  move(state, steerIn, dt);
+  if (state.speed !== v) w.crashSpeed = Math.abs(state.speed) * 3.6; // a hit: the car page carries on from here (km/h)
+  if (state.hit > 1) crash(state.hit); // (not the nudges of pushing against a wall or steering along one)
 
   // on the ground: height from the surface under the axles and the sides, and the tilt eased over ~0.1 s so the
   // corner where one 3 m road segment meets the next can't jolt it; the slope feeds the car page's physics
   const sh = Math.sin(state.heading), ch = Math.cos(state.heading);
-  const hF = surfaceAt(state.x + sh * 1.38, state.z + ch * 1.38), hB = surfaceAt(state.x - sh * 1.38, state.z - ch * 1.38);
-  const hL = surfaceAt(state.x + ch * 0.8, state.z - sh * 0.8), hR = surfaceAt(state.x - ch * 0.8, state.z + sh * 0.8);
+  const hF = surfaceAt(state.x + sh * 1.38, state.z + ch * 1.38, state.y), hB = surfaceAt(state.x - sh * 1.38, state.z - ch * 1.38, state.y);
+  const hL = surfaceAt(state.x + ch * 0.8, state.z - sh * 0.8, state.y), hR = surfaceAt(state.x - ch * 0.8, state.z + sh * 0.8, state.y);
   const settle = 1 - Math.exp(-dt * 10);
   tilt.pitch += (Math.atan2(hF - hB, 2.76) - tilt.pitch) * settle;
   tilt.roll += (Math.atan2(hL - hR, 1.6) - tilt.roll) * settle;
-  car.position.set(state.x, (hF + hB + hL + hR) / 4, state.z);
+  car.position.set(state.x, state.y = (hF + hB + hL + hR) / 4, state.z);
   car.rotation.set(-tilt.pitch, state.heading, tilt.roll, 'YXZ');
   frame.contentWindow.roadGrade = Math.sin(tilt.pitch); // + = uphill: slower on the climb, gathering speed downhill
   wheelSpin += roll * dt / WHEEL_R;

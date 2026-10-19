@@ -1584,6 +1584,7 @@
       xdriveTraction(0, dt);
     }
     speed = Math.max(0, Math.min(speed, 400));
+    if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
 
     // ---- gear selection ----
     if(shiftCooldown > 0) shiftCooldown = Math.max(0, shiftCooldown - dt);

@@ -1884,6 +1884,7 @@
       speed = Math.max(0, speed - (dragDecel_ms2 + rollA)*3.6*dt);
     }
     speed = Math.max(0, Math.min(speed, 400)); // sanity ceiling only - physics are never clamped to the printed dial max
+    if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
 
     // ---- gear selection + rpm ----
     if(shiftCooldown > 0) shiftCooldown = Math.max(0, shiftCooldown - dt);

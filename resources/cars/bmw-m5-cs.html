@@ -1940,6 +1940,7 @@
     if(!running && !braking) a = Math.min(a, 0);
     speed = Math.max(0, speed + (a - dragA - gradeA)*3.6*dt); // no cap: drag and the rev limiter set the top speed
     if(braking && speed < 0.3) speed = 0;
+    if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
 
     // ---- gear selection ----
     if(!running){ if(transmissionMode !== 'N' && transmissionMode !== 'R') gearIdx = -1; }

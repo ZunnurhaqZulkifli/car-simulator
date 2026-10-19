@@ -2278,6 +2278,7 @@
       speed = Math.max(0, speed - (dragDecel_ms2 + rollA)*3.6*dt);
     }
     speed = Math.max(0, Math.min(speed, 520)); // sanity ceiling only - raised so Map 6's real drag-limited equilibrium (~470-500 km/h) is never artificially clipped
+    if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
 
     // ---- gear selection + rpm ----
     if(shiftCooldown > 0) shiftCooldown = Math.max(0, shiftCooldown - dt);

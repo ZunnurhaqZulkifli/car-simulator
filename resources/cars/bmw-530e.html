@@ -2595,6 +2595,7 @@
       speed = Math.max(0, speed - (rollA + dragDecel_ms2 + engineBrakeDecel + regenDecel)*3.6*dt);
     }
     speed = Math.max(0, Math.min(speed, 400)); // sanity ceiling only - drag sets the real top speed
+    if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
     regenW = Math.min(REGEN_MAX_W, MASS*regenDecel*v_ms);
 
     // ---- energy split: engine covers what it can, the motor boosts on top or charges in reverse ----
