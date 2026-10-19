@@ -98,6 +98,7 @@ const CARS = {
   },
   m3: {
     name: 'BMW M3 CS Touring', page: 'bmw-m3-touring', model: '/models/bmw-m3-cs-touring.glb', length: 4.801, wheelbase: 2.857, redline: 7200,
+    grip: 1.1, // g: track-biased tyres (everyday cars: 0.92)
     credit: ['2025 BMW M3 CS Touring', 'https://sketchfab.com/3d-models/2025-bmw-m3-cs-touring-ebda8c29a8ef4ec789391e918d52ef55'],
     glass: /Window_Material1\|/, cabin: /Interior_Geo|SeatBelt_Geo/,
     wheels: /Wheel1A_3D/, tyre: /Wheel1A_3D/,
@@ -110,7 +111,7 @@ const CARS = {
     exhaustX: 0.4,
   },
   m5: {
-    name: 'BMW M5 CS', page: 'bmw-m5-cs', model: '/models/bmw-m5-competition.glb', length: 4.983, wheelbase: 2.982, redline: 7200,
+    name: 'BMW M5 CS', page: 'bmw-m5-cs', model: '/models/bmw-m5-competition.glb', length: 4.983, wheelbase: 2.982, redline: 7200, grip: 1.05,
     credit: ['2021 BMW M5 Competition', 'https://sketchfab.com/3d-models/2021-bmw-m5-competition-29a4c13761cb40e6a050871bd40a0963'],
     glass: /^bMAT_Glass1\|(?!bSM_FrontKit)/, glassPlain: true, cabin: /\|(bD_Body|bSM_Interior)_/, // (not the headlight lenses)
     wheels: /Wheel1A_3D|\|bSM_(Hub|Disk)_/, tyre: /Wheel1A_3D/, // the calipers (bSM_Brake_) stay put
@@ -122,7 +123,7 @@ const CARS = {
     exhaustX: 0.5,
   },
   m140: {
-    name: 'BMW M140i xDrive', page: 'bmw-140i', model: '/models/bmw-m140i.glb', length: 4.324, wheelbase: 2.69, redline: 7400,
+    name: 'BMW M140i xDrive', page: 'bmw-140i', model: '/models/bmw-m140i.glb', length: 4.324, wheelbase: 2.69, redline: 7400, grip: 1.0,
     credit: ['2018 BMW M140i', 'https://sketchfab.com/3d-models/2018-bmw-m140i-24f09cc46773424fb2a3922427f1c37d', 'by'],
     paint: /^iBody1\|/, glass: /^iGlass_Clear_Windshield1\|/, glassPlain: true, cabin: /^iInterior1\|/,
     wheels: /^(iRim1|iTyres1|iBreak1)\|/, tyre: /^iTyres1\|/, // the (blue) calipers stay put
@@ -165,15 +166,15 @@ const CAR = CARS[query.get('car')] || Object.values(CARS).find(c => c.page === q
 
 // shortcut: kinematic bicycle model, no tyre slip or weight transfer; swap for a Pacejka tyre model to get drift/oversteer.
 const WHEELBASE = CAR.wheelbase, MAX_STEER = 0.6;
-// m/s² sideways at full A/D: 9 up to 70 km/h (hairpins, junctions), easing to 7 from 180 km/h - a real car's grip, so
-// fast bends still turn in
-const steerG = v => THREE.MathUtils.lerp(9, 7, THREE.MathUtils.smoothstep(Math.abs(v), 20, 50));
+// m/s² sideways at full A/D: the car's tyre grip (CAR.grip, in g), the same at any speed as a real road car's - it
+// doesn't fade at 130 km/h, so a fast corner still turns in
+const GRIP = (CAR.grip ?? 0.92) * 9.81;
 
 // car.speed (m/s, negative in reverse) comes from the car page's own powertrain; this only steers and moves the car.
 // steer: -1..1, already eased in from the keys (steerInput)
 function step(car, steer, dt) {
-  // speed-sensitive lock: full lock when parking, shrinking with v² so full A/D never pulls more than steerG
-  const lock = Math.min(MAX_STEER, Math.atan(steerG(car.speed) * WHEELBASE / Math.max(car.speed ** 2, 1)));
+  // speed-sensitive lock: full lock when parking, shrinking with v² so full A/D never pulls more than GRIP
+  const lock = Math.min(MAX_STEER, Math.atan(GRIP * WHEELBASE / Math.max(car.speed ** 2, 1)));
   car.steer += (steer * lock - car.steer) * Math.min(1, dt * 12);
   // about the middle of the wheelbase (the car's origin): the rear wheels roll where they point instead of sliding
   // out, so the car pivots like a real one at parking speeds; the middle runs beta inside the heading
@@ -196,7 +197,7 @@ function steerInput(cur, want, dt) {
   console.assert(t.heading > 0 && t.x > 0, 'A should turn left', t);
   const f = { x: 0, z: 0, heading: 0, speed: 50, steer: 0 };
   for (let i = 0; i < 60; i++) step(f, 1, 1 / 60);
-  console.assert(f.heading > 0 && f.heading < steerG(50) / 50, 'full A at 180 km/h should pull no more than steerG', f);
+  console.assert(f.heading > 0.8 * GRIP / 50 && f.heading < GRIP / 50, 'full A at 180 km/h should pull GRIP, no more', f);
   // full lock at parking speed: the car turns about one fixed point level with its rear axle (as a real one does),
   // R = wheelbase / tan(lock) out to the left - the rear wheels roll round it instead of sliding
   const R = WHEELBASE / Math.tan(MAX_STEER), p = { x: 0, z: 0, heading: 0, speed: 2, steer: MAX_STEER };
