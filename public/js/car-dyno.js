@@ -3,8 +3,9 @@
 // A car hooks in with:
 //   CarDyno.init({ fuel, turbo, rpmMax, hpMax, tqMax }) - once at load. fuel 'petrol' | 'diesel'; turbo = has an
 //        intercooler; rpmMax / hpMax / tqMax size the empty chart (a run that goes past them grows it)
-//   CarDyno.tick({ dt, ignition, rpm, throttle, hp, tq, gear, gearLabel, speed, coolant, boost, egt, oil, ambient })
-//        once per frame. throttle 0..1, gear 0-based (-1 = no drive gear). boost (bar) / egt / oil / ambient (°C)
+//   CarDyno.tick({ dt, tc, spin, ignition, rpm, throttle, hp, tq, gear, gearLabel, speed, coolant, boost, egt, oil, ambient })
+//        once per frame. throttle 0..1, gear 0-based (-1 = no drive gear). tc: traction control cutting in this
+//        frame, spin: how hard the driven tyres are spinning (0 = gripping) - the drive page lays tyre marks from them. boost (bar) / egt / oil / ambient (°C)
 //        only if the car models them - every other dyno channel is simulated here, unless the car runs car-tune.js,
 //        whose engine model supplies AFR, knock and intake temperature. Every frame is passed on to
 //        car-perf.js (the Performance tab's timing)

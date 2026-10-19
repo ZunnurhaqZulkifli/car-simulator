@@ -2091,7 +2091,7 @@
     hpReadout.textContent = Math.round(dispHp) + ' hp';
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
-    CarDyno.tick({ dt, ignition: running, rpm, throttle: pedalRaw, hp: liveHp, tq: liveTq, gear: gearIdx, gearLabel: gearStr,
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: running, rpm, throttle: pedalRaw, hp: liveHp, tq: liveTq, gear: gearIdx, gearLabel: gearStr,
       speed, coolant: coolantC, boost: boostBar, egt: egrC, oil: oilC });
 
     // ---- warning lights ----

@@ -1758,7 +1758,7 @@
     hpReadout.textContent = Math.round(dispHp) + ' hp';
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
-    CarDyno.tick({ dt, ignition: running, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: running, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
       gearLabel: `${gearTxt.replace(/\d/,'')}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC, ambient: AMBIENT_C });
 
     // ---- tell-tales: bulb check at power-on, then live. Charge + oil stay lit until it runs ----

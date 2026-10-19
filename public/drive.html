@@ -1581,7 +1581,7 @@ function setView(seat) {
 // The car page drives: its own I/W/S/R keys run the engine, gearbox and brakes, and every frame it hands its speed
 // to CarDyno.tick. It's same-origin, so this page can reach into it.
 const frame = document.getElementById('carpage');
-const carPage = { speed: 0, reverse: false, smoke: 0, braking: 0, ignition: false, gear: '', rpm: 0 };
+const carPage = { speed: 0, reverse: false, smoke: 0, braking: 0, ignition: false, gear: '', rpm: 0, tc: false, spin: 0 };
 
 // throttle and brake limiters: ↑/↓ and O/P set how far W and S open (20-100% in 20% steps), linearly up to that.
 // The car page reads them (window.throttleLimit / brakeLimit); this browser remembers them between drives
@@ -1783,7 +1783,7 @@ frame.addEventListener('load', () => {
     html:not(.drive-pump) #refuel-btn { visibility: hidden !important; }
   </style>`);
   const tick = w.CarDyno.tick;
-  w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = w.CarTune.ch.smoke; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; tick(i); };
+  w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = w.CarTune.ch.smoke; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; carPage.tc = !!i.tc; carPage.spin = i.spin || 0; tick(i); };
   const serviceTick = w.CarService.tick; // the brake pedal (0-100) only reaches CarService
   w.CarService.tick = i => { carPage.braking = i.braking; carPage.ignition = i.ignition; return serviceTick.call(w.CarService, i); };
   // the frame and its hole sized to this car's cluster (the CSS3D panel keeps its width), the chase panel kept on screen
@@ -1901,6 +1901,52 @@ function smoke(dt, pct) {
   }
 }
 
+// tyre marks, rubber laid down by the rear tyres: wherever they spin (DSC off / MDM), when traction control cuts in
+// (the tyres were already at their limit) and on a hard launch, which these sticky tyres take without slipping - darker
+// the harder they work. One mesh of quads, the oldest written over once it's full
+const MARKS = 4000, MARK_W = 0.24, MARK_STEP = 0.3;
+const markGeo = new THREE.BufferGeometry(), markPos = new Float32Array(MARKS * 12), markCol = new Float32Array(MARKS * 16), markIdx = [];
+for (let i = 0; i < MARKS; i++) markIdx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4 + 2, i * 4 + 1, i * 4 + 3);
+markGeo.setIndex(markIdx);
+markGeo.setAttribute('position', new THREE.BufferAttribute(markPos, 3).setUsage(THREE.DynamicDrawUsage));
+markGeo.setAttribute('color', new THREE.BufferAttribute(markCol, 4).setUsage(THREE.DynamicDrawUsage));
+const marks = new THREE.Mesh(markGeo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false }));
+marks.frustumCulled = false; // its quads are all over the map
+marks.renderOrder = -1; // under the car and the smoke
+scene.add(marks);
+let markNext = 0, launchAcc = 0, lastRoll = 0;
+const tracks = [{}, {}], wheelAt = new THREE.Vector3();
+function markQuad(a, b, ka, kb) {
+  const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz) || 1, sx = dz / d * MARK_W / 2, sz = -dx / d * MARK_W / 2; // wound to face up
+  const i = markNext++ % MARKS;
+  markPos.set([a.x + sx, a.y, a.z + sz, a.x - sx, a.y, a.z - sz, b.x + sx, b.y, b.z + sz, b.x - sx, b.y, b.z - sz], i * 12);
+  markCol.set([0.04, 0.04, 0.04, ka, 0.04, 0.04, 0.04, ka, 0.04, 0.04, 0.04, kb, 0.04, 0.04, 0.04, kb], i * 16);
+  markGeo.attributes.position.needsUpdate = markGeo.attributes.color.needsUpdate = true;
+}
+function tyreMarks(dt, roll, onRollers) {
+  // how hard it's pulling (m/s², eased): a sticky-tyred launch lays rubber from about 0.6 g, fading out from 30 to 60
+  // km/h as the gearing takes the edge off it
+  const acc = dt > 0 ? (Math.abs(roll) - Math.abs(lastRoll)) / dt : 0;
+  lastRoll = roll;
+  launchAcc += (acc - launchAcc) * (1 - Math.exp(-dt * 8));
+  const k = onRollers ? 0 : Math.max(Math.min(1, carPage.spin * 1.2), carPage.tc ? 0.5 : 0, THREE.MathUtils.smoothstep(launchAcc, 6, 10) * 0.7 * (1 - THREE.MathUtils.smoothstep(Math.abs(roll), 8, 17)));
+  car.updateMatrixWorld();
+  const rear = wheels.filter(w => w.position.z <= 0).slice(0, 2);
+  rear.forEach((w, n) => {
+    const t = tracks[n];
+    if (k < 0.05) { t.at = null; return; }
+    w.getWorldPosition(wheelAt);
+    const p = { x: wheelAt.x, z: wheelAt.z, y: surfaceAt(wheelAt.x, wheelAt.z, state.y) + 0.03 }, alpha = k * 0.6;
+    if (!t.at) { t.at = p; t.k = alpha; t.still = 0; return; }
+    if (Math.hypot(p.x - t.at.x, p.z - t.at.z) >= MARK_STEP) { markQuad(t.at, p, t.k, alpha); t.at = p; t.k = alpha; t.still = 0; }
+    else if (Math.abs(roll) < 0.5 && (t.still += dt) > 0.3) { // a burnout on the spot: a patch under the tyre, darkening
+      const h = { x: Math.sin(state.heading) * 0.25, z: Math.cos(state.heading) * 0.25 };
+      markQuad({ x: p.x - h.x, y: p.y, z: p.z - h.z }, { x: p.x + h.x, y: p.y, z: p.z + h.z }, alpha * 0.5, alpha * 0.5);
+      t.still = 0;
+    }
+  });
+}
+
 const pumpEl = document.getElementById('pump'), rollersEl = document.getElementById('rollers');
 let camYaw = startHeading, camPitch = PITCH, wheelSpin = 0, steerIn = 0;
 const tilt = { pitch: 0, roll: 0 };
@@ -1947,6 +1993,7 @@ renderer.setAnimationLoop(() => {
   for (const [mt, full] of modelTail) mt.emissiveIntensity = full * (braking ? CAR.tail.brake : CAR.tail.idle);
   for (const g of modelTailGlow) g.opacity = braking ? 1 : 0;
   smoke(dt, carPage.smoke);
+  tyreMarks(dt, roll, rollers);
   const pump = atPump();
   refuel(pump && !carPage.ignition);
   pumpEl.hidden = !pump;
