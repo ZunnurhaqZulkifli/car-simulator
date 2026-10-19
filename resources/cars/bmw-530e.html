@@ -2596,6 +2596,7 @@
     }
     speed = Math.max(0, Math.min(speed, 400)); // sanity ceiling only - drag sets the real top speed
     if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
+    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // scrubbed off sliding on the driving page, km/h
     regenW = Math.min(REGEN_MAX_W, MASS*regenDecel*v_ms);
 
     // ---- energy split: engine covers what it can, the motor boosts on top or charges in reverse ----
@@ -2873,7 +2874,7 @@
 
     // dyno logs against engine rpm, so a run only records while the engine is awake (try Sport)
     // gearLabel R: the driving page (drive.html) rolls the car backwards on it
-    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: engineRunning, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, rwd: xdrive === '2wd', ignition: engineRunning, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
       gearLabel: transmissionMode==='R' ? 'R' : `${transmissionMode==='M' ? 'M' : (transmissionMode==='S' ? 'S' : 'D')}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
 
     // ---- warning lights: startup bulb-check, then live conditions ----

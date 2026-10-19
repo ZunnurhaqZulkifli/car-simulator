@@ -1941,6 +1941,7 @@
     speed = Math.max(0, speed + (a - dragA - gradeA)*3.6*dt); // no cap: drag and the rev limiter set the top speed
     if(braking && speed < 0.3) speed = 0;
     if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
+    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // scrubbed off sliding on the driving page, km/h
 
     // ---- gear selection ----
     if(!running){ if(transmissionMode !== 'N' && transmissionMode !== 'R') gearIdx = -1; }
@@ -2091,7 +2092,7 @@
     hpReadout.textContent = Math.round(dispHp) + ' hp';
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
-    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: running, rpm, throttle: pedalRaw, hp: liveHp, tq: liveTq, gear: gearIdx, gearLabel: gearStr,
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, rwd: setup.xdrive === '2wd', ignition: running, rpm, throttle: pedalRaw, hp: liveHp, tq: liveTq, gear: gearIdx, gearLabel: gearStr,
       speed, coolant: coolantC, boost: boostBar, egt: egrC, oil: oilC });
 
     // ---- warning lights ----
