@@ -1,14 +1,19 @@
 // Diagnostics tab, injected after car-service.js. Fills CarService.sections.diag with a scan-tool style view:
 // vehicle health ring, per-module live readings, the fault memory (clearable) and a scan console.
-// Everything it shows comes from CarService (parts, codes, clearCodes, ignitionOn) - no per-car code.
+// Everything it shows comes from CarService (parts, codes, clearCodes, ignitionOn) - no per-car code. A tuned car
+// (car-tune.js) adds the ECU's live data and its service functions (compression test, DPF regeneration...).
 (function () {
-  const MODULES = [
+  const ALL_MODULES = [
     { id: 'ECM', name: 'Engine control module' },
+    { id: 'TCM', name: 'Transmission control', optional: true },
     { id: 'ABS', name: 'Brake / stability control' },
     { id: 'TPMS', name: 'Tyre pressure monitor' },
     { id: 'BMS', name: 'Battery management' },
-    { id: 'BCM', name: 'Body control module' },
+    { id: 'BCM', name: 'Body control module', note: 'Lighting, comfort &amp; driver assistance' },
   ];
+  // an optional module only shows on a car that has parts or codes for it
+  let MODULES = ALL_MODULES;
+  const tuned = () => window.CarTune && CarTune.on;
   const COLORS = { ok: '#33d17a', warn: '#ff9d2e', bad: '#ff5f3d', dim: '#8a8f96' };
 
   const CSS = `
@@ -63,13 +68,21 @@
     .cs-narrow .cd-top,.cs-narrow .cd-bottom{grid-template-columns:1fr;}
     .cs-narrow .cd-health{flex-direction:row;gap:18px;}
     .cs-sized .cd-log{height:auto;min-height:150px;max-height:40vh;}
+    .cd-ecu{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px;margin-top:14px;}
+    .cs-narrow .cd-ecu{grid-template-columns:1fr;}
+    .cd-pids{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 16px;}
+    .cd-pid{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #16181b;font-size:.62rem;color:#aab0b8;}
+    .cd-pid b{font:700 .64rem/1.2 "Courier New",monospace;color:#f4f6f8;text-align:right;white-space:nowrap;}
+    .cd-pid[data-w=warn] b{color:#ffb020;} .cd-pid[data-w=bad] b{color:#ff5a3c;}
+    .cd-funcs{display:flex;flex-direction:column;gap:8px;}
+    .cd-funcs .cd-btn{text-align:left;}
   `;
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const health = (p) => Math.max(0, 100 - p.value);
   const tone = (h) => (h <= 0 ? COLORS.bad : h < 25 ? COLORS.warn : COLORS.ok);
-  const reading = (p) => (p.read ? p.read(p.value) : Math.round(health(p)) + '%');
+  const reading = (p) => (p.diag ? p.diag(p.value) : p.read ? p.read(p.value) : Math.round(health(p)) + '%');
 
   let root, els = {}, busy = false;
 
@@ -90,6 +103,8 @@
     document.head.appendChild(style);
     const slug = (window.__CAR_STATE__ && window.__CAR_STATE__.slug) || 'vehicle';
     root = CS.sections.diag;
+    const used = new Set([...CS.parts.map((p) => p.module), ...[...CS.codes.values()].map((c) => c.module)]);
+    MODULES = ALL_MODULES.filter((m) => !m.optional || used.has(m.id) || (m.id === 'TCM' && tuned()));
     root.innerHTML = `
       <div class="cd-head">
         <div>
@@ -124,7 +139,12 @@
           <div class="cd-log" data-log></div>
           <div class="cd-progress"><i data-progress></i></div>
         </div>
-      </div>`;
+      </div>
+      ${tuned() ? `<div class="cd-ecu">
+        <div class="cd-card"><div class="cd-label"><span>ECU live data</span><span data-cal></span></div><div class="cd-pids" data-pids></div></div>
+        <div class="cd-card"><div class="cd-label"><span>Service functions</span></div><div class="cd-funcs" data-funcs></div>
+          <div class="cd-note" style="margin-top:10px">Results print in the scan console.</div></div>
+      </div>` : ''}`;
     ['conn', 'scan', 'clear', 'arc', 'score', 'active', 'stored', 'modules', 'codes', 'codecount', 'log', 'progress', 'status']
       .forEach((k) => { els[k] = root.querySelector(`[data-${k}]`); });
     els.modules.innerHTML = MODULES.map((m) => `
@@ -134,6 +154,18 @@
         <div data-rows></div>
       </div>`).join('');
     els.scan.addEventListener('click', () => { els.scan.blur(); scan(); });
+    if (tuned()) {
+      els.pids = root.querySelector('[data-pids]');
+      const funcs = root.querySelector('[data-funcs]');
+      CarTune.functions().forEach((f) => {
+        const b = document.createElement('button');
+        b.className = 'cd-btn';
+        b.textContent = f.label;
+        b.addEventListener('click', () => { b.blur(); runFunction(f); });
+        funcs.appendChild(b);
+      });
+      els.funcBtns = [...funcs.querySelectorAll('button')];
+    }
     els.clear.addEventListener('click', () => { els.clear.blur(); clear(); });
     log('Diagnostic interface ready. Switch the ignition on and run a full scan.', 'hi');
     render();
@@ -146,6 +178,11 @@
     els.conn.style.color = on ? COLORS.ok : COLORS.dim;
     els.conn.innerHTML = `<i></i>${on ? 'Connected' : 'No ignition'}`;
     els.scan.disabled = els.clear.disabled = busy || !on;
+    if (els.funcBtns) els.funcBtns.forEach((b) => { b.disabled = busy || !on; });
+    if (els.pids) {
+      els.pids.innerHTML = on ? CarTune.pids().map((r) => `<div class="cd-pid" data-w="${r.warn}"><span>${esc(r.label)}</span><b>${esc(r.value)}</b></div>`).join('')
+        : '<div class="cd-empty">Switch the ignition on to read live data</div>';
+    }
 
     const score = Math.round(CS.parts.reduce((a, p) => a + health(p), 0) / CS.parts.length);
     els.arc.style.strokeDashoffset = String(314.16 * (1 - score / 100));
@@ -166,7 +203,8 @@
         <div class="cd-row"><span>${esc(p.label)}</span>
           <span class="cd-bar"><i style="width:${health(p)}%;background:${tone(health(p))}"></i></span>
           <span class="cd-val">${esc(reading(p))}</span></div>`).join('') +
-        (ps.length ? '' : `<div class="cd-note">Lighting, comfort &amp; driver assistance</div>`) +
+        (ps.length || !m.note ? '' : `<div class="cd-note">${m.note}</div>`) +
+        (m.id === 'ABS' && CS.brakeTemp ? `<div class="cd-note">Brake discs ${Math.round(CS.brakeTemp())} °C</div>` : '') +
         `<div class="cd-note">${n ? n + ' fault code' + (n > 1 ? 's' : '') : 'No fault codes'}</div>`;
     });
 
@@ -223,6 +261,20 @@
     if (due.length) log(`> Service recommended: ${due.join(', ')}`, 'warn');
     await sleep(600);
     els.progress.style.width = '0';
+    els.status.textContent = 'Idle';
+    busy = false;
+    render();
+  }
+
+  // a tuned car's service function (compression test, DPF regeneration...), printing into the console
+  async function runFunction(f) {
+    const CS = window.CarService;
+    if (busy || !CS.ignitionOn()) return;
+    busy = true;
+    els.status.textContent = f.label;
+    render();
+    log('');
+    try { await f.run((text, cls) => log(text, cls)); } catch (e) { log('    Function failed: ' + e.message, 'err'); }
     els.status.textContent = 'Idle';
     busy = false;
     render();

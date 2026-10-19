@@ -12,6 +12,11 @@ export default defineConfig({
                 bunny('Instrument Sans', {
                     weights: [400, 500, 600],
                 }),
+                // garage menu: the M3 cluster's numerals and labels
+                bunny('Electrolize'),
+                bunny('Roboto Condensed', {
+                    weights: [400, 700],
+                }),
             ],
         }),
         tailwindcss(),

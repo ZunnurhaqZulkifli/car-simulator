@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>@yield('title', 'Instrument Cluster Sim')</title>
 @vite(['resources/css/app.css', 'resources/js/app.js'])
+@stack('head')
 </head>
 <body>
   <nav class="navbar">

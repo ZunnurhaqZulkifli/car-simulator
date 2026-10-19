@@ -18,6 +18,10 @@
 //
 // Shared modules (e.g. car-service.js's tyre screech) add their own slider with
 // EngineMixer.addLayer({ id, label, value, set }), before or after the car registers.
+//
+// Each non-master row has a Solo (S) toggle: while any layer is soloed, every other
+// non-master layer is driven at 0; the header's Reset solo button clears them all.
+// Solo is session-only and never saved.
 (function () {
   const PREFIX = 'emix';
   let layers = [];
@@ -26,6 +30,24 @@
   let registered = false;
   let panelBuilt = false;
   let saveTimer = null;
+  const soloed = new Set();
+
+  // volume actually sent to the graph; master is never silenced by solo
+  function effective(l) {
+    return soloed.size && l.id !== 'master' && !soloed.has(l.id) ? 0 : l.value;
+  }
+
+  function applyAll() {
+    layers.forEach((l) => { try { l.set(effective(l)); } catch (e) {} });
+    if (!grid) return;
+    const reset = panel.querySelector('.' + PREFIX + '-reset');
+    reset.disabled = !soloed.size;
+    grid.querySelectorAll('.' + PREFIX + '-solo').forEach((b) => b.setAttribute('aria-pressed', soloed.has(b.closest('.' + PREFIX + '-row').dataset.id)));
+    grid.querySelectorAll('.' + PREFIX + '-row').forEach((row) => {
+      const id = row.dataset.id;
+      row.classList.toggle(PREFIX + '-dim', soloed.size > 0 && id !== 'master' && !soloed.has(id));
+    });
+  }
 
   const saved = (window.__CAR_STATE__ && window.__CAR_STATE__.engineMix) || {};
 
@@ -46,13 +68,23 @@
       .${PREFIX}-panel.${PREFIX}-open{display:block;}
       .${PREFIX}-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
       .${PREFIX}-title{font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:#8a8f96;}
+      .${PREFIX}-reset{margin-left:auto;margin-right:6px;padding:3px 8px;border-radius:4px;border:1px solid #333;
+        background:#161616;color:#8a8f96;font-size:.55rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;}
+      .${PREFIX}-reset:hover:not(:disabled){color:#fff;border-color:#e8402a;}
+      .${PREFIX}-reset:disabled{opacity:.35;cursor:default;}
       .${PREFIX}-close{background:none;border:none;color:#8a8f96;font-size:1.1rem;line-height:1;cursor:pointer;padding:2px 6px;}
       .${PREFIX}-close:hover{color:#fff;}
       .${PREFIX}-note{font-size:.72rem;color:#8a8f96;padding:8px 2px;}
       .${PREFIX}-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 18px;}
       .${PREFIX}-row{display:flex;flex-direction:column;gap:6px;min-width:0;}
       .${PREFIX}-row label{font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:#8a8f96;
-        display:flex;justify-content:space-between;gap:8px;}
+        display:flex;justify-content:space-between;gap:8px;flex:1;min-width:0;}
+      .${PREFIX}-lh{display:flex;align-items:center;gap:8px;}
+      .${PREFIX}-solo{flex:none;width:18px;height:16px;padding:0;border-radius:4px;border:1px solid #333;
+        background:#161616;color:#8a8f96;font-size:.55rem;font-weight:700;line-height:1;cursor:pointer;}
+      .${PREFIX}-solo:hover{color:#fff;border-color:#e8402a;}
+      .${PREFIX}-solo[aria-pressed=true]{background:#e8402a;border-color:#e8402a;color:#fff;}
+      .${PREFIX}-row.${PREFIX}-dim{opacity:.4;}
       .${PREFIX}-row input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:3px;
         background:linear-gradient(90deg,#e8402a var(--pct,0%),#262626 var(--pct,0%));}
       .${PREFIX}-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;
@@ -85,6 +117,7 @@
     panel.className = PREFIX + '-panel';
     panel.innerHTML =
       `<div class="${PREFIX}-head"><span class="${PREFIX}-title">${title} &mdash; Sound Layer Mixer</span>` +
+      `<button type="button" class="${PREFIX}-reset" disabled>Reset solo</button>` +
       `<button class="${PREFIX}-close" aria-label="Close">&times;</button></div>` +
       `<div class="${PREFIX}-note">Start the engine to adjust the sound layers.</div>` +
       `<div class="${PREFIX}-grid"></div>`;
@@ -93,6 +126,7 @@
     note = panel.querySelector('.' + PREFIX + '-note');
 
     btn.addEventListener('click', () => panel.classList.toggle(PREFIX + '-open'));
+    panel.querySelector('.' + PREFIX + '-reset').addEventListener('click', () => { soloed.clear(); applyAll(); });
     panel.querySelector('.' + PREFIX + '-close').addEventListener('click', () => panel.classList.remove(PREFIX + '-open'));
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') panel.classList.remove(PREFIX + '-open'); });
 
@@ -110,10 +144,18 @@
       const pct = Math.round(layer.value * 100);
       const row = document.createElement('div');
       row.className = PREFIX + '-row';
+      row.dataset.id = layer.id;
       const rid = PREFIX + '-r-' + layer.id;
+      const solo = layer.id === 'master' ? '' :
+        `<button type="button" class="${PREFIX}-solo" title="Solo ${layer.label}" aria-label="Solo ${layer.label}" aria-pressed="${soloed.has(layer.id)}">S</button>`;
       row.innerHTML =
-        `<label for="${rid}">${layer.label} <span>${pct}%</span></label>` +
+        `<div class="${PREFIX}-lh"><label for="${rid}">${layer.label} <span>${pct}%</span></label>${solo}</div>` +
         `<input id="${rid}" type="range" min="0" max="100" value="${pct}">`;
+      const soloBtn = row.querySelector('.' + PREFIX + '-solo');
+      if (soloBtn) soloBtn.addEventListener('click', () => {
+        if (soloed.has(layer.id)) soloed.delete(layer.id); else soloed.add(layer.id);
+        applyAll();
+      });
       const input = row.querySelector('input');
       const out = row.querySelector('span');
       input.style.setProperty('--pct', pct + '%');
@@ -122,11 +164,12 @@
         layer.value = f;
         out.textContent = input.value + '%';
         input.style.setProperty('--pct', input.value + '%');
-        try { layer.set(f); } catch (e) { /* graph not ready */ }
+        try { layer.set(effective(layer)); } catch (e) { /* graph not ready */ }
         scheduleSave();
       });
       grid.appendChild(row);
     });
+    applyAll();
   }
 
   function scheduleSave() {
@@ -147,7 +190,7 @@
     addLayer(config) {
       const layer = withSaved(config);
       extraLayers.push(layer);
-      try { layer.set(layer.value); } catch (e) {}
+      try { layer.set(effective(layer)); } catch (e) {}
       if (registered) {
         layers.push(layer);
         if (panel) renderRows();
@@ -158,7 +201,7 @@
       layers = (config.layers || []).map(withSaved).concat(extraLayers);
       registered = true;
       // push merged (saved) values into the audio graph immediately
-      layers.forEach((l) => { try { l.set(l.value); } catch (e) {} });
+      applyAll();
       if (panel) renderRows();
     },
   };
