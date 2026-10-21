@@ -176,6 +176,13 @@ function drawSteer() {
   bar.style.width = Math.abs(pad.s) * 50 + '%';
 }
 
+// no zooming: iOS ignores user-scalable=no, and a thumb tapping a paddle while another finger holds a pedal reads
+// as a pinch or a double-tap. The pad runs on pointer events, so the touches' own defaults can all go - bar the
+// intro's button, which wants its click
+for (const t of ['gesturestart', 'gesturechange', 'gestureend', 'touchmove', 'dblclick'])
+  document.addEventListener(t, e => e.preventDefault(), { passive: false });
+document.addEventListener('touchend', e => e.target.closest('#intro') || e.preventDefault(), { passive: false });
+
 // pedals: touch anywhere on one to set it, and it springs back when you let go
 for (const el of document.querySelectorAll('.pedal')) {
   const k = el.dataset.k, draw = () => {
