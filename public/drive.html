@@ -43,7 +43,6 @@
   <div id="pump" hidden></div>
   <div id="rollers" hidden>On the dyno rollers - Dyno mode is on (<kbd>Tab</kbd> car menu, Dyno) - switch it off to drive</div>
   <div id="padlink" hidden></div>
-  <div>Home: drive into the garage to change car · straight over the valley road is the city, its avenue running on to the mountains' direct road · the mechanic is just east of home, the racetrack down the road south 400 m past it (its pit garage, at the start line: service, tuning, dyno, fuel and a change of car) · the valley road runs west to the autobahn, east to the mountains · U-turn flyovers off the autobahn's left lane: north of the valley road (back south), and 250 m past the fuel station (back north to it) · winding country roads from the mountain loop (its second west hairpin, its eastern valley, its southern run) lead to an old stone village in the hills between</div></div>
 <div id="garage" class="menu" hidden>
   <h2>Garage</h2>
   <div id="garage-cars"></div>
@@ -98,9 +97,11 @@ const CARS = {
   },
   m3: {
     name: 'BMW M3 CS Touring', page: 'bmw-m3-touring', model: '/models/bmw-m3-cs-touring.glb', length: 4.801, wheelbase: 2.857, redline: 7200,
-    grip: 1.1, // g: track-biased tyres (everyday cars: 0.92)
+    grip: 2.1, // g: track-biased tyres (everyday cars: 0.92)
     credit: ['2025 BMW M3 CS Touring', 'https://sketchfab.com/3d-models/2025-bmw-m3-cs-touring-ebda8c29a8ef4ec789391e918d52ef55'],
-    glass: /Window_Material1\|/, cabin: /Interior_Geo|SeatBelt_Geo/,
+    glass: /\|glass\|/, 
+    glassPlain: true,
+    cabin: /Interior_Geo|SeatBelt_Geo/,
     wheels: /Wheel1A_3D/, tyre: /Wheel1A_3D/,
     // inside the one-piece interior, which comes twice: a see-through layer over a solid glow layer. Turned, the two
     // speckle through each other, so the see-through layer's wheel is left out
@@ -111,7 +112,7 @@ const CARS = {
     exhaustX: 0.4,
   },
   m5: {
-    name: 'BMW M5 CS', page: 'bmw-m5-cs', model: '/models/bmw-m5-competition.glb', length: 4.983, wheelbase: 2.982, redline: 7200, grip: 1.05,
+    name: 'BMW M5 CS', page: 'bmw-m5-cs', model: '/models/bmw-m5-competition.glb', length: 4.983, wheelbase: 2.982, redline: 7200, grip: 2.3,
     credit: ['2021 BMW M5 Competition', 'https://sketchfab.com/3d-models/2021-bmw-m5-competition-29a4c13761cb40e6a050871bd40a0963'],
     glass: /^bMAT_Glass1\|(?!bSM_FrontKit)/, glassPlain: true, cabin: /\|(bD_Body|bSM_Interior)_/, // (not the headlight lenses)
     wheels: /Wheel1A_3D|\|bSM_(Hub|Disk)_/, tyre: /Wheel1A_3D/, // the calipers (bSM_Brake_) stay put
@@ -123,7 +124,7 @@ const CARS = {
     exhaustX: 0.5,
   },
   m140: {
-    name: 'BMW M140i xDrive', page: 'bmw-140i', model: '/models/bmw-m140i.glb', length: 4.324, wheelbase: 2.69, redline: 7400, grip: 1.0,
+    name: 'BMW M140i xDrive', page: 'bmw-140i', model: '/models/bmw-m140i.glb', length: 4.324, wheelbase: 2.69, redline: 7400, grip: 1.5,
     credit: ['2018 BMW M140i', 'https://sketchfab.com/3d-models/2018-bmw-m140i-24f09cc46773424fb2a3922427f1c37d', 'by'],
     paint: /^iBody1\|/, glass: /^iGlass_Clear_Windshield1\|/, glassPlain: true, cabin: /^iInterior1\|/,
     wheels: /^(iRim1|iTyres1|iBreak1)\|/, tyre: /^iTyres1\|/, // the (blue) calipers stay put
@@ -165,7 +166,7 @@ const query = new URLSearchParams(location.search), TEST_DRIVE = query.has('test
 const CAR = CARS[query.get('car')] || Object.values(CARS).find(c => c.page === query.get('car')) || CARS.x1;
 
 // shortcut: kinematic bicycle model, no tyre slip or weight transfer.
-const WHEELBASE = CAR.wheelbase, MAX_STEER = 0.6;
+const WHEELBASE = CAR.wheelbase, MAX_STEER = 0.8;
 // m/s² sideways at full A/D: the car's tyre grip (CAR.grip, in g), the same at any speed as a real road car's - it
 // doesn't fade at 130 km/h, so a fast corner still turns in
 const GRIP = (CAR.grip ?? 0.92) * 9.81;
@@ -326,7 +327,7 @@ const SL = makeRoad([onCR(5240, 330), [5241, 80, 300], [5243, 80, 250], [5250, 8
   [5440, 7, -750], atM(5480, -890)], false, 4.2, 1);
 const VL = makeRoad([onCR(5178, 321), [5170, 80, 360], [5190, 80, 410], [5240, 80, 440], [5295, 80, 428], [5322, 80, 390], [5318, 80, 352], onCR(5310, 326)], false, 3, 0.05);
 // home: a driveway south off the valley road to the garage, and a yard round the house (only there to flatten the land)
-const HOME = { x: 2700, z: -1290 }; // the middle of the garage; its door faces north, down the drive
+const HOME = { x: 2700, z: -1283 }; // the middle of the garage; its door faces north, down the drive
 const D = makeRoad([[2700, 0, -1229], [2700, 0, -1250], [2700, 0, -1270], [2700, 0, -1288]], false, 3, 0.05);
 const Y = makeRoad([[2709, 0, -1262], [2709, 0, -1281], [2709, 0, -1300]], false, 10, 0.05);
 // the viewpoint: a lay-by on the loop's left at the summit, 14 m out from its centre line, looking south
@@ -1887,14 +1888,14 @@ function drawMap() {
 // exhaust smoke at the car page's own smoke opacity (CarTune.ch.smoke, 0-100 %): soft puffs left behind in the world
 const puffTex = blob('#fff');
 const puffs = Array.from({ length: 160 }, () => {
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0x6a6a6a, transparent: true, depthWrite: false })); // diesel grey, still visible over asphalt
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0x6a6a6a, transparent: true, depthWrite: true })); // diesel grey, still visible over asphalt
   s.visible = false;
   scene.add(s);
   return { s, age: 1, alpha: 0, vel: new THREE.Vector3() };
 });
 let puffDue = 0, puffNext = 0;
 function smoke(dt, pct) {
-  for (puffDue += pct / 100 * 60 * dt; puffDue >= 1; puffDue--) { // up to 60 puffs a second at 100 %
+  for (puffDue += pct / 100 * 1200 * dt; puffDue >= 1; puffDue--) { // up to 60 puffs a second at 100 %
     const p = puffs[puffNext++ % puffs.length];
     p.s.position.copy(EXHAUST).applyEuler(car.rotation).add(car.position);
     p.vel.set(Math.random() - 0.5, 0.4 + Math.random() * 0.4, Math.random() - 0.5).multiplyScalar(0.8);
