@@ -38,7 +38,7 @@
 </head>
 <body>
 <div id="hud">I start · W gas · S brake · Space handbrake · A/D steer · R reverse · ←/→ signal · C in-car view · two-finger swipe to look around
-  <div><kbd>↑</kbd><kbd>↓</kbd> throttle limit <b id="lim-throttle">100%</b> · <kbd>O</kbd><kbd>P</kbd> brake limit <b id="lim-brake">100%</b></div>
+  <div><kbd>F</kbd> cruise control, <kbd>,</kbd><kbd>.</kbd> set speed -5 / +5 km/h · <kbd>↑</kbd><kbd>↓</kbd> throttle limit <b id="lim-throttle">100%</b> · <kbd>O</kbd><kbd>P</kbd> brake limit <b id="lim-brake">100%</b></div>
   <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <a href="/" style="color:inherit">main menu</a></div>
   <div id="pump" hidden></div>
   <div id="rollers" hidden>On the dyno rollers - Dyno mode is on (<kbd>Tab</kbd> car menu, Dyno) - switch it off to drive</div>
@@ -1648,6 +1648,12 @@ function showPadLink(url) { // the relay copies the phone's link to the clipboar
 
 // Its live cluster is a web page, so a CSS3D layer under the WebGL canvas draws it in 3D. A transparent "hole" mesh
 // in its exact place lets it show through the canvas, and anything nearer - the steering wheel - still covers it.
+// The CSS layer has its own scene and camera: the camera stays at the origin and the cluster is placed where the view's
+// camera sees it, CSS_SCALE times further out and bigger (the same picture). In world terms - thousands of metres out,
+// the in-dash cluster under a metre from the eye at a 0.0002 scale - Chrome's GPU compositor loses it as the view
+// turns and the gauges go blank
+const CSS_SCALE = 1000, cssScene = new THREE.Scene(), cssCam = new THREE.PerspectiveCamera(), cssPose = new THREE.Matrix4();
+const cssScaling = new THREE.Matrix4().makeScale(CSS_SCALE, CSS_SCALE, CSS_SCALE);
 const cssRenderer = new CSS3DRenderer();
 cssRenderer.setSize(innerWidth, innerHeight);
 Object.assign(cssRenderer.domElement.style, { position: 'fixed', inset: '0', zIndex: 0, pointerEvents: 'none' });
@@ -1656,8 +1662,9 @@ const cluster = new CSS3DObject(frame);
 frame.style.pointerEvents = 'none';
 const hole = new THREE.Mesh(new THREE.PlaneGeometry(1100, 510),
   new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0, blending: THREE.NoBlending, side: THREE.DoubleSide, fog: false }));
-scene.add(cluster, hole);
-cssRenderer.render(scene, camera); // adopts the iframe now, while it's blank: moving it after it loads would reload the car page
+cssScene.add(cluster);
+scene.add(hole);
+cssRenderer.render(cssScene, cssCam); // adopts the iframe now, while it's blank: moving it after it loads would reload the car page
 // chase view: the cluster as a panel along the bottom of the screen, fixed to the camera
 const hudAnchor = new THREE.Object3D();
 hudAnchor.position.set(0, -0.42, -1);
@@ -2076,12 +2083,18 @@ renderer.setAnimationLoop(() => {
   panelAnchor.scale.setScalar(panelFit);
   const anchor = panelOpen ? panelAnchor : inCar ? dashAnchor : hudAnchor;
   anchor.updateWorldMatrix(true, false);
-  anchor.matrixWorld.decompose(cluster.position, cluster.quaternion, cluster.scale);
-  hole.position.copy(cluster.position); hole.quaternion.copy(cluster.quaternion); hole.scale.copy(cluster.scale);
+  anchor.matrixWorld.decompose(hole.position, hole.quaternion, hole.scale);
+  if (panelOpen) cssPose.copy(anchor.matrixWorld); // (the menu's camera already stands in its own space)
+  else {
+    camera.updateMatrixWorld();
+    cssPose.multiplyMatrices(camera.matrixWorldInverse, anchor.matrixWorld).premultiply(cssScaling);
+  }
+  cssPose.decompose(cluster.position, cluster.quaternion, cluster.scale);
+  cssCam.projectionMatrix.copy(camera.projectionMatrix);
 
   drawMap();
   renderer.render(scene, camera);
-  cssRenderer.render(scene, panelOpen ? panelCam : camera);
+  cssRenderer.render(cssScene, panelOpen ? panelCam : cssCam);
 });
 </script>
 </body>
