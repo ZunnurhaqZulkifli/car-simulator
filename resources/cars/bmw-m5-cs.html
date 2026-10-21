@@ -1856,8 +1856,8 @@
       if(!ignition || braking || transmissionMode === 'N' || gearIdx === -1) setCruise(false);
       else {
         const error = cruiseTargetSpeed - speed;
-        cruiseIntegral = Math.max(-100, Math.min(100, cruiseIntegral + error*dt));
-        throttleSlider.value = Math.round(clamp01(error*0.04 + cruiseIntegral*0.01)*100);
+        cruiseIntegral = Math.max(-20, Math.min(20, cruiseIntegral + error*dt));
+        throttleSlider.value = Math.round(clamp01(error*0.12 + cruiseIntegral*0.06)*100);
         throttleSlider.dispatchEvent(new Event('input'));
       }
     }
@@ -2116,6 +2116,7 @@
     if(launchState !== 'idle'){ status = 'LAUNCH CONTROL'; statusCol = 'var(--accent)'; }
     else if(launchHint){ status = 'LAUNCH: M GATE + DSC MDM / OFF'; statusCol = '#ffc21a'; }
     else if(cruiseActive){ status = `CRUISE • ${Math.round(cruiseTargetSpeed)} km/h`; statusCol = 'var(--accent)'; }
+    else if(cruiseRefused > 0){ cruiseRefused -= dt; status = 'NO CRUISE IN M MODE TRACK'; statusCol = '#ffc21a'; }
     else if(ignition && rangeKm <= 5){ status = 'LOW FUEL'; statusCol = '#ff3322'; }
     else if(running && REDLINE < NORMAL_REDLINE){ status = `ENGINE WARMING UP · ${REDLINE.toFixed(1)}k`; statusCol = '#ff9d2e'; }
     else if(ignition && dsc !== 'on'){ status = dsc === 'mdm' ? 'M DYNAMIC MODE' : 'DSC OFF'; statusCol = '#ff9d2e'; }
@@ -2184,7 +2185,7 @@
   const cruiseMarkerG = $('cruise-marker');
   const cruiseMarkerSq = el('path', {d:'M-5.5 -4.5H5.5L0 4.5Z'}); // red set-speed pointer just outside the scale
   cruiseMarkerG.appendChild(cruiseMarkerSq);
-  let cruiseMarkerV = 0, cruiseMarkerRaf = 0, cruiseActive = false, cruiseTargetSpeed = 0, cruiseIntegral = 0;
+  let cruiseMarkerV = 0, cruiseMarkerRaf = 0, cruiseActive = false, cruiseTargetSpeed = 0, cruiseIntegral = 0, cruiseRefused = 0; // s left showing why F did nothing
   function updateCruiseMarker(onDone){
     const to = Math.max(SPD_MIN, Math.min(SPD_MAX, cruiseTargetSpeed)), from = cruiseMarkerV, t0 = performance.now();
     const dur = noMotion() ? 0 : 800;
@@ -2234,7 +2235,8 @@
       case 'f':
         if(!ignition) break;
         if(cruiseActive) setCruise(false);
-        else if(speed > 5 && transmissionMode !== 'R' && setup.mmode !== 'track') setCruise(true); // Track has no comfort assists
+        else if(setup.mmode === 'track') cruiseRefused = 3; // Track has no comfort assists - say so rather than ignore F
+        else if(speed > 5 && transmissionMode !== 'R') setCruise(true);
         break;
       case ',': case '<': if(cruiseActive){ cruiseTargetSpeed = Math.max(SPD_MIN, cruiseTargetSpeed - 5); updateCruiseMarker(); } break;
       case '.': case '>': if(cruiseActive){ cruiseTargetSpeed = Math.min(SPD_MAX, cruiseTargetSpeed + 5); updateCruiseMarker(); } break;
