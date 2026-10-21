@@ -1885,7 +1885,7 @@
     }
     speed = Math.max(0, Math.min(speed, 400)); // sanity ceiling only - physics are never clamped to the printed dial max
     if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
-    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // scrubbed off sliding on the driving page, km/h
+    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // taken off by the handbrake on the driving page, km/h
 
     // ---- gear selection + rpm ----
     if(shiftCooldown > 0) shiftCooldown = Math.max(0, shiftCooldown - dt);
@@ -2189,7 +2189,7 @@
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
     // gearLabel R: the driving page (drive.html) rolls the car backwards on it
-    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, rwd: true, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
       gearLabel: transmissionMode==='R' ? 'R' : `${transmissionMode==='M' || transmissionMode==='S' ? transmissionMode : 'D'}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
 
     // ---- warning lights: startup bulb-check, then live conditions ----

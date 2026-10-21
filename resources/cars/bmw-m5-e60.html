@@ -1700,7 +1700,7 @@
     hpReadout.textContent = Math.round(dispHp) + ' hp';
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
-    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, rwd: true, ignition: running, rpm, throttle: pedalRaw, hp: liveHp, tq: liveTq, gear: gearIdx,
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: running, rpm, throttle: pedalRaw, hp: liveHp, tq: liveTq, gear: gearIdx,
       gearLabel: transmissionMode === 'N' || transmissionMode === 'R' ? transmissionMode : transmissionMode + gearStr, speed, coolant: coolantC, egt: egrC, oil: oilC });
 
     // ---- tell-tales: bulb check at terminal 15, then what the car reports ----

@@ -2279,7 +2279,7 @@
     }
     speed = Math.max(0, Math.min(speed, 520)); // sanity ceiling only - raised so Map 6's real drag-limited equilibrium (~470-500 km/h) is never artificially clipped
     if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
-    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // scrubbed off sliding on the driving page, km/h
+    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // taken off by the handbrake on the driving page, km/h
 
     // ---- gear selection + rpm ----
     if(shiftCooldown > 0) shiftCooldown = Math.max(0, shiftCooldown - dt);
@@ -2591,7 +2591,7 @@
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
     // gearLabel R: the driving page (drive.html) rolls the car backwards on it
-    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, rwd: false, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
       gearLabel: transmissionMode==='R' ? 'R' : `${transmissionMode==='M' || transmissionMode==='S' ? transmissionMode : 'D'}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
 
     // ---- warning lights: startup bulb-check, then live conditions ----

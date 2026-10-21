@@ -1539,7 +1539,7 @@
     LIVE.hp.readout.textContent   = Math.round(LIVE.hp.disp) + ' hp';
     LIVE.tq.readout.textContent   = Math.round(LIVE.tq.disp) + ' Nm';
 
-    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, rwd: false, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: liveHp, tq: liveNm, gear: gear-1, gearLabel: `${gear}`,
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: liveHp, tq: liveNm, gear: gear-1, gearLabel: `${gear}`,
       speed, coolant: coolantC });
     if(++teleFrameCounter >= TELE_SAMPLE_EVERY){
       teleFrameCounter = 0;
