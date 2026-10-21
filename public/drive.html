@@ -39,7 +39,6 @@
 <body>
 <div id="hud">I start · W gas · S brake · Space handbrake · A/D steer · R reverse · ←/→ signal · C in-car view · two-finger swipe to look around
   <div><kbd>↑</kbd><kbd>↓</kbd> throttle limit <b id="lim-throttle">100%</b> · <kbd>O</kbd><kbd>P</kbd> brake limit <b id="lim-brake">100%</b></div>
-  <div><kbd>9</kbd> drift mode <b id="drift">off</b></div>
   <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <a href="/" style="color:inherit">main menu</a></div>
   <div id="pump" hidden></div>
   <div id="rollers" hidden>On the dyno rollers - Dyno mode is on (<kbd>Tab</kbd> car menu, Dyno) - switch it off to drive</div>
@@ -165,7 +164,7 @@ CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', page: 'bmw-530e', redline: 
 const query = new URLSearchParams(location.search), TEST_DRIVE = query.has('test_drive');
 const CAR = CARS[query.get('car')] || Object.values(CARS).find(c => c.page === query.get('car')) || CARS.x1;
 
-// shortcut: kinematic bicycle model, no tyre slip or weight transfer (drift mode, stepDrift below, slides on tyres instead).
+// shortcut: kinematic bicycle model, no tyre slip or weight transfer.
 const WHEELBASE = CAR.wheelbase, MAX_STEER = 0.6;
 // m/s² sideways at full A/D: the car's tyre grip (CAR.grip, in g), the same at any speed as a real road car's - it
 // doesn't fade at 130 km/h, so a fast corner still turns in
@@ -191,59 +190,6 @@ function steerInput(cur, want, dt) {
   return cur + Math.sign(want - cur) * Math.min(Math.abs(want - cur), rate * dt);
 }
 
-// drift mode (9): a car driving only its rear wheels - rear-drive, or xDrive set to 2WD - slides on its tyres instead
-// of following its wheels (four-wheel drive keeps to the grip model above). A single-track model: tyres grip up to
-// ~7° of slip (the car's GRIP between the two axles) and a little less once sliding. The rear's grip goes to the drive
-// (a friction circle), to a stab of throttle (a powerslide) and mostly to spinning tyres, and some under braking, so
-// power swings the tail out and a lift brings it back; the handbrake (Space) locks the rear, so a flick of it does too.
-// Loose hands let the front wheels follow the slide (caster); A/D steer on top. A drift assist keeps a keyboard out of
-// a spin: the slide is held within ~40° under power (A/D swing it wider or close it up), easing to ~6° off it.
-// car.speed stays the car page's own (forward) speed, v is sideways (m/s, + = left) and r the yaw rate (rad/s); the
-// speed the slide scrubs off goes back to the car page (window.speedLoss)
-const TYRE_B = 17, TYRE_C = 1.4, CASTER = 0.9, REAR_GRIP = 0.95;
-const POWERSLIDE = 0.55; // the rear grip full throttle takes away mid-corner, even before the tyres spin
-// the car page's wheelspin (0 = gripping), drive (m/s², - = braking) and throttle (0-1), and the handbrake
-const driftGrip = { spin: 0, pull: 0, throttle: 0, handbrake: false };
-const tyre = (slip, max) => max * Math.sin(TYRE_C * Math.atan(TYRE_B * slip));
-function stepDrift(car, steer, dt) {
-  const a = WHEELBASE / 2;
-  if (Math.hypot(car.speed, car.v) < 3 || car.speed < 0.5) { // parking speeds and reversing: the grip model
-    step(car, steer, dt);
-    car.v = car.speed * Math.tan(car.steer) / 2;
-    car.r = car.speed * Math.tan(car.steer) / WHEELBASE;
-    car.slideMax = 0.1;
-    return;
-  }
-  const { spin, pull, throttle, handbrake } = driftGrip;
-  const stab = Math.min(1, Math.max(0, (throttle - 0.4) / 0.5)); // a real stab of throttle, not cruising
-  const power = Math.min(1, spin * 1.5 + Math.max(0, pull) / 8 + stab * 0.7);
-  // the drive (a friction circle) and the throttle (a powerslide) take the rear's grip, spinning tyres most of it,
-  // braking some (the weight goes forward); locked by the handbrake they keep a tenth of it, sliding along
-  const rearMax = GRIP / 2 * REAR_GRIP * Math.sqrt(Math.max(0.1, 1 - (Math.max(0, pull) / 10) ** 2)) * (1 - POWERSLIDE * stab)
-    / (1 + 2 * spin) * (1 - 0.25 * Math.min(1, Math.max(0, -pull) / 10)) * (handbrake ? 0.1 : 1);
-  const caster = handbrake ? CASTER * 0.3 : CASTER; // hands on the wheel through a handbrake turn
-  const n = Math.ceil(dt / 0.002), h = dt / n; // short steps: the tyres are stiff
-  for (let k = 0; k < n; k++) {
-    const rear = Math.atan2(car.v - a * car.r, car.speed), slide = rear - Math.max(-0.06, Math.min(0.06, rear));
-    const beta = Math.atan2(car.v, car.speed), into = -Math.sign(beta) * steer; // A/D: + toward the slide's turn, - against it
-    // A/D get more lock the further it's sliding
-    const lock = Math.min(MAX_STEER, Math.max(Math.atan(GRIP * WHEELBASE / car.speed ** 2), 0.7 * Math.abs(beta)));
-    car.steer += (Math.max(-MAX_STEER, Math.min(MAX_STEER, steer * lock + caster * slide)) - car.steer) * Math.min(1, h * 20);
-    const fy = tyre(car.steer - Math.atan2(car.v + a * car.r, car.speed), GRIP / 2), ry = tyre(-rear, rearMax), c = Math.cos(car.steer);
-    // the drift assist's limit: ~6° off the power to ~40° on it, swung out to ~63° steering into the slide or closed up
-    // countersteering; ~75° on the handbrake
-    const limit = handbrake ? 1.3 : (0.1 + 0.6 * power) * (1 - 0.6 * Math.max(0, -into)) + 0.4 * power * Math.max(0, into);
-    car.slideMax += (limit - car.slideMax) * Math.min(1, h * 2);
-    const over = beta - Math.max(-car.slideMax, Math.min(car.slideMax, beta));
-    car.v += (fy * c + ry - car.speed * car.r) * h;
-    car.r += ((fy * c - ry) / a + (over ? over * 25 - car.r * 6 : 0)) * h;
-    car.speed = Math.max(0, car.speed + (car.v * car.r - fy * Math.sin(car.steer)) * h);
-    car.heading += car.r * h;
-    car.x += (Math.sin(car.heading) * car.speed + Math.cos(car.heading) * car.v) * h;
-    car.z += (Math.cos(car.heading) * car.speed - Math.sin(car.heading) * car.v) * h;
-  }
-}
-
 // steering self-check; failures show in the devtools console
 {
   const t = { x: 0, z: 0, heading: 0, speed: 10, steer: 0 };
@@ -262,37 +208,6 @@ function stepDrift(car, steer, dt) {
   let s = 0;
   for (let i = 0; i < 6; i++) s = steerInput(s, 1, 1 / 60);
   console.assert(s > 0.35 && s < 0.45, 'a 0.1 s tap should give about 40% of the lock', s);
-}
-// drift self-check: off the power a drift-mode car corners on its tyres as the grip model does (~GRIP at full A), and
-// cruising throttle doesn't unstick it; a stab of throttle, or the rear spinning, slides it out to a drift it holds short
-// of a spin, and it straightens up off the power; a handbrake turn swings it round
-{
-  const fresh = () => ({ x: 0, z: 0, heading: 0, speed: 15, steer: 0, v: 0, r: 0, slideMax: 0.1 }), beta = c => Math.abs(Math.atan2(c.v, c.speed));
-  const g = fresh();
-  for (let i = 0; i < 120; i++) stepDrift(g, 1, 1 / 60);
-  console.assert(beta(g) < 0.05 && g.r * g.speed > 0.85 * GRIP && g.r * g.speed < 1.05 * GRIP, 'a drift-mode car should grip off the power', g);
-  const c = fresh();
-  Object.assign(driftGrip, { pull: 1, throttle: 0.3 });
-  for (let i = 0; i < 120; i++) stepDrift(c, 0.6, 1 / 60);
-  console.assert(beta(c) < 0.05, 'cruising throttle should keep it gripping', c);
-  for (const spin of [0.6, 0]) { // the rear spinning, or a powerslide on the throttle alone
-    const d = fresh();
-    Object.assign(driftGrip, { spin, pull: 4, throttle: 1 });
-    let most = 0;
-    for (let i = 0; i < 48; i++) stepDrift(d, 1, 1 / 60);
-    for (let i = 0; i < 150; i++) { stepDrift(d, 0, 1 / 60); most = Math.max(most, beta(d)); }
-    console.assert(most > 0.5 && most < 1, 'on the power it should hold a drift short of a spin', spin, most);
-    Object.assign(driftGrip, { spin: 0, pull: -1, throttle: 0 });
-    for (let i = 0; i < 120; i++) stepDrift(d, 0, 1 / 60);
-    console.assert(beta(d) < 0.1, 'off the power it should straighten up', spin, d);
-  }
-  const h = fresh();
-  Object.assign(driftGrip, { pull: 0, handbrake: true });
-  let most = 0;
-  for (let i = 0; i < 72; i++) { if (i === 48) driftGrip.handbrake = false; stepDrift(h, 1, 1 / 60); most = Math.max(most, beta(h)); }
-  for (let i = 0; i < 90; i++) stepDrift(h, 0, 1 / 60);
-  console.assert(most > 0.4 && most < 1.3 && h.heading > 0.8 && beta(h) < 0.1, 'a handbrake turn should swing the car round and settle', most, h);
-  Object.assign(driftGrip, { spin: 0, pull: 0, throttle: 0, handbrake: false });
 }
 
 // log depth: no flicker between road and paint far away; alpha: the cluster's "hole" lets the CSS3D layer below show
@@ -1161,13 +1076,8 @@ function collide(car) {
 }
 // a frame's move, in steps of under 0.4 m so nothing thin is driven clean through at speed
 function move(car, steer, dt) {
-  const n = Math.ceil(Math.hypot(car.speed, car.v || 0) * dt / 0.4) || 1;
-  for (let k = 0; k < n; k++) {
-    (car.drift ? stepDrift : step)(car, steer, dt / n);
-    const hit = car.hit;
-    collide(car);
-    if (car.hit !== hit) car.v = car.r = 0; // a hit ends a slide
-  }
+  const n = Math.ceil(Math.abs(car.speed) * dt / 0.4) || 1;
+  for (let k = 0; k < n; k++) { step(car, steer, dt / n); collide(car); }
 }
 // collision self-checks: head-on into the home garage's back wall the car stops short of it; glancing the autobahn's
 // median wall at 10° it runs on along the wall, clear of it, at cos 10° of its speed; into it at 45° it stops, wherever
@@ -1593,7 +1503,6 @@ function onKey(e) {
   if (e.code === 'KeyW') orbitYaw = 0, orbitPitch = PITCH;
   if (e.code === 'KeyC') setView(!inCar);
   if (LIMIT_KEYS[e.code]) setLimit(...LIMIT_KEYS[e.code]);
-  if (e.code === 'Digit9') setDrift(!driftMode);
   if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') signal.side = e.code === 'ArrowLeft' ? 1 : -1, signal.t = 0;
 }
 
@@ -1673,7 +1582,7 @@ function setView(seat) {
 // The car page drives: its own I/W/S/R keys run the engine, gearbox and brakes, and every frame it hands its speed
 // to CarDyno.tick. It's same-origin, so this page can reach into it.
 const frame = document.getElementById('carpage');
-const carPage = { speed: 0, reverse: false, smoke: 0, braking: 0, ignition: false, gear: '', rpm: 0, tc: false, spin: 0, rwd: false, throttle: 0 };
+const carPage = { speed: 0, reverse: false, smoke: 0, braking: 0, ignition: false, gear: '', rpm: 0, tc: false, spin: 0 };
 
 // throttle and brake limiters: ↑/↓ and O/P set how far W and S open (20-100% in 20% steps), linearly up to that.
 // The car page reads them (window.throttleLimit / brakeLimit); this browser remembers them between drives
@@ -1689,14 +1598,6 @@ function showLimits() {
   for (const k of ['throttle', 'brake']) document.getElementById('lim-' + k).textContent = Math.round(limits[k] * 100) + '%';
 }
 showLimits();
-// drift mode (9), also remembered: the slide model above (stepDrift) whenever the car drives its rear wheels only
-let driftMode = false;
-try { driftMode = localStorage.getItem('drive-drift') === '1'; } catch {}
-const driftEl = document.getElementById('drift');
-function setDrift(on) {
-  driftMode = on;
-  try { localStorage.setItem('drive-drift', on ? '1' : '0'); } catch {}
-}
 
 // phone pad (scripts/pad-relay.mjs, public/pad.html). From the phone: tilt steering (-1-1, + = left) and throttle /
 // brake sliders (0-1) at 30 Hz, taps of the car's keys and of its drive modes. To it: gear, speed and revs, this car's
@@ -1885,7 +1786,7 @@ frame.addEventListener('load', () => {
     html:not(.drive-pump) #refuel-btn { visibility: hidden !important; }
   </style>`);
   const tick = w.CarDyno.tick;
-  w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = w.CarTune.ch.smoke; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; carPage.tc = !!i.tc; carPage.spin = i.spin || 0; carPage.rwd = !!i.rwd; carPage.throttle = i.throttle || 0; tick(i); };
+  w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = w.CarTune.ch.smoke; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; carPage.tc = !!i.tc; carPage.spin = i.spin || 0; tick(i); };
   const serviceTick = w.CarService.tick; // the brake pedal (0-100) only reaches CarService
   w.CarService.tick = i => { carPage.braking = i.braking; carPage.ignition = i.ignition; return serviceTick.call(w.CarService, i); };
   // the frame and its hole sized to this car's cluster (the CSS3D panel keeps its width), the chase panel kept on screen
@@ -1942,7 +1843,7 @@ addEventListener('resize', () => {
 // every drive starts at home, on the drive just out of the garage, facing down it to the valley road - or, after a
 // swap in the pit garage, on the pit lane outside it, pointing to the exit
 const atPits = query.get('at') === 'pits', startHeading = atPits ? Math.PI / 2 : 0;
-const state = { x: atPits ? PIT.x : HOME.x, z: atPits ? -2380 : HOME.z + 14, heading: startHeading, speed: 0, steer: 0, v: 0, r: 0, slideMax: 0.1, drift: false };
+const state = { x: atPits ? PIT.x : HOME.x, z: atPits ? -2380 : HOME.z + 14, heading: startHeading, speed: 0, steer: 0 };
 
 // mini map, north-up: +Z is up and +X is drawn on the left, so the map turns the same way the view does
 const mapEl = document.getElementById('map'), map = mapEl.getContext('2d');
@@ -2005,7 +1906,7 @@ function smoke(dt, pct) {
 
 // tyre marks, rubber laid down by the rear tyres: wherever they spin (DSC off / MDM), when traction control cuts in
 // (the tyres were already at their limit), on a hard launch, which these sticky tyres take without slipping, and
-// sliding sideways in a drift - darker the harder they work. One mesh of quads, the oldest written over once it's full
+// skidding on the handbrake - darker the harder they work. One mesh of quads, the oldest written over once it's full
 const MARKS = 4000, MARK_W = 0.24, MARK_STEP = 0.3;
 const markGeo = new THREE.BufferGeometry(), markPos = new Float32Array(MARKS * 12), markCol = new Float32Array(MARKS * 16), markIdx = [];
 for (let i = 0; i < MARKS; i++) markIdx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4 + 2, i * 4 + 1, i * 4 + 3);
@@ -2018,7 +1919,7 @@ marks.renderOrder = -1; // under the car and the smoke
 scene.add(marks);
 let markNext = 0;
 const tracks = [{}, {}], wheelAt = new THREE.Vector3();
-// and tyre smoke, white and billowing, while they slide or spin hard
+// and tyre smoke, white and billowing, while they skid or spin hard
 const tyreSmoke = Array.from({ length: 240 }, () => {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0xe6e6e6, transparent: true, depthWrite: false }));
   s.visible = false;
@@ -2026,7 +1927,7 @@ const tyreSmoke = Array.from({ length: 240 }, () => {
   return { s, age: 1, alpha: 0, vel: new THREE.Vector3() };
 });
 let smokeDue = 0, smokeNext = 0;
-// how hard the car page is pulling (m/s², eased) - from where this page last left its speed, so what a slide or a hit
+// how hard the car page is pulling (m/s², eased) - from where this page last left its speed, so what the handbrake or a hit
 // scrubbed off doesn't count as braking
 let pull = 0, lastRoll = 0, handedBack = Infinity;
 function markQuad(a, b, ka, kb) {
@@ -2036,12 +1937,12 @@ function markQuad(a, b, ka, kb) {
   markCol.set([0.04, 0.04, 0.04, ka, 0.04, 0.04, 0.04, ka, 0.04, 0.04, 0.04, kb, 0.04, 0.04, 0.04, kb], i * 16);
   markGeo.attributes.position.needsUpdate = markGeo.attributes.color.needsUpdate = true;
 }
-// slide: how fast the rear tyres slide sideways (m/s); skid: locked by the handbrake
-function tyres(dt, roll, slide, skid, onRollers) {
+// skid: locked by the handbrake
+function tyres(dt, roll, skid, onRollers) {
   // a sticky-tyred launch lays rubber from about 0.6 g, fading out from 30 to 60 km/h as the gearing takes the edge off it
   const launch = THREE.MathUtils.smoothstep(pull, 6, 10) * 0.7 * (1 - THREE.MathUtils.smoothstep(Math.abs(roll), 8, 17));
-  const k = onRollers ? 0 : Math.max(Math.min(1, carPage.spin * 1.2), carPage.tc ? 0.5 : 0, launch, THREE.MathUtils.smoothstep(slide, 1, 3.5), skid ? 0.6 : 0);
-  const fume = onRollers ? 0 : Math.min(1, THREE.MathUtils.smoothstep(slide, 2, 6) + THREE.MathUtils.smoothstep(carPage.spin, 0.3, 1.2)
+  const k = onRollers ? 0 : Math.max(Math.min(1, carPage.spin * 1.2), carPage.tc ? 0.5 : 0, launch, skid ? 0.6 : 0);
+  const fume = onRollers ? 0 : Math.min(1, THREE.MathUtils.smoothstep(carPage.spin, 0.3, 1.2)
     + (skid ? 0.35 * THREE.MathUtils.smoothstep(Math.abs(roll), 4, 15) : 0));
   smokeDue += fume * 25 * dt; // puffs a second from each tyre
   const puffs = Math.floor(smokeDue);
@@ -2094,12 +1995,7 @@ renderer.setAnimationLoop(() => {
   steerIn = steerInput(steerIn, (keys.has('KeyA') - keys.has('KeyD')) || pad.s, dt);
   pull += ((dt > 0 ? (Math.abs(roll) - Math.min(Math.abs(lastRoll), handedBack)) / dt : 0) - pull) * (1 - Math.exp(-dt * 8));
   lastRoll = roll;
-  state.drift = driftMode && carPage.rwd;
-  if (!state.drift) state.v = state.r = 0;
   const handbrake = keys.has('Space') && !rollers && !panelOpen;
-  Object.assign(driftGrip, { spin: carPage.spin, pull, throttle: carPage.throttle, handbrake });
-  const driftText = !driftMode ? 'off' : carPage.rwd ? 'on - rear-wheel drive: it slides' : 'on - four-wheel drive keeps its grip (drifts in rear-wheel drive / 2WD)';
-  if (driftEl.textContent !== driftText) driftEl.textContent = driftText;
   const v = state.speed;
   state.hit = 0;
   // the handbrake locks the rear wheels: they skid, slowing the car at ~0.35 g, and hold it standing
@@ -2107,7 +2003,7 @@ renderer.setAnimationLoop(() => {
   move(state, steerIn, dt);
   handedBack = state.speed !== v ? Math.abs(state.speed) : Infinity;
   if (state.hit && state.speed !== v) w.crashSpeed = handedBack * 3.6; // a hit: the car page carries on from here (km/h)
-  else if (Math.abs(state.speed) < Math.abs(v)) w.speedLoss = (w.speedLoss || 0) + (Math.abs(v) - Math.abs(state.speed)) * 3.6; // what the handbrake or a slide took off, km/h (its drive kept)
+  else if (Math.abs(state.speed) < Math.abs(v)) w.speedLoss = (w.speedLoss || 0) + (Math.abs(v) - Math.abs(state.speed)) * 3.6; // what the handbrake took off, km/h (its drive kept)
   if (state.hit > 1) crash(state.hit); // (not the nudges of pushing against a wall or steering along one)
 
   // on the ground: height from the surface under the axles and the sides, and the tilt eased over ~0.1 s so the
@@ -2135,7 +2031,7 @@ renderer.setAnimationLoop(() => {
   for (const [mt, full] of modelTail) mt.emissiveIntensity = full * (braking ? CAR.tail.brake : CAR.tail.idle);
   for (const g of modelTailGlow) g.opacity = braking ? 1 : 0;
   smoke(dt, carPage.smoke);
-  tyres(dt, roll, state.drift ? Math.abs(state.v - WHEELBASE / 2 * state.r) : 0, handbrake && Math.abs(roll) > 1, rollers);
+  tyres(dt, roll, handbrake && Math.abs(roll) > 1, rollers);
   const pump = atPump();
   refuel(pump && !carPage.ignition);
   pumpEl.hidden = !pump;
@@ -2162,10 +2058,8 @@ renderer.setAnimationLoop(() => {
     const look = new THREE.Vector3(Math.sin(orbitYaw) * Math.cos(p), Math.sin(p), Math.cos(orbitYaw) * Math.cos(p)).applyQuaternion(car.quaternion);
     camera.lookAt(camera.position.clone().add(look));
   } else {
-    // ease the angles, not the position, so swinging round circles the car instead of cutting through it. In a drift it
-    // looks mostly along the way the car is going, so the car shows sideways
-    const slip = state.drift ? Math.atan2(state.v, Math.abs(state.speed) + 1) * 0.8 : 0;
-    const k = 1 - Math.exp(-dt * 4), yawTarget = state.heading + slip + orbitYaw;
+    // ease the angles, not the position, so swinging round circles the car instead of cutting through it
+    const k = 1 - Math.exp(-dt * 4), yawTarget = state.heading + orbitYaw;
     camYaw += Math.atan2(Math.sin(yawTarget - camYaw), Math.cos(yawTarget - camYaw)) * k; // shortest way round
     camPitch += (orbitPitch - camPitch) * k;
     const flat = Math.cos(camPitch) * CAM_DIST, cx = state.x - Math.sin(camYaw) * flat, cz = state.z - Math.cos(camYaw) * flat;

@@ -1585,7 +1585,7 @@
     }
     speed = Math.max(0, Math.min(speed, 400));
     if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
-    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // scrubbed off sliding on the driving page, km/h
+    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // taken off by the handbrake on the driving page, km/h
 
     // ---- gear selection ----
     if(shiftCooldown > 0) shiftCooldown = Math.max(0, shiftCooldown - dt);
@@ -1759,7 +1759,7 @@
     hpReadout.textContent = Math.round(dispHp) + ' hp';
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
-    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, rwd: false, ignition: running, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: running, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
       gearLabel: `${gearTxt.replace(/\d/,'')}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC, ambient: AMBIENT_C });
 
     // ---- tell-tales: bulb check at power-on, then live. Charge + oil stay lit until it runs ----
