@@ -48,7 +48,7 @@ are saved per car, and every drive, refuel, service and tune is logged so you ca
 | BMW M3 Competition Touring | S58 3.0 twin-turbo I6 | ZF 8HP | ✅ | engine / chassis / steering / brake set-up, M xDrive, M Mode, MTC, M1/M2 |
 | BMW M5 CS | S63 4.4 twin-turbo V8 | ZF 8HP | ✅ | as the M3, plus M Sound and storable M1/M2 |
 | BMW M5 E60 | S85 5.0 V10 | SMG III | ✅ | Drivelogic, BMW's launch-control procedure, POWER / EDC / MDrive, 9,500 rpm cut |
-| Porsche 911 GT3 RS | 4.0 flat-six (no turbo) | PDK | — | 9,000 rpm, PSM, twin-turbo kits up to ~960 hp |
+| Porsche 911 GT3 RS | 4.0 flat-six (no turbo) | PDK | ✅ | 9,000 rpm, PSM, twin-turbo kits up to ~960 hp; drives lime with a black bonnet and white wheels, the grippiest car in the garage |
 | BMW 550D | twin-turbo diesel I6 | ZF 8HP | — | the original cluster |
 | Proton Iriz | petrol I4 | CVT | — | hatchback cluster |
 
@@ -260,7 +260,7 @@ pad's tilt) and report failures in the browser console.
 
 ## 🙏 Credits
 
-- 3D models from Sketchfab, credited on the drive page: X1, M3 CS Touring, M5 Competition and M140i by
+- 3D models from Sketchfab, credited on the drive page: X1, M3 CS Touring, M5 Competition, M140i and 911 GT3 RS by
   [Ddiaz Design](https://sketchfab.com/ddiaz-design); F30 by DEMON_SCARY1235; G30 by Mona x Supercars; E60 by
   GT Cars: Hyperspeed. Licences are CC BY-NC-SA 4.0 or CC BY 4.0, as shown per car.
 - Nordschleife line: © [OpenStreetMap](https://www.openstreetmap.org/relation/38566) contributors (ODbL); heights

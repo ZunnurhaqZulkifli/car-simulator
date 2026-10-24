@@ -82,7 +82,8 @@ import NORDSCHLEIFE from './js/nordschleife.js';
 // with a model of the same car as its body. A model's parts are found by matching "material|mesh|parent" names:
 // paint (repainted Black Sapphire, or paintColor), glass (tinted), cabin (mirrored to right-hand drive), wheels and tyre (hung on
 // pivots that spin and steer), steering (searched for its rim, from `near` if it hides inside a bigger mesh; with
-// no `re`, the built wheel goes at `near`; `look`: how high over its centre the eye looks for the cluster), tail (its rear half glows when braking), head/tail/mirror lamps (where the
+// no `re`, the built wheel goes at `near`; `look`: how high over its centre the eye looks for the cluster; `inset`: how far short of what it sees there the cluster
+// goes, for dials deep in tubes), tail (its rear half glows when braking), head/tail/mirror lamps (where the
 // amber signals go), credit (title, page, licence if not by-nc-sa, author if not Ddiaz Design and their page)
 const CARS = {
   x1: {
@@ -173,6 +174,18 @@ const CARS = {
     tail: { overlay: true },
     lamps: { head: /\|head_lights_1\|/, tail: /\|tail_lights_1\|/ },
     exhaustX: 0.5, exhaustBoth: true, // tips both sides
+  },
+  // already nose-first: its front lid split off the paint onto a gloss black of its own ("bonnet") and its rims white
+  gt3: {
+    name: 'Porsche 911 GT3 RS', page: 'porsche-911-gt3-rs', model: '/models/porsche-911-gt3-rs.glb', length: 4.557, wheelbase: 2.453, redline: 9000,
+    credit: ['2019 Porsche 911 (991.2) GT3 RS', 'https://sketchfab.com/3d-models/2019-porsche-911-9912-gt3-rs-97ea84db846e4945961dffb8b2d7af18'],
+    grip: 2.8, // Cup tyres and downforce: the garage's grippiest
+    paint: /^991_2phong2SG1\|/, paintColor: 0x8fd41e, glass: /^991_2phong18SG1\|/, glassPlain: true, cabin: /^991_2phong(9|11)SG1\|/, // lime
+    wheels: /Wheel1A_3D|^991_2phong2[01]SG1\|/, tyre: /Wheel1A_3D/, // the calipers stay put
+    steering: { re: /^991_2phong9SG1\|/, near: [-0.365, 0.815, 0.245], look: 0.115, inset: 0.15 }, // over the rims of its five dial tubes
+    tail: { overlay: true, keep: v => v.y > 0.7 && v.y < 0.9 }, // the clusters (not the bumper reflectors or third brake light)
+    lamps: { head: /^991_2phong8SG1\|/, tail: /^991_2phong12SG1\|/ },
+    exhaustX: 0.06, exhaustBoth: true, // twin tips in the middle
   },
 };
 CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', grip: 2.2, page: 'bmw-530e', redline: 6500, paintColor: 0x1a3363 }; // the M550d's body, in blue like the garage photo
@@ -1581,7 +1594,7 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
   root.updateMatrixWorld(true); // root has no parent yet, so this is car space
   const look = wheelAt.clone().add(new THREE.Vector3(0, CAR.steering.look ?? 0.1, 0)).sub(EYE).normalize();
   const hit = new THREE.Raycaster(EYE, look).intersectObject(root, true).find(h => !swMeshes.includes(h.object));
-  const at = hit ? hit.point.addScaledVector(look, -0.01) : wheelAt.clone().add(new THREE.Vector3(0, 0.11, 0.32));
+  const at = hit ? hit.point.addScaledVector(look, -(CAR.steering.inset ?? 0.01)) : wheelAt.clone().add(new THREE.Vector3(0, 0.11, 0.32));
   dashAnchor.position.copy(at);
   dashAnchor.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(EYE, at, new THREE.Vector3(0, 1, 0))); // faces the driver
   dashAnchor.scale.setScalar(0.36 * at.distanceTo(EYE) / 1100); // about as wide, to the eye, as the model's own cluster

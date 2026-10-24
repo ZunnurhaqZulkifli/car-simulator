@@ -1404,6 +1404,8 @@
     if(!running && !braking) a = Math.min(a, 0);
     speed = Math.max(0, speed + (a - dragA)*3.6*dt); // no cap: drag and the rev limiter set the top speed
     if((braking && speed < 0.3) || transmissionMode === 'P') speed = 0; // P: the parking pawl
+    if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
+    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // taken off by the handbrake on the driving page, km/h
 
     // ---- gear selection ----
     if(running && isDrive()){

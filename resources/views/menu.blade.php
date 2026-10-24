@@ -19,7 +19,7 @@
     </header>
 
     {{-- the cars public/drive.html has a 3D model for (its CARS): Start drives them there, the others open their gauges --}}
-    @php($drivable = ['bmw-x1-xdrive20d', 'bmw-m3-touring', 'bmw-m5-cs', 'bmw-140i', 'bmw-320d', 'bmw-550d-mk2', 'bmw-530e', 'bmw-m5-e60'])
+    @php($drivable = ['bmw-x1-xdrive20d', 'bmw-m3-touring', 'bmw-m5-cs', 'bmw-140i', 'bmw-320d', 'bmw-550d-mk2', 'bmw-530e', 'bmw-m5-e60', 'porsche-911-gt3-rs'])
     <div class="garage-grid">
       @foreach($cars as $car)
         @php($chips = collect(explode('·', $car->subtitle ?? ''))->map(fn ($c) => trim($c))->filter())
