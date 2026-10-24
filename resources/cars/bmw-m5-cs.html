@@ -1280,6 +1280,7 @@
     const t = actx.currentTime;
     burst(t, 0.09, 520, 120, 1.2, 10, 0.42*k*layerVol.shiftPop);
     burst(t + 0.03, 0.05, 1300, 300, 1.6, 7, 0.2*k*layerVol.shiftPop);
+    CarDyno.pop(0, 0.5 + 0.5*k);
   }
   // downshift: the rev-match blip itself is the engine sound following rpm; with the flaps open it's chased by a
   // scatter of pops as the throttle snaps shut again
@@ -1289,7 +1290,7 @@
     if(k < 0.1) return;
     const t = actx.currentTime, n = 2 + Math.floor(Math.random()*4);
     for(let i=0;i<n;i++){ const pt = t + 0.08 + Math.random()*0.25, bang = Math.random() < 0.3;
-      burst(pt, bang ? 0.11 : 0.05, bang ? 200 + Math.random()*150 : 700 + Math.random()*1000, bang ? 90 : 250, bang ? 1.1 : 1.6, bang ? 10 : 7, (bang ? 0.3 : 0.17)*k*layerVol.shiftPop*(0.5+Math.random()*0.5)); }
+      burst(pt, bang ? 0.11 : 0.05, bang ? 200 + Math.random()*150 : 700 + Math.random()*1000, bang ? 90 : 250, bang ? 1.1 : 1.6, bang ? 10 : 7, (bang ? 0.3 : 0.17)*k*layerVol.shiftPop*(0.5+Math.random()*0.5)); CarDyno.pop(pt - t, bang ? 1 : 0.5); }
   }
 
   /* ================= STATE + PHYSICS: M5 CS - 635 hp / 750 Nm, 1,825 kg, M xDrive ================= */
@@ -1670,7 +1671,7 @@
     }
   }
   // one exhaust pop: distorted noise burst through a falling bandpass (a bang is longer, deeper, harder driven)
-  const liftPop = (pt, bang, freq, peak) => burst(pt, bang ? 0.13 : 0.05, freq, bang ? 90 : 200, bang ? 1.1 : 1.6, bang ? 10 : 7, peak);
+  const liftPop = (pt, bang, freq, peak) => { burst(pt, bang ? 0.13 : 0.05, freq, bang ? 90 : 200, bang ? 1.1 : 1.6, bang ? 10 : 7, peak); CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5); };
 
   // ---- fuel: 68 L tank, 9 L reserve ----
   const TANK_SIZE_L = 68, RESERVE_L = 9, REFUEL_RATE = 0.12, PETROL_KG_PER_L = 0.745;

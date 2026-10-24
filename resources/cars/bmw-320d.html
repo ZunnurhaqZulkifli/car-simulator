@@ -836,11 +836,16 @@
   const CONS_ZERO = 0.25, CONS_SCALE_MAX = 20; // first quarter is the blue recuperation zone, then a linear 0-20 l/100km scale
   const consFrac = l100 => CONS_ZERO + (1-CONS_ZERO)*Math.min(1, l100/CONS_SCALE_MAX);
   function ledColorFor(fracI){ return fracI < CONS_ZERO ? '#3f9bff' : '#ff4a1f'; }
+  // the lit segments' glow: one blur over copies of them, under the bar - a drop-shadow on each lit segment was
+  // ~48 filters re-rastered every frame, which made drive.html stutter
+  const consumptionGlowG = el('g',{style:'filter:blur(2px)'}), consumptionLedGlows = [];
+  consumptionLedG.appendChild(consumptionGlowG);
   for(let i=0;i<CONSUMPTION_LED_COUNT;i++){
     const fracI = i/(CONSUMPTION_LED_COUNT-1);
     const a = consAngle(fracI);
     const [x1,y1]=polar(160,160,135,a), [x2,y2]=polar(160,160,129,a);
     const seg = el('line',{x1,y1,x2,y2,stroke:ledColorFor(fracI),'stroke-width':1.1,opacity:'0.42'});
+    consumptionLedGlows.push(consumptionGlowG.appendChild(el('line',{x1,y1,x2,y2,stroke:ledColorFor(fracI),'stroke-width':1.1,display:'none'})));
     consumptionLedG.appendChild(seg);
     consumptionLedSegs.push(seg);
   }
@@ -1469,6 +1474,7 @@
   }
   // one exhaust pop: distorted noise burst through a falling bandpass
   function liftPop(pt, bang, freq, peak){
+    CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5);
     const dur = bang ? 0.13 : 0.05;
     const bufSize = Math.floor(actx.sampleRate * dur);
     const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
@@ -2094,7 +2100,7 @@
       const fracI = i/(CONSUMPTION_LED_COUNT-1);
       const lit = fracI < CONS_ZERO ? recup : (dispConsumption > 0.2 && fracI <= litTo);
       seg.setAttribute('opacity', lit ? '1' : '0.42');
-      seg.style.filter = lit ? `drop-shadow(0 0 4px ${seg.getAttribute('stroke')})` : 'none';
+      consumptionLedGlows[i].setAttribute('display', lit ? 'inline' : 'none');
     });
     tachGearTxt.textContent = gearNum.style.display !== 'none' ? gearLetter.textContent + gearNum.textContent : gearLetter.textContent;
 

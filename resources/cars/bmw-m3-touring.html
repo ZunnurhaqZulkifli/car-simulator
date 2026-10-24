@@ -1471,6 +1471,7 @@
     burst(t, 0.08, 600, 140, 1.2, 10, 0.4*k*layerVol.shiftPop);
     burst(t + 0.025, 0.045, 1500, 350, 1.6, 7, 0.2*k*layerVol.shiftPop);
     flashTips(t);
+    CarDyno.pop(0, 0.5 + 0.5*k);
   }
   // downshift: the rev-match blip is the engine sound following rpm; with the flaps open it's chased by a scatter of
   // pops as the throttle snaps shut again
@@ -1481,7 +1482,7 @@
     const t = actx.currentTime, n = 2 + Math.floor(Math.random()*4);
     for(let i=0;i<n;i++){ const pt = t + 0.08 + Math.random()*0.25, bang = Math.random() < 0.3;
       burst(pt, bang ? 0.1 : 0.045, bang ? 240 + Math.random()*160 : 900 + Math.random()*1200, bang ? 100 : 300, bang ? 1.1 : 1.6, bang ? 10 : 7, (bang ? 0.28 : 0.16)*k*layerVol.shiftPop*(0.5+Math.random()*0.5));
-      if(bang) flashTips(pt); }
+      if(bang) flashTips(pt); CarDyno.pop(pt - t, bang ? 1 : 0.5); }
   }
 
   /* ================= STATE + PHYSICS: M3 Competition Touring xDrive (G81 LCI) - 530 hp / 650 Nm, 1,865 kg ================= */
@@ -1847,7 +1848,7 @@
     }
   }
   // one exhaust pop: distorted noise burst through a falling bandpass (a bang is longer, deeper, harder driven)
-  const liftPop = (pt, bang, freq, peak) => { burst(pt, bang ? 0.11 : 0.045, freq, bang ? 100 : 230, bang ? 1.1 : 1.6, bang ? 10 : 7, peak); if(bang) flashTips(pt); };
+  const liftPop = (pt, bang, freq, peak) => { burst(pt, bang ? 0.11 : 0.045, freq, bang ? 100 : 230, bang ? 1.1 : 1.6, bang ? 10 : 7, peak); if(bang) flashTips(pt); CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5); };
 
   // ---- fuel: 59 L tank, 8 L reserve ----
   const TANK_SIZE_L = 59, RESERVE_L = 8, REFUEL_RATE = 0.12, PETROL_KG_PER_L = 0.745;

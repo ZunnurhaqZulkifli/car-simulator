@@ -11,6 +11,9 @@
 //        car-perf.js (the Performance tab's timing)
 //   CarDyno.on   - dyno mode: the car skips kickdown (a pull starts low in a tall gear) and Space runs the dyno
 //   CarDyno.hold - a run is armed or recording: the car's auto box holds the gear so the pull stays in it
+//   CarDyno.pop(delay, size) - an exhaust pop the car's sound fires delay s from now (size 0.5 a crackle, 1 a bang): a
+//        no-op here, the drive page replaces it to spit flame from the tips. shortcut: called from the car's pop sounds,
+//        so a muted car (or its crackle layer at 0) shows no flame; split the decision from the sound if that matters
 //
 // Flow: dyno mode on, roll into a gear, Space arms, the run records from the first touch of throttle, Space again
 // finalises it into the run list (and the car's history). Runs last for the session; Save PDF prints the selected run as a dyno sheet.
@@ -790,6 +793,7 @@
   api.init = (o) => { Object.assign(cfg, o); paint(); };
   api.ch = ch; // read-only: car-tune.js takes the cell's ambient from here
   api.tick = tick;
+  api.pop = () => {};
   window.CarDyno = api;
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);

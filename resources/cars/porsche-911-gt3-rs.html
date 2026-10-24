@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Porsche 911 GT3 RS Instrument Cluster</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,700&display=swap">
+<style>
+  :root{
+    --white:#eef0f2;
+    --dim:#878b90;
+    --amber:#ffa21a;
+    --red:#e5281e;
+    --teal:#3fd6c0;
+    --green:#3ddc6a;
+    /* the GT3's acid yellow-green needles carry through the switchgear */
+    --accent:#c3d63a;
+    --accent-soft:rgba(195,214,58,.15);
+    --accent-glow:rgba(195,214,58,.45);
+    --dial:"Barlow","Helvetica Neue",Arial,sans-serif; /* stands in for Porsche Next */
+    --ui:"Barlow","Helvetica Neue",Arial,sans-serif;
+    --cond:"Barlow","Arial Narrow",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0; min-height:100%; background:#000; color:var(--white); }
+  body{
+    display:flex; overflow-x:hidden; font-family:var(--ui);
+    background: radial-gradient(80% 55% at 50% 0%, #121314 0%, #000 72%);
+  }
+  .page-layout{ display:flex; gap:18px; align-items:center; justify-content:center; width:100%; max-width:1440px; min-height:100vh; padding:24px 16px; margin:0 auto; }
+  .rig{ flex:1 1 auto; min-width:0; max-width:1100px; }
+
+  /* ---------- 992 GT3 RS cluster: one SVG for the hood, the two screens and the rev counter; tell-tales are HTML over it ---------- */
+  .cluster{
+    position:relative; padding:10px 12px 6px;
+    background: radial-gradient(120% 140% at 50% -20%, #18191b 0%, #060607 60%);
+    border-radius:46px 46px 22px 22px; border:1px solid #222326;
+    box-shadow: 0 30px 70px -30px rgba(0,0,0,.95), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .cl-face{ position:relative; }
+  .cl-face > svg{ display:block; width:100%; height:auto; overflow:visible; }
+  /* rev counter print: grey under the glass, backlit white at terminal 15 */
+  .mk{ fill:#9c9ea2; stroke:none; transition:fill .5s; }
+  .num{ font-family:var(--dial); font-weight:500; fill:#a2a4a8; transition:fill .5s; }
+  .lit .mk, .lit .num{ fill:#f4f5f6; }
+  /* one glow per dial's print, not per tick (the E60 lesson: filtered marks under a moving needle halve the frame rate) */
+  .print{ transition:filter .5s; }
+  .lit .print{ filter:drop-shadow(0 0 1.4px rgba(255,255,255,.5)); }
+  .tk{ opacity:.45; transition:opacity .5s; }
+  .lit .tk{ opacity:1; }
+  .rz{ fill:#9c1e18; stroke:#9c1e18; transition:fill .5s, stroke .5s; }
+  .lit .rz{ fill:#ff2a1c; stroke:#ff2a1c; }
+  .logo{ font-family:var(--dial); font-style:italic; font-weight:700; fill:none; stroke:#8a8d92; stroke-width:1.1; letter-spacing:1.5px; transition:stroke .5s; }
+  .lit .logo{ stroke:#e8eaec; }
+  .ndl-body{ fill:#a6b232; transition:fill .4s; }
+  .ndl{ transition:filter .4s; }
+  .lit .ndl-body{ fill:#d2e03c; }
+  .lit .ndl{ filter:drop-shadow(0 0 2.5px rgba(205,225,60,.65)); }
+  /* the two 7-inch screens (and the inset in the rev counter) stay blank glass until terminal 15 */
+  .scr{ opacity:0; transition:opacity .7s; }
+  .lit .scr{ opacity:1; }
+  .tft{ font-family:var(--dial); fill:#eceef0; }
+  .dig{ font-family:var(--dial); font-weight:500; fill:#dce8f4; }
+  .prnd{ font-family:var(--dial); font-weight:700; fill:#5f6469; }
+  .prnd.on{ fill:#ff3524; }
+  .mk-y{ fill:#c8d034; }
+  .vicon{ color:#e4e7ea; }
+  .cc{ fill:#8e959c; stroke:#8e959c; }
+  .cc.on{ fill:var(--green); stroke:var(--green); }
+  .cc text{ stroke:none; font-family:var(--dial); }
+  .cc-mark{ fill:var(--green); }
+  #veh-title.tw-r text{ fill:#ff3a2a; }
+  #veh-title.tw-a text{ fill:#ffa21a; }
+  #veh-title.tw-g text{ fill:var(--accent); }
+  .blinkfx{ animation: wlBlink .5s steps(1) infinite; }
+
+  /* tell-tales: drawn on the screens, so nothing shows until one is lit */
+  .warning-lights{ position:absolute; inset:0; pointer-events:none; }
+  .wl{ position:absolute; width:2.05%; aspect-ratio:1; transform:translate(-50%,-50%); color:transparent; transition:color .15s, filter .15s; }
+  .wl.wide{ width:4.4%; aspect-ratio:2.2; }
+  .wl svg{ width:100%; height:100%; display:block; overflow:visible; }
+  .wl.on-red{ color:#ff3324; filter:drop-shadow(0 0 4px rgba(255,51,36,.7)); }
+  .wl.on-amber{ color:#ffa21a; filter:drop-shadow(0 0 4px rgba(255,162,26,.65)); }
+  .wl.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 4px rgba(79,168,255,.7)); }
+  .wl.on-green{ color:#5cdc6d; filter:drop-shadow(0 0 4px rgba(92,220,109,.7)); }
+  .wl.on-white{ color:#f4f1ea; filter:drop-shadow(0 0 4px rgba(255,240,220,.6)); }
+  .wl.blink{ animation: wlBlink 0.5s steps(1) infinite; }
+  @keyframes wlBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.15; } }
+  /* car-service.js appends its service light to this field - park it on the right screen's bottom row */
+  .warning-lights > .wl[title="Service required"]{ left:81.38%; top:89.36%; }
+
+  /* ---------- drive deck: black alcantara and carbon ---------- */
+  .deck{
+    position:relative; margin-top:14px; padding:12px 14px;
+    background:linear-gradient(180deg,#141415 0%,#09090a 100%);
+    border:1px solid #262729; border-radius:16px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:12px 16px;
+  }
+  .deck::before{ content:""; position:absolute; left:28px; right:28px; top:-1px; height:2px; border-radius:2px;
+    background:linear-gradient(90deg,transparent,var(--accent) 30%,var(--accent) 70%,transparent); opacity:.7; }
+  .deck-col{ display:flex; flex-direction:column; gap:6px; }
+  .deck-label, .deck-throttle label{ font-size:.52rem; letter-spacing:.2em; text-transform:uppercase; color:var(--dim); display:flex; justify-content:space-between; gap:8px; font-weight:600; }
+  .deck-throttle{ flex:0 1 200px; min-width:170px; }
+  .deck-row{ display:flex; gap:6px; align-items:center; }
+  /* the twist starter left of the wheel, drawn as a knob */
+  .start-btn{
+    width:62px; height:62px; flex:none; border-radius:50%; padding:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+    background: radial-gradient(circle at 50% 35%, #2a2b2c 0%, #101011 70%);
+    border:2px solid #3e3f42; color:#b3b5b8; font-size:.42rem; letter-spacing:.14em; line-height:1.15;
+    box-shadow: 0 0 0 3px #0a0a0b, 0 0 0 5px #4a4c50, 0 8px 18px -8px #000;
+  }
+  .start-btn .sb-mid{ font-size:.5rem; font-weight:800; color:var(--white); }
+  .start-btn.active{ border-color:var(--accent); color:#fff; box-shadow: 0 0 0 3px #0a0a0b, 0 0 0 5px #6a6c70, 0 0 22px -2px var(--accent-glow); }
+  input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:5px; border-radius:3px; background: linear-gradient(90deg, var(--accent) var(--pct,0%), #232426 var(--pct,0%)); }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--white); border:3px solid var(--accent); cursor:pointer; margin-top:-6px; }
+  input[type=range]::-moz-range-thumb{ width:12px; height:12px; border-radius:50%; background:var(--white); border:3px solid var(--accent); cursor:pointer; }
+  button{ font-family:inherit; font-size:.58rem; letter-spacing:.1em; text-transform:uppercase; font-weight:700; padding:8px 11px; border-radius:8px; border:1px solid #2c2d30; background:#161618; color:var(--dim); cursor:pointer; transition:.16s; }
+  button:hover{ color:var(--white); border-color:#47494d; }
+  button:active{ transform:scale(.96); }
+  button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .seg{ display:flex; border:1px solid #2c2d30; border-radius:9px; overflow:hidden; }
+  .seg button{ border:0; border-right:1px solid #242527; border-radius:0; background:#101011; }
+  .seg button:last-child{ border-right:0; }
+  .seg button.active{ color:#fff; background:#2e3033; box-shadow:inset 0 -2px 0 var(--accent); }
+  button.brake-btn{ background:#241315; border-color:#5a1f19; color:#ff9a92; }
+  button.brake-btn:active{ border-color:var(--red); }
+  button.psm-btn.active{ color:#1a0f00; background:var(--amber); border-color:var(--amber); }
+  button.lights-btn.active{ color:#04140a; background:var(--green); border-color:var(--green); }
+  button.highbeam-btn.active{ color:#00101f; background:#4fa8ff; border-color:#4fa8ff; }
+  .keys{ display:flex; flex-wrap:wrap; justify-content:center; gap:6px 14px; margin-top:10px; font-size:.6rem; color:#5d5f63; }
+  .keys kbd{ display:inline-block; min-width:18px; padding:2px 5px; margin-right:3px; border-radius:4px; border:1px solid #2c2d30; border-bottom-width:2px; background:#111112; color:#afb1b5; font:700 .58rem/1.2 var(--cond); text-align:center; }
+
+  /* floating buttons (dyno + sound), alongside the shared sound-mixer button */
+  .mute-fab, .dyno-toggle-btn{
+    position:fixed; bottom:16px; width:44px; height:44px; border-radius:50%; padding:0;
+    border:1px solid #2a2a2a; background:#131313; color:#c9c9c9; cursor:pointer; z-index:2147483000;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px -6px rgba(0,0,0,.7);
+    transition:color .15s, border-color .15s;
+  }
+  .mute-fab{ right:70px; }
+  .dyno-toggle-btn{ left:16px; }
+  .mute-fab:hover, .dyno-toggle-btn:hover{ color:#fff; border-color:var(--accent); }
+  .mute-fab.muted{ color:var(--red); border-color:var(--red); }
+  .dyno-toggle-btn.active{ color:var(--accent); border-color:var(--accent); }
+  .mute-fab svg, .dyno-toggle-btn svg{ width:20px; height:20px; }
+
+  /* ---------- dyno + telemetry ---------- */
+  .dyno-panel{ margin-top:16px; padding:18px 20px 20px; background:#0a0a0a; border:1px solid #1c1c1c; border-radius:14px; }
+  .dyno-title-row{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+  .dyno-title{ font-size:.72rem; font-weight:700; letter-spacing:.08em; color:#c8cacd; text-transform:uppercase; }
+  .dyno-svg{ width:100%; height:auto; display:block; }
+  .dyno-content-row{ display:flex; gap:16px; align-items:flex-start; }
+  .dyno-content-row > .dyno-svg{ flex:1 1 auto; min-width:0; }
+  .telemetry-grid{ flex:0 0 260px; width:260px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .telemetry-card{ background:#0a0a0a; border:1px solid #1c1c1c; border-radius:10px; padding:10px 10px 8px; text-align:center; }
+  .telemetry-title{ font-size:.56rem; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:2px; }
+  .telemetry-value{ font-family:"Courier New", monospace; font-weight:700; font-size:.85rem; color:#f4f6f8; margin-bottom:4px; }
+  .telemetry-svg{ width:100%; height:auto; display:block; }
+  .dyno-readout{ text-align:center; font-family:"Courier New", monospace; font-size:.72rem; color:var(--dim); margin-top:4px; letter-spacing:.03em; }
+  .dyno-hidden{ display:none; }
+  .dyno-panel.dyno-collapsed{ display:none; }
+  .dyno-title-actions{ display:flex; gap:8px; align-items:center; }
+  .dyno-close{ background:none; border:none; color:var(--dim); font-size:1.15rem; line-height:1; cursor:pointer; padding:2px 8px; }
+  .dyno-close:hover{ color:var(--white); }
+
+  /* ---------- side panel: model, vehicle, live data ---------- */
+  .side-panel{
+    flex:0 0 290px; width:290px;
+    background:linear-gradient(180deg,#101011 0%,#070708 100%); border:1px solid #262729; border-radius:18px;
+    padding:14px 14px 16px; box-shadow: 0 0 34px -22px var(--accent-glow);
+    max-height:calc(100vh - 40px); display:flex; flex-direction:column; overflow:hidden;
+  }
+  .side-panel > .cs-scroller{ flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; margin-right:-8px; padding-right:8px; scrollbar-width:thin; scrollbar-color:#2c2d30 transparent; }
+  .sp-model{ font:700 1.5rem/1 var(--ui); letter-spacing:.04em; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .sp-model b{ font-style:italic; color:var(--accent); }
+  .sp-model span.sub{ font:600 .78rem var(--ui); color:var(--dim); letter-spacing:.06em; }
+  .sp-spec{ font-size:.62rem; color:var(--dim); margin:7px 0 2px; line-height:1.5; }
+  .tuning-section{ margin-top:12px; padding-top:12px; border-top:1px solid #1e1f21; }
+  .tuning-label{ font-size:.56rem; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); margin-bottom:8px; font-weight:600; }
+  .tune-row{ display:flex; align-items:center; gap:8px; margin-bottom:9px; }
+  .tune-row:last-child{ margin-bottom:0; }
+  .tune-label{ font-size:.52rem; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); min-width:40px; font-weight:600; }
+  .icon-btn{ width:30px; height:30px; padding:0; border-radius:8px; border:1px solid #2c2d30; background:#161618; color:var(--dim); display:flex; align-items:center; justify-content:center; flex:none; }
+  .icon-btn:hover{ color:var(--white); border-color:var(--accent); }
+  .icon-btn.active{ color:#7ff0a8; border-color:#33d17a; }
+  .icon-btn svg{ width:15px; height:15px; }
+  .tuning-bar-track{ flex:1; height:6px; border-radius:3px; background:#1b1c1e; overflow:hidden; }
+  .tuning-bar-fill{ height:100%; border-radius:3px; transition:width .3s ease; }
+  .fill-wear{ background:linear-gradient(90deg,#33d17a,var(--amber),var(--red)); }
+  .fill-fuel{ background:linear-gradient(90deg,#c9c6bf,#f4f2ee); }
+  .tune-pct{ font-size:.58rem; color:var(--dim); font-family:"Courier New", monospace; min-width:34px; text-align:right; }
+  .subgauge-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px 8px; margin-top:4px; }
+  .engtemp-panel{ min-width:0; text-align:center; }
+  .engtemp-panel svg{ display:block; width:100%; height:auto; }
+  .engtemp-label{ font-size:.5rem; letter-spacing:.14em; color:var(--dim); margin-top:2px; text-transform:uppercase; white-space:nowrap; font-weight:600; }
+  .led-multi-panel{ margin-top:12px; background:#060708; border:1px solid #26282b; border-radius:8px; padding:9px 12px; display:grid; grid-template-columns:auto 1fr; gap:5px 10px; align-items:center;
+    box-shadow:inset 0 0 14px rgba(0,0,0,.6); }
+  .lm-label{ font:600 .5rem var(--cond); letter-spacing:.16em; color:#7c8187; }
+  .lm-val{ font:500 .9rem var(--cond); color:#eceef0; text-align:right; font-variant-numeric:tabular-nums; }
+
+  @media (max-width:1140px){
+    .page-layout{ flex-direction:column; align-items:stretch; }
+    .side-panel{ width:auto; flex:none; max-height:none; }
+    .subgauge-grid{ grid-template-columns:repeat(4,1fr); }
+  }
+  @media (max-width:640px){
+    .cluster{ padding:6px 4px 4px; border-radius:28px 28px 14px 14px; }
+    .subgauge-grid{ grid-template-columns:1fr 1fr; }
+    .dyno-content-row{ flex-direction:column; }
+    .telemetry-grid{ width:100%; flex:none; }
+  }
+  @media (prefers-reduced-motion: reduce){ .wl.blink, .blinkfx{ animation:none; } }
+</style>
+</head>
+<body>
+<div class="page-layout">
+<div class="rig">
+  <div class="cluster" id="cluster">
+    <div class="cl-face">
+      <!-- 992 GT3 RS cluster, laid out off the reference photo (rev-counter bezel radius 115 px there = 170 here):
+           left screen the clock / outside temperature and the 0-350 km/h speedometer, the analog rev counter
+           (0-10 x1000 over 230 deg) in its tube in the middle, right screen the "Vehicle" readouts and the
+           coolant / fuel dial. -->
+      <svg viewBox="0 0 1300 470" id="cl-svg" role="img" aria-label="Porsche 911 GT3 RS instrument cluster">
+        <defs>
+          <linearGradient id="housingG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2b2e"/><stop offset=".55" stop-color="#1c1d1f"/><stop offset="1" stop-color="#111213"/></linearGradient>
+          <!-- the rev counter's dark satin bezel, lit from above -->
+          <linearGradient id="bezelG" x1=".3" y1="0" x2=".7" y2="1"><stop offset="0" stop-color="#3a3c40"/><stop offset=".45" stop-color="#18191b"/><stop offset=".8" stop-color="#0f1011"/><stop offset="1" stop-color="#26282b"/></linearGradient>
+          <!-- the grey numeral ring, r 93-128 -->
+          <radialGradient id="annG" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="128"><stop offset=".72" stop-color="#2a2c30"/><stop offset="1" stop-color="#404348"/></radialGradient>
+          <radialGradient id="faceG" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#101113"/><stop offset="1" stop-color="#050506"/></radialGradient>
+          <radialGradient id="hubG" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#f2f3f4"/><stop offset=".5" stop-color="#a2a6ab"/><stop offset="1" stop-color="#4b4f54"/></radialGradient>
+          <!-- the red field between 9 and 10 on the numeral ring: a dark red dot screen -->
+          <pattern id="redDots" width="3" height="3" patternUnits="userSpaceOnUse"><rect width="3" height="3" fill="#2a0a0a"/><circle cx="1.5" cy="1.5" r=".8" fill="#7a1814"/></pattern>
+        </defs>
+
+        <!-- hood, and black faces under the screen dials (filled from each dial's transform below) -->
+        <path d="M10 466 L10 190 C10 96 150 30 340 22 L960 22 C1150 30 1290 96 1290 190 L1290 466 Z" fill="url(#housingG)" stroke="#2a2b2d" stroke-width="2"/>
+        <g id="faces" fill="#030304" stroke="#2e3034" stroke-width="2"></g>
+
+        <g class="scr">
+          <!-- clock + outside temperature -->
+          <g id="clk-g" transform="translate(125 290) scale(.92)">
+            <circle r="96" fill="none" stroke="#5d6166" stroke-width="3"/>
+            <text id="clk" class="tft" y="-8" text-anchor="middle" font-size="25" font-weight="500">--:--</text>
+            <rect x="-52" y="1" width="104" height="1.6" fill="#8d9298"/>
+            <text class="tft" y="30" text-anchor="middle" font-size="25" font-weight="500">20.0<tspan font-size="14" dx="4">&#176;C</tspan></text>
+          </g>
+          <g id="spd" transform="translate(341 268) scale(.94)"></g>
+          <g id="veh" transform="translate(956 262) scale(.92)"></g>
+          <g id="aux" transform="translate(1173 286) scale(.9)"></g>
+        </g>
+
+        <!-- the analog rev counter in its tube, in front of both screens -->
+        <g id="tach" transform="translate(650 250)"></g>
+      </svg>
+
+      <div class="warning-lights">
+        <!-- left screen: seat belt between the clock and the speedometer and auto lights at its lower right (both where
+             the photo has them), the rest along the bottom -->
+        <div class="wl" id="wl-belt" title="Seatbelt" style="left:16.92%;top:34.47%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="4.6" r="2.4"/><path d="M8 21v-6.5C8 11 9.8 9 12 9s4 2 4 5.5V21"/><path d="M9 9.8l6 7.2"/></svg>
+        </div>
+        <div class="wl" id="wl-lighton" title="Lights on" style="left:36%;top:80.43%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 7.5h6M2.5 10.5h6M2.5 13.5h6M2.5 16.5h6"/><circle cx="16" cy="12" r="5.8"/><text x="16" y="15.1" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" stroke="none" font-family="Arial">A</text></svg>
+        </div>
+        <div class="wl" id="wl-highbeam" title="High beam" style="left:5.38%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5H3M10 10.5H3M10 13.5H3M10 16.5H3"/></svg>
+        </div>
+        <div class="wl" id="wl-airbag" title="Airbag" style="left:8.62%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="2.2"/><path d="M8 8v6l5 4M5 21l3-7M13 18l-2 3"/><circle cx="17.5" cy="11" r="4.5"/></svg>
+        </div>
+        <div class="wl" id="wl-abs" title="ABS" style="left:11.85%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none"><text x="12" y="15.5" text-anchor="middle" font-size="8.5" font-weight="800" fill="currentColor" font-family="Arial">ABS</text><circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6.5a10 10 0 0 0 0 11M20.5 6.5a10 10 0 0 1 0 11" stroke="currentColor" stroke-width="1.5"/></svg>
+        </div>
+        <div class="wl" id="wl-brake" title="Parking brake" style="left:15.08%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none"><text x="12" y="15.8" text-anchor="middle" font-size="10" font-weight="800" fill="currentColor" font-family="Arial">P</text><circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6.5a10 10 0 0 0 0 11M20.5 6.5a10 10 0 0 1 0 11" stroke="currentColor" stroke-width="1.5"/></svg>
+        </div>
+        <div class="wl" id="wl-engine" title="Engine (emissions)" style="left:18.31%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v2.5M10 3v2.5M6 8h11l2 2v3l-2 1v3l-3 2H8l-3-2v-4H4V9h1z"/></svg>
+        </div>
+        <!-- right screen bottom row (the service light parks at 81.38%) -->
+        <div class="wl" id="wl-psm" title="PSM" style="left:65.38%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 11.5 6.3 7c.3-.8 1-1.2 1.8-1.2h7.8c.8 0 1.5.4 1.8 1.2l1.8 4.5V15h-15z"/><path d="M4.5 11.5h15M6.5 15v1.8M17.5 15v1.8"/><path d="M7 22c1.4-1.3 1.4-2.4 0-3.6M17 22c-1.4-1.3-1.4-2.4 0-3.6"/></svg>
+        </div>
+        <div class="wl wide" id="wl-psmoff" title="PSM off" style="left:69.62%;top:89.36%">
+          <svg viewBox="0 0 44 20"><text x="22" y="14.5" text-anchor="middle" font-size="11.5" font-weight="800" fill="currentColor" font-family="Arial">PSM OFF</text></svg>
+        </div>
+        <div class="wl" id="wl-battery" title="Charging" style="left:84.62%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="7" width="18" height="12" rx="1.5"/><path d="M6.5 7V5h3v2M14.5 7V5h3v2M6 13h4M15 13h4M17 11v4"/></svg>
+        </div>
+        <div class="wl" id="wl-oil" title="Oil pressure" style="left:87.85%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M1.5 11h4.5l1.8-1.8h6.4l7.8-2.4-6.6 9.4H6.5l-3-3z"/><path d="M11 9.2V7M8.5 7h5"/><path d="M22.5 15.5c0 1.1-.7 1.8-1.4 1.8s-1.4-.7-1.4-1.8 1.4-3 1.4-3 1.4 1.9 1.4 3z" fill="currentColor"/></svg>
+        </div>
+        <div class="wl" id="wl-temp" title="Coolant temperature" style="left:91.08%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 3v11"/><circle cx="12" cy="16.2" r="2.4" fill="currentColor"/><path d="M12 6h4M12 9h4M12 12h4"/><path d="M3 21c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/></svg>
+        </div>
+        <div class="wl" id="wl-fuel" title="Low fuel" style="left:94.31%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12"/><rect x="6.5" y="6" width="5" height="4.5"/><path d="M14 9h2a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 0 3 0V8.5L18 6"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="deck">
+    <button class="start-btn" id="power-btn" title="Start / Stop (I)"><span>ENGINE</span><span class="sb-mid">START</span><span>STOP</span></button>
+    <div class="deck-col deck-throttle">
+      <label>Accelerator <span id="throttle-val">0%</span></label>
+      <input type="range" id="throttle" min="0" max="100" value="0" aria-label="Accelerator">
+      <button class="brake-btn" id="brake-btn">Hold to brake</button>
+    </div>
+    <div class="deck-col">
+      <div class="deck-label">PDK selector</div>
+      <div class="seg">
+        <button class="active" id="trans-p-btn" title="Park (P)">P</button>
+        <button id="trans-r-btn" title="Reverse (R)">R</button>
+        <button id="trans-n-btn" title="Neutral (N)">N</button>
+        <button id="trans-d-btn" title="Drive: D (automatic) / M (manual) - M toggles, K for D">D</button>
+        <button id="shift-down-btn" title="Left paddle: down (Q)">&minus;</button>
+        <button id="shift-up-btn" title="Right paddle: up (E)">&plus;</button>
+      </div>
+    </div>
+    <div class="deck-col">
+      <div class="deck-label">Drive mode</div>
+      <div class="seg" id="mode-seg">
+        <button data-mode="normal" title="Normal (G)">Normal</button>
+        <button data-mode="sport" title="Sport (G)">Sport</button>
+        <button data-mode="track" title="Track (G)">Track</button>
+      </div>
+    </div>
+    <div class="deck-col">
+      <div class="deck-label">Engine map</div>
+      <div class="seg" id="map-seg">
+        <button data-map="1" title="Map 1 (1)">Map 1</button>
+        <button data-map="2" title="Map 2 (2)">Map 2</button>
+      </div>
+    </div>
+    <div class="deck-col">
+      <div class="deck-label">Wheel</div>
+      <div class="deck-row">
+        <button class="psm-btn" id="psm-btn" title="PSM: On / Sport / Off (T)">PSM</button>
+        <button class="lights-btn" id="lights-btn" title="Headlights (L)">Lights</button>
+        <button class="highbeam-btn" id="highbeam-btn" title="High beam (H)">High</button>
+      </div>
+    </div>
+  </div>
+  <div class="keys">
+    <span><kbd>I</kbd>start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
+    <span><kbd>Q</kbd><kbd>E</kbd>paddles (D &rarr; M)</span><span><kbd>M</kbd>D / M</span><span><kbd>K</kbd>D</span><span><kbd>N</kbd>neutral</span><span><kbd>R</kbd>reverse</span><span><kbd>P</kbd>park</span>
+    <span><kbd>G</kbd>/<kbd>Shift</kbd>+<kbd>G</kbd>drive mode</span><span><kbd>1</kbd><kbd>2</kbd>engine map</span><span><kbd>T</kbd>PSM</span>
+    <span><kbd>F</kbd>cruise <kbd>,</kbd><kbd>.</kbd></span><span><kbd>L</kbd><kbd>H</kbd>lights</span>
+    <span>launch: Sport / Track, hold <kbd>S</kbd>, floor <kbd>W</kbd>, release <kbd>S</kbd></span>
+  </div>
+
+  <button class="mute-fab" id="mute-btn" title="Toggle engine sound" aria-label="Toggle engine sound"></button>
+  <button class="dyno-toggle-btn" id="dyno-toggle-btn" title="Dyno chart" aria-label="Toggle dyno chart">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M7 14l3.5-4.5 3 2.5L18 6"/></svg>
+  </button>
+  <div class="dyno-panel dyno-collapsed">
+    <div class="dyno-title-row">
+      <div class="dyno-title">Dyno</div>
+      <div class="dyno-title-actions">
+        <button class="dyno-close" id="dyno-close-btn" aria-label="Close dyno chart">&times;</button>
+      </div>
+    </div>
+    <div id="dyno-graph-wrap" class="dyno-hidden">
+    <div class="dyno-content-row">
+    <svg viewBox="0 0 640 260" class="dyno-svg"><!-- power + torque, drawn by car-dyno.js --></svg>
+    <div class="telemetry-grid">
+      <div class="telemetry-card"><div class="telemetry-title">Engine Temp</div><div class="telemetry-value" id="tele-temp-val">--</div>
+        <svg viewBox="0 0 200 70" class="telemetry-svg"><line x1="6" y1="60" x2="194" y2="60" stroke="#242424"/><line x1="6" y1="35" x2="194" y2="35" stroke="#1c1c1c" stroke-dasharray="2,2"/><polyline id="tele-temp-line" points="" fill="none" stroke="#ff9d2e" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div class="telemetry-card"><div class="telemetry-title">Fuel Consumption</div><div class="telemetry-value" id="tele-cons-val">--</div>
+        <svg viewBox="0 0 200 70" class="telemetry-svg"><line x1="6" y1="60" x2="194" y2="60" stroke="#242424"/><line x1="6" y1="35" x2="194" y2="35" stroke="#1c1c1c" stroke-dasharray="2,2"/><polyline id="tele-cons-line" points="" fill="none" stroke="#33d17a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div class="telemetry-card"><div class="telemetry-title">Fuel Level</div><div class="telemetry-value" id="tele-fuel-val">--</div>
+        <svg viewBox="0 0 200 70" class="telemetry-svg"><line x1="6" y1="60" x2="194" y2="60" stroke="#242424"/><line x1="6" y1="35" x2="194" y2="35" stroke="#1c1c1c" stroke-dasharray="2,2"/><polyline id="tele-fuel-line" points="" fill="none" stroke="#4fa8ff" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div class="telemetry-card"><div class="telemetry-title">Avg Speed</div><div class="telemetry-value" id="tele-avgspeed-val">--</div>
+        <svg viewBox="0 0 200 70" class="telemetry-svg"><line x1="6" y1="60" x2="194" y2="60" stroke="#242424"/><line x1="6" y1="35" x2="194" y2="35" stroke="#1c1c1c" stroke-dasharray="2,2"/><polyline id="tele-avgspeed-line" points="" fill="none" stroke="#c48cff" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div class="telemetry-card"><div class="telemetry-title">Fuel Used</div><div class="telemetry-value" id="tele-fuelused-val">--</div>
+        <svg viewBox="0 0 200 70" class="telemetry-svg"><line x1="6" y1="60" x2="194" y2="60" stroke="#242424"/><line x1="6" y1="35" x2="194" y2="35" stroke="#1c1c1c" stroke-dasharray="2,2"/><polyline id="tele-fuelused-line" points="" fill="none" stroke="var(--teal)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div class="telemetry-card"><div class="telemetry-title">Exhaust Gas Temp</div><div class="telemetry-value" id="tele-egr-val">--</div>
+        <svg viewBox="0 0 200 70" class="telemetry-svg"><line x1="6" y1="60" x2="194" y2="60" stroke="#242424"/><line x1="6" y1="35" x2="194" y2="35" stroke="#1c1c1c" stroke-dasharray="2,2"/><polyline id="tele-egr-line" points="" fill="none" stroke="#ff5f3d" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+      <div class="telemetry-card"><div class="telemetry-title">Oil Pressure</div><div class="telemetry-value" id="tele-oil-val">--</div>
+        <svg viewBox="0 0 200 70" class="telemetry-svg"><line x1="6" y1="60" x2="194" y2="60" stroke="#242424"/><line x1="6" y1="35" x2="194" y2="35" stroke="#1c1c1c" stroke-dasharray="2,2"/><polyline id="tele-oil-line" points="" fill="none" stroke="#e8c34a" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg></div>
+    </div>
+    </div>
+    <div class="dyno-readout" id="dyno-readout">Idle</div>
+    </div>
+  </div>
+</div>
+
+<aside class="side-panel">
+  <div class="sp-model">911 <b>GT3 RS</b> <span class="sub">992 &middot; flat-six &middot; PDK</span></div>
+  <div class="sp-spec">4.0 naturally aspirated flat-six, six individual throttle bodies &middot; 525 hp @ 8,500 &middot; 465 Nm @ 6,300 &middot; 9,000 rpm &middot; 7-speed PDK &middot; rear-drive &middot; 1,450 kg &middot; 0-100 3.2 s &middot; 0-200 10.6 s &middot; 296 km/h &middot; drive mode <span id="spec-mode">Normal</span> &middot; <span id="spec-map">Map 1</span></div>
+
+  <div class="tuning-section">
+    <div class="tuning-label">Vehicle</div>
+    <div class="tune-row">
+      <span class="tune-label">Wear</span>
+      <div class="tuning-bar-track"><div class="tuning-bar-fill fill-wear" id="wear-bar-fill" style="width:0%;"></div></div>
+      <span class="tune-pct" id="wear-pct">0%</span>
+      <button class="icon-btn" id="repair-btn" title="Repair engine" aria-label="Repair engine">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-2.4z"/></svg>
+      </button>
+    </div>
+    <div class="tune-row">
+      <span class="tune-label">Fuel</span>
+      <div class="tuning-bar-track"><div class="tuning-bar-fill fill-fuel" id="fuel-bar-fill" style="width:100%;"></div></div>
+      <span class="tune-pct" id="fuel-pct">64 L</span>
+      <button class="icon-btn" id="refuel-btn" title="Refuel (hold)" aria-label="Refuel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M3 21h13"/><rect x="6" y="6" width="6" height="5"/><path d="M14 8h2.5a1.5 1.5 0 0 1 1.5 1.5V15a1.5 1.5 0 0 0 3 0V9l-2.5-2.5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="tuning-section sec-live">
+    <div class="tuning-label">Live Data</div>
+    <div class="subgauge-grid">
+      <div class="engtemp-panel"><svg viewBox="0 0 200 200" id="g-hp"></svg><div class="engtemp-label">Power</div></div>
+      <div class="engtemp-panel"><svg viewBox="0 0 200 200" id="g-tq"></svg><div class="engtemp-label">Torque</div></div>
+      <div class="engtemp-panel"><svg viewBox="0 0 200 200" id="g-cool"></svg><div class="engtemp-label">Coolant</div></div>
+      <div class="engtemp-panel"><svg viewBox="0 0 200 200" id="g-oilp"></svg><div class="engtemp-label">Oil Pressure</div></div>
+    </div>
+    <div class="led-multi-panel">
+      <span class="lm-label">SPEED</span><span class="lm-val" id="led-speed-txt">0 km/h</span>
+      <span class="lm-label">RPM</span><span class="lm-val" id="led-rpm-txt">0</span>
+      <span class="lm-label">OIL</span><span class="lm-val" id="oil-txt">+20&deg;C</span>
+      <span class="lm-label">COOLANT</span><span class="lm-val" id="engtemp-readout">+20&deg;C</span>
+      <span class="lm-label">POWER</span><span class="lm-val" id="hp-readout">0 hp</span>
+      <span class="lm-label">TORQUE</span><span class="lm-val" id="tq-readout">0 Nm</span>
+      <span class="lm-label">BOOST</span><span class="lm-val" id="boost-readout">+0.00 bar</span>
+      <span class="lm-label">RANGE</span><span class="lm-val" id="range-txt">-- km</span>
+    </div>
+  </div>
+</aside>
+</div>
+
+<script>
+(function(){
+  const NS = "http://www.w3.org/2000/svg";
+  const $ = id => document.getElementById(id);
+  function el(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for(const k in attrs) e.setAttribute(k, attrs[k]); if(parent) parent.appendChild(e); return e; }
+  function polar(cx,cy,r,deg){ const rad=(deg-90)*Math.PI/180; return [cx+r*Math.cos(rad), cy+r*Math.sin(rad)]; }
+  function arcPath(cx,cy,r,a0,a1){
+    const [x0,y0]=polar(cx,cy,r,a0), [x1,y1]=polar(cx,cy,r,a1);
+    return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${Math.abs(a1-a0) > 180 ? 1 : 0} ${a1>a0?1:0} ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  }
+  const clamp01 = x => Math.max(0, Math.min(1, x));
+
+  /* ================= 992 GT3 RS DIALS =================
+     Off the photo, as fractions of the rev counter's bezel (115 px there, 170 here): dark bezel 0.88-1 with a
+     silver lip, graduation band 0.75-0.88 (white 1,000s, fine 100-rpm marks: blue at the bottom, dim through 3-4,
+     yellow-green through the top end, red 9-10), grey numeral ring 0.55-0.75, black face. Rev counter and
+     speedometer both sweep 230 deg; the speedo (0.72 of the tach) and the side dials are drawn on the screens. */
+  const SPD_MAX = 350, TACH_MAX = 10;
+  const tachAng = k => -115 + Math.max(0, Math.min(k, 10.3))*23; // a little past 10 into the gap at the bottom
+  const spdAng = v => -115 + Math.max(0, Math.min(v, 362))*230/SPD_MAX;
+
+  const dash = (g, a, r0, r1, w, cls) => el('rect', { x:-w/2, y:-r1, width:w, height:r1-r0, class:cls || 'mk', transform:`rotate(${a.toFixed(2)})` }, g);
+  function num(g, x, y, text, size, extra){
+    const t = el('text', { x:x.toFixed(2), y:y.toFixed(2), dy:'0.36em', 'text-anchor':'middle', class:'num', 'font-size':size, ...(extra || {}) }, g);
+    t.textContent = text; return t;
+  }
+  // needle pointing up from its pivot: the GT3's thin yellow-green blade with a short tail
+  function needle(g, len, tail, w0, w1){
+    const n = el('g', { class:'ndl' }, g);
+    el('path', { class:'ndl-body', d:`M${-w0} ${tail} L${w0} ${tail} L${w1} ${-len+2.5} L0 ${-len} L${-w1} ${-len+2.5} Z` }, n);
+    return n;
+  }
+  // the turned silver hub
+  function hub(g, r){
+    el('circle', { r:r+2, fill:'#000', opacity:.55, transform:'translate(1 2)' }, g);
+    el('circle', { r, fill:'url(#hubG)', stroke:'#2b2e31', 'stroke-width':1 }, g);
+  }
+  const rot = (n, a) => n.setAttribute('transform', `rotate(${a.toFixed(2)})`);
+
+  const ICON = {
+    temp: '<path d="M12 3v11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.2" r="2.5" fill="currentColor"/><path d="M12 6h4M12 9h4M12 12h4" stroke="currentColor" stroke-width="1.6"/><path d="M3 21c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    oil: '<path d="M1.5 13h4.5l1.8-1.8h6.4l7.8-2.4-6.6 9.4H6.5l-3-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M11 11.2V9M8.5 9h5" stroke="currentColor" stroke-width="1.6"/><path d="M22.5 17.5c0 1.1-.7 1.8-1.4 1.8s-1.4-.7-1.4-1.8 1.4-3 1.4-3 1.4 1.9 1.4 3z" fill="currentColor"/>',
+    batt: '<rect x="3" y="7" width="18" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M6.5 7V5h3v2M14.5 7V5h3v2M6 13h4M15 13h4M17 11v4" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+    fuel: '<path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><rect x="6.5" y="6" width="5" height="4.5" fill="currentColor"/><path d="M14 9h2a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 0 3 0V8.5L18 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>',
+  };
+  // oil temperature: the oil can with a thermometer over it
+  ICON.oilT = ICON.oil + '<path d="M17.5 1.5v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="17.5" cy="8" r="1.7" fill="currentColor"/><path d="M17.5 3h2.5M17.5 5h2.5" stroke="currentColor" stroke-width="1.2"/>';
+
+  /* ---------------- REV COUNTER ---------------- */
+  const tachG = $('tach');
+  // the screen dials' black faces stay on with the ignition off; only their print is screen
+  [['clk-g',96],['spd',122],['veh',124],['aux',100]].forEach(([id, r]) => el('circle', { r:r+2, transform:$(id).getAttribute('transform') }, $('faces')));
+  el('circle', { r:177, fill:'#000', opacity:.7 }, tachG); // the tube's shadow on the hood
+  el('circle', { r:170, fill:'url(#bezelG)' }, tachG);
+  el('circle', { r:169.3, fill:'none', stroke:'#4a4d52', 'stroke-width':1.4 }, tachG);
+  el('circle', { r:149, fill:'#0a0b0d', stroke:'#9a9ea3', 'stroke-width':1.8 }, tachG); // silver lip, then the graduation band
+  el('path', { d:arcPath(0,0,138,tachAng(0),tachAng(3.3)), fill:'none', stroke:'#1d4a8c', 'stroke-width':19, class:'tk', style:'opacity:.3' }, tachG); // the blue at the bottom of the band
+  el('circle', { r:110.5, fill:'none', stroke:'url(#annG)', 'stroke-width':35 }, tachG);
+  {
+    const a0 = tachAng(9), a1 = tachAng(10), p = (r, a) => polar(0,0,r,a).map(v => v.toFixed(2)).join(' ');
+    el('path', { d:`M${p(128,a0)} A128 128 0 0 1 ${p(128,a1)} L${p(93,a1)} A93 93 0 0 0 ${p(93,a0)} Z`, fill:'url(#redDots)' }, tachG);
+  }
+  el('circle', { r:92.5, fill:'url(#faceG)', stroke:'#5e6267', 'stroke-width':2 }, tachG);
+  const tp = el('g', { class:'print' }, tachG);
+  // fine graduations every 100 rpm, coloured as the photo shows them
+  const tickCol = k => k < 3 ? '#3f7fd6' : k < 4.3 ? '#3b3e43' : k < 9 ? `hsl(${(82 - 26*(k - 4.3)/4.7).toFixed(1)} 62% 52%)` : '#e4261c';
+  for(let i = 1; i < 100; i++) if(i % 10) dash(tp, tachAng(i/10), 136, 145, 1.7, 'tk').setAttribute('fill', tickCol(i/10));
+  for(let k = 0; k <= 8; k++) dash(tp, tachAng(k), 129, 145, 4.6);
+  // red field: the 9 and 10 lines and the arc along the band's outer edge
+  const rz = el('g', { class:'rz' }, tp);
+  [9, 10].forEach(k => dash(rz, tachAng(k), 127, 147, 3.2, ''));
+  el('path', { d:arcPath(0,0,146,tachAng(9),tachAng(10)), fill:'none', 'stroke-width':2.4 }, rz);
+  for(let k = 0; k <= TACH_MAX; k++){ const [x,y] = polar(0,0,111,tachAng(k)); num(tp, x, y, k, 24); }
+  num(tp, 0, 141, '1/min x 1000', 9.5);
+  el('text', { x:0, y:-36, 'text-anchor':'middle', class:'logo', 'font-size':25, transform:'scale(1.3 1)' }, tp).textContent = 'GT3 RS';
+  // the TFT inset: digital speed, and the PDK's P R N D (the active one red)
+  const tachScr = el('g', { class:'scr' }, tachG);
+  el('rect', { x:-24, y:44, width:48, height:30, rx:3, fill:'#0d1013' }, tachScr);
+  const dSpd = el('text', { x:0, y:69, 'text-anchor':'middle', class:'dig', 'font-size':30 }, tachScr);
+  dSpd.textContent = '0';
+  el('text', { x:0, y:87, 'text-anchor':'middle', class:'tft', 'font-size':12 }, tachScr).textContent = 'km/h';
+  const prnd = ['P','R','N','D'].map((c, i) => { const t = el('text', { x:33, y:47 + i*10, class:'prnd', 'font-size':10 }, tachScr); t.textContent = c; return t; });
+  const tachNdl = needle(tachG, 136, 36, 2.6, 1.2);
+  hub(tachG, 12.5);
+
+  /* ---------------- SPEEDOMETER (left screen) ---------------- */
+  const spdG = $('spd');
+  el('circle', { r:122, fill:'none', stroke:'#8d9297', 'stroke-width':3 }, spdG);
+  const sp = el('g', { class:'print' }, spdG);
+  for(let v = 0; v <= SPD_MAX; v += 10){
+    if(v % 50) dash(sp, spdAng(v), 110.5, 117.5, 2.6, 'mk-y');
+    else { dash(sp, spdAng(v), 106, 119, 3.2); const [x,y] = polar(0,0,92,spdAng(v)); num(sp, x, y, v, 16); }
+  }
+  { const [x,y] = polar(0,0,101,129); num(sp, x, y, 'km/h', 12, { transform:`rotate(-51 ${x.toFixed(1)} ${y.toFixed(1)})` }); }
+  // cruise control: its symbol under the hub, the set speed, and a marker on the ring
+  const ccG = el('g', { class:'cc', transform:'translate(0 47)' }, spdG);
+  el('path', { d:'M-9 3.5a9.5 9.5 0 1 1 18 0', fill:'none', 'stroke-width':1.8 }, ccG);
+  el('path', { d:'M0 2 L4.5 -5', fill:'none', 'stroke-width':1.8, 'stroke-linecap':'round' }, ccG);
+  const ccTxt = el('text', { y:21, 'text-anchor':'middle', 'font-size':13 }, ccG);
+  ccTxt.textContent = '– – –';
+  const ccMark = el('path', { d:'M0 -121 l-5.5 -9 h11 z', class:'cc-mark', visibility:'hidden' }, spdG);
+  const odoTrip = el('text', { x:2, y:93, 'text-anchor':'middle', class:'tft', 'font-size':14.5 }, spdG);
+  const odoTot = el('text', { x:2, y:110, 'text-anchor':'middle', class:'tft', 'font-size':14.5 }, spdG);
+  const spdNdl = needle(spdG, 103, 8, 2.8, 1.3);
+  hub(spdG, 11);
+
+  /* ---------------- "Vehicle" readouts (right screen) ---------------- */
+  const vehG = $('veh');
+  el('path', { d:arcPath(0,0,124,-136,136), fill:'none', stroke:'#8d9297', 'stroke-width':3 }, vehG); // open at the bottom for the mode
+  [[136,158],[202,224]].forEach(([a0,a1]) => el('path', { d:arcPath(0,0,124,a0,a1), fill:'none', stroke:'#e9c21b', 'stroke-width':4.5 }, vehG));
+  const modeTxt = el('text', { y:125, 'text-anchor':'middle', class:'tft', 'font-size':15, 'font-weight':600, 'letter-spacing':'.5' }, vehG);
+  const vehTitle = el('g', { id:'veh-title' }, vehG);
+  const vehT1 = el('text', { y:-69, 'text-anchor':'middle', class:'tft', 'font-size':16.5, 'font-weight':600 }, vehTitle);
+  const vehT2 = el('text', { y:-47, 'text-anchor':'middle', class:'tft', 'font-size':14, 'font-weight':500 }, vehTitle);
+  // each bar: its scale's cold (blue) / low (red) end and hot end marked, filled to the value
+  const vrow = {};
+  [['cool', -30, ICON.temp, '#4b9be0', '°C'], ['oilt', -1, ICON.oilT, '#4b9be0', '°C'], ['oilp', 28, ICON.oil, '#e0281e', 'bar'], ['batt', 57, ICON.batt, '#e0281e', 'V']]
+    .forEach(([key, y, icon, lo, unit]) => {
+      const g = el('g', { transform:`translate(0 ${y})` }, vehG);
+      el('g', { class:'vicon', transform:'translate(-96 -11) scale(.92)' }, g).innerHTML = icon;
+      el('rect', { x:-60, y:-3, width:70, height:6, fill:'#3a3e43' }, g);
+      const fill = el('rect', { x:-60, y:-3, width:0, height:6, fill:'#c2c7cd' }, g);
+      el('rect', { x:-60, y:-3, width:6, height:6, fill:lo }, g);
+      el('rect', { x:7, y:-3, width:3, height:6, fill:'#e0281e' }, g);
+      const val = el('text', { x:60, y:7, 'text-anchor':'end', class:'tft', 'font-size':19.5, 'font-weight':500 }, g);
+      el('text', { x:64, y:7, class:'tft', 'font-size':12 }, g).textContent = unit;
+      vrow[key] = { fill, val };
+    });
+  const setRow = (key, txt, f) => { const r = vrow[key]; if(r.val.textContent !== txt) r.val.textContent = txt; r.fill.setAttribute('width', (70*clamp01(f)).toFixed(1)); };
+
+  /* ---------------- coolant + fuel dial (right screen) ---------------- */
+  const TANK_SIZE_L = 64, RESERVE_L = 10;
+  const auxG = $('aux');
+  const cAng = c => (Math.max(60, Math.min(120, c)) - 90)*2; // 60 C at -60 deg, 90 at the top, 120 at +60
+  const fAng = f => 240 - clamp01(f)*120;                     // empty lower left, through the bottom, full lower right
+  el('circle', { r:100, fill:'none', stroke:'#8d9297', 'stroke-width':2.6 }, auxG);
+  el('path', { d:arcPath(0,0,89,-60,60), fill:'none', stroke:'#25282c', 'stroke-width':8 }, auxG);
+  el('path', { d:arcPath(0,0,89,240,120), fill:'none', stroke:'#25282c', 'stroke-width':8 }, auxG);
+  const coolFill = el('path', { fill:'none', stroke:'#a3a9af', 'stroke-width':8 }, auxG);
+  const fuelFill = el('path', { fill:'none', stroke:'#a3a9af', 'stroke-width':8 }, auxG);
+  el('path', { d:arcPath(0,0,89,240,fAng(RESERVE_L/TANK_SIZE_L)), fill:'none', stroke:'#d9261c', 'stroke-width':8 }, auxG);
+  [-60, 0, 60, 240, 180, 120].forEach(a => dash(auxG, a, 80, 97, 3));
+  [100, 110].forEach(c => dash(auxG, cAng(c), 86, 93, 2.6, 'mk-y'));
+  for(let i = 1; i < 8; i++) if(i !== 4) dash(auxG, fAng(i/8), 86, 93, 2.6, 'mk-y');
+  [['60', 66, -49], ['120', 66, 49], ['0', 70, 232], ['4/4', 64, 134]].forEach(([t, r, a]) => { const [x,y] = polar(0,0,r,a); num(auxG, x, y, t, 16); });
+  el('g', { class:'vicon', transform:'translate(-10 -70) scale(.85)' }, auxG).innerHTML = ICON.temp;
+  el('g', { class:'vicon', transform:'translate(-12 56) scale(.8)' }, auxG).innerHTML = ICON.fuel + '<path d="M22 13l4 3-4 3z" fill="currentColor"/>';
+  el('g', { class:'vicon', transform:'translate(-50 -11) scale(.9)' }, auxG).innerHTML = ICON.fuel;
+  const rangeCl = el('text', { x:-18, y:7, class:'tft', 'font-size':19.5, 'font-weight':500 }, auxG);
+
+  /* ---------------- side-panel live gauges: the speedometer in miniature ---------------- */
+  function miniGauge(svg, { max, step, labels, red, unit }){
+    const g = el('g', { transform:'translate(100 100)' }, svg);
+    const ang = v => -115 + clamp01(v/max)*230;
+    el('circle', { r:96, fill:'#060708' }, g);
+    el('circle', { r:88, fill:'none', stroke:'#8d9297', 'stroke-width':2.6 }, g);
+    if(red) el('path', { d:arcPath(0,0,82,ang(red),115), fill:'none', stroke:'#e0281e', 'stroke-width':3 }, g);
+    const p = el('g', { class:'print' }, g);
+    for(let v = 0; v <= max + 1e-6; v += step) dash(p, ang(v), 72, 85, 2.6);
+    for(let v = step/2; v < max; v += step) dash(p, ang(v), 77, 84, 2.2, 'mk-y');
+    labels.forEach(v => { const [x,y] = polar(0,0,57,ang(v)); num(p, x, y, v, 15); });
+    num(p, 0, 44, unit, 12);
+    const n = needle(g, 76, 6, 2.2, 1);
+    hub(g, 9);
+    return v => rot(n, ang(v));
+  }
+  // (their url(#...) fills resolve to the cluster SVG's gradients - one document, one id space)
+  const gaugeHp = miniGauge($('g-hp'), { max:600, step:100, labels:[0,200,400,600], unit:'hp' });
+  const gaugeTq = miniGauge($('g-tq'), { max:600, step:100, labels:[0,200,400,600], unit:'Nm' });
+  const gaugeCool = miniGauge($('g-cool'), { max:140, step:20, labels:[0,40,80,120], red:115, unit:'°C' });
+  const gaugeOilP = miniGauge($('g-oilp'), { max:8, step:1, labels:[0,2,4,6,8], unit:'bar' });
+  const sideLit = on => document.querySelector('.side-panel').classList.toggle('lit', on);
+
+  /* ================= SOUND ENGINE: 4.0 NATURALLY ASPIRATED FLAT-SIX =================
+     Built from the engine. The GT3's flat-six fires every 120 deg in the order 1-6-2-4-3-5, which alternates banks
+     every time (1-3 one side, 4-6 the other), so each bank breathes like an even-firing triple through its own
+     header (one pulse every 240 deg, the 1.5th order) and the two interleave into the 3rd-order howl: 43 Hz at an
+     850 rpm idle, 450 Hz at the 9,000 cut. The banks get different pipe delays, resonances and levels so the
+     1.5th-order rasp survives under the howl, as it does on the car.
+     The source is a stereo loop of that firing sequence (L / R = the two banks), rendered twice - soft part-load
+     pulses and hard full-load ones - from the same seed so both stay sample-locked; load crossfades between them.
+     playbackRate follows rpm, so the pulse train stays locked to the crank; everything that must not scale with rpm
+     (header and silencer resonances, the six throttle bodies, the muffler) sits after it as fixed filters. Rendered
+     at 3,000 rpm and band-limited, so 3x playback at the cut doesn't alias. */
+  let actx=null, masterGain, soundOn=true, noiseBuf=null;
+  const MASTER_BASE = 0.6;
+  const LOOP_RPM = 3000, LOOP_CYCLES = 72; // 72 four-stroke cycles (2.9 s) with jitter - never audibly repeats
+  let srcSoft, srcHard, softMix, hardMix, engineBus, limiterDepth;
+  let exhaustGain, exDrive, exPost, mufflerLP, howlEQ, bodyGain, intakeGain, intakeNoiseBP, mechGain;
+  let exhaustTrim, bodyTrim, intakeTrim, mechTrim, sapGain, sapTrim, sapOsc, starterGain, starterTrim, starterOsc, starterLfo;
+  let gearOsc1, gearOsc2, gearFilter, gearGain, gearTrim, shiftBus, popBus, turboGain, turboTrim, turboAirFilter, turboWhistles = [];
+  let limiterWasActive = false;
+  const layerVol = { fan:0.7, master:1, exhaust:1, body:1, intake:1, mech:1, sap:1, starter:1, gear:1, turbo:1, limiter:0.8, shiftFx:0.9, liftCrackle:0.7 };
+  let SND_HW = { ex:1, intake:1, turbo:0 }, BURBLE_TUNE = 1; // the fitted hardware's loudness and the map's overrun burble (car-tune.js)
+
+  const gainN = v => { const g = actx.createGain(); g.gain.value = v; return g; };
+  const biquad = (type, f, q, db) => { const b = actx.createBiquadFilter(); b.type = type; b.frequency.value = f; if(q != null) b.Q.value = q; if(db != null) b.gain.value = db; return b; };
+  const oscN = (type, f) => { const o = actx.createOscillator(); o.type = type; o.frequency.value = f; o.start(); return o; };
+  function makeDistortionCurve(amount){
+    const n = 2048, curve = new Float32Array(n), norm = Math.tanh(amount) || 1;
+    for(let i=0;i<n;i++){ const x = (i/(n-1))*2-1; curve[i] = Math.tanh(amount*x)/norm; }
+    return curve;
+  }
+  const shaperN = amount => { const s = actx.createWaveShaper(); s.curve = makeDistortionCurve(amount); s.oversample = '2x'; return s; };
+  function absShaper(){ const s = actx.createWaveShaper(), c = new Float32Array(1025); for(let i=0;i<1025;i++) c[i] = Math.abs(i/512 - 1); s.curve = c; return s; }
+  function noiseBuffer(sec){
+    const b = actx.createBuffer(1, Math.floor(actx.sampleRate*sec), actx.sampleRate), d = b.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+    return b;
+  }
+  const loopNoise = offset => { const s = actx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start(0, offset); return s; };
+  // small seeded PRNG: both loops draw the same timing / level sequence
+  function seeded(seed){ return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  function renderFlat6Loop(hard){
+    const sr = actx.sampleRate, cycleS = 120/LOOP_RPM, degS = cycleS/720;
+    const len = Math.round(sr*cycleS*LOOP_CYCLES);
+    const buf = actx.createBuffer(2, len, sr), L = buf.getChannelData(0), R = buf.getChannelData(1);
+    const ORDER = [1,6,2,4,3,5];
+    const CYL = [0, 1.00,0.97,1.03, 0.98,1.02,0.96]; // no two cylinders breathe quite alike
+    const rand = seeded(911), noise = seeded(hard ? 525 : 465);
+    // pulse attack / decay in crank degrees (so they sharpen with rpm via playbackRate); part load burns slower and
+    // softer, full load is a hard blowdown with turbulent gas riding the decay
+    const TAU = (hard ? 17 : 28)*degS, TAU_A = (hard ? 2.2 : 5)*degS, GRIT = hard ? 0.85 : 0.3, GRIT_LP = hard ? 0.26 : 0.12;
+    const n = Math.floor(TAU*9*sr);
+    for(let c=0;c<LOOP_CYCLES;c++){
+      const cyc = 0.94 + rand()*0.12; // cycle-to-cycle combustion spread
+      for(let k=0;k<6;k++){
+        const cyl = ORDER[k];
+        const t0 = (c + k/6)*cycleS + (rand() - 0.5)*0.7*degS;
+        const amp = CYL[cyl]*cyc*(0.9 + rand()*0.2), tau = TAU*(0.88 + rand()*0.24);
+        const ch = cyl <= 3 ? R : L, i0 = Math.floor(t0*sr);
+        let grit = 0;
+        for(let j=0;j<n;j++){
+          const t = j/sr, idx = ((i0 + j) % len + len) % len; // wraps: the loop seam is continuous
+          grit += GRIT_LP*((noise()*2 - 1) - grit);
+          // difference of exponentials (attack, blowdown decay), a slower negative rebound that cancels its DC
+          // (the scavenging dip), and the gas turbulence on the decay
+          ch[idx] += amp*(Math.exp(-t/tau) - Math.exp(-t/TAU_A) - 0.24*Math.exp(-t/(tau*2.5)) + GRIT*grit*Math.exp(-t/(tau*1.4)));
+        }
+      }
+    }
+    // DC out, 2-pole Butterworth at 7.5 kHz (band-limit for the fast playback), normalise
+    const w = 2*Math.PI*7500/sr, al = Math.sin(w)/(2*Math.SQRT1_2), cw = Math.cos(w), a0 = 1 + al;
+    const b0 = (1 - cw)/2/a0, b1 = (1 - cw)/a0, a1 = -2*cw/a0, a2 = (1 - al)/a0;
+    for(const ch of [L, R]){
+      let m = 0; for(let i=0;i<len;i++) m += ch[i]; m /= len;
+      let x1 = 0, x2 = 0, y1 = 0, y2 = 0, pk = 0;
+      for(let pass=0; pass<2; pass++) for(let i=0;i<len;i++){ // the first pass only settles the filter across the loop seam
+        const x = ch[i] - m, y = b0*x + b1*x1 + b0*x2 - a1*y1 - a2*y2; // lowpass: b2 = b0
+        x2 = x1; x1 = x; y2 = y1; y1 = y;
+        if(pass){ ch[i] = y; pk = Math.max(pk, Math.abs(y)); }
+      }
+      for(let i=0;i<len;i++) ch[i] *= 0.8/pk;
+    }
+    return buf;
+  }
+
+  function initAudio(){
+    if(actx) return;
+    actx = new (window.AudioContext||window.webkitAudioContext)();
+    masterGain = gainN(soundOn ? MASTER_BASE*layerVol.master : 0);
+    masterGain.connect(actx.destination);
+    noiseBuf = noiseBuffer(2);
+
+    // ---- radiator fans ----
+    fanFilter = biquad('bandpass', 300, 0.6); fanHum = oscN('triangle', 30);
+    fanGain = gainN(0); fanTrim = gainN(layerVol.fan);
+    loopNoise(0).connect(fanFilter).connect(fanGain);
+    fanHum.connect(gainN(0.15)).connect(fanGain);
+    fanGain.connect(fanTrim).connect(masterGain);
+
+    // ---- engine bus: every combustion layer meets here so the rev limiter's fuel cut chops them all at once ----
+    const comp = actx.createDynamicsCompressor();
+    comp.threshold.value = -10; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.003; comp.release.value = 0.15;
+    engineBus = gainN(1);
+    engineBus.connect(comp).connect(masterGain);
+    const limLFO = oscN('square', 15), limShaper = actx.createWaveShaper();
+    { const c = new Float32Array(256); for(let i=0;i<256;i++) c[i] = i < 128 ? -1 : 0; limShaper.curve = c; }
+    limiterDepth = gainN(0);
+    limLFO.connect(limShaper).connect(limiterDepth).connect(engineBus.gain);
+
+    // ---- the flat-six: soft + hard loops, sample-locked, crossfaded by load ----
+    const t0 = actx.currentTime + 0.05;
+    const mkSrc = hard => { const s = actx.createBufferSource(); s.buffer = renderFlat6Loop(hard); s.loop = true; s.playbackRate.value = 0.28; s.start(t0); return s; };
+    srcSoft = mkSrc(false); srcHard = mkSrc(true);
+    softMix = gainN(1); hardMix = gainN(0);
+    const srcBus = gainN(1);
+    srcSoft.connect(softMix).connect(srcBus); srcHard.connect(hardMix).connect(srcBus);
+    // banks: one header ~7 cm longer (0.2 ms) and resonating a little higher; each a little off centre
+    const split = actx.createChannelSplitter(2), banks = gainN(1.4);
+    [[0, -0.3, 0.0002, 560, 0.95], [1, 0.3, 0, 470, 1]].forEach(([ch, pan, delay, f, lvl]) => {
+      const d = actx.createDelay(0.01); d.delayTime.value = delay;
+      const p = actx.createStereoPanner(); p.pan.value = pan;
+      split.connect(d, ch); d.connect(biquad('peaking', f, 1.1, 2.5)).connect(gainN(lvl)).connect(p).connect(banks);
+    });
+    srcBus.connect(split);
+    const env = absShaper(); banks.connect(env); // the pulse train's envelope, shared by every gated noise layer
+
+    // exhaust: clean pulse tone + pulse-gated gas noise, through the silencer's echoes, the header / tailpipe
+    // resonances, the metallic howl band that opens up past 5,000, saturation by load, and the muffler lowpass
+    const exSum = gainN(1);
+    banks.connect(gainN(0.62)).connect(exSum);
+    const gasGate = gainN(0);
+    env.connect(biquad('lowpass', 520, 0.7)).connect(gasGate.gain);
+    loopNoise(1.1).connect(biquad('highpass', 60, 0.7)).connect(biquad('lowpass', 1100, 0.5)).connect(gasGate).connect(gainN(1.4)).connect(exSum);
+    const muffler = gainN(1.35); exSum.connect(muffler);
+    [[0.0027, 0.3], [0.0046, 0.24]].forEach(([d, fb]) => {
+      const dl = actx.createDelay(0.05); dl.delayTime.value = d;
+      const g = gainN(fb);
+      exSum.connect(dl).connect(biquad('lowpass', 1900, 0.7)).connect(g).connect(dl); // feedback loop
+      g.connect(muffler);
+    });
+    howlEQ = biquad('peaking', 2800, 1.5, 0);
+    exDrive = gainN(0.8); exPost = gainN(1);
+    mufflerLP = biquad('lowpass', 1500, 0.6);
+    exhaustGain = gainN(0.0001); exhaustTrim = gainN(layerVol.exhaust);
+    muffler.connect(biquad('peaking', 115, 0.9, 5)).connect(biquad('peaking', 820, 1.0, 3.5)).connect(howlEQ).connect(biquad('peaking', 5600, 0.8, -6))
+      .connect(gainN(0.5)).connect(exDrive).connect(shaperN(2.4)).connect(exPost).connect(exhaustTrim).connect(mufflerLP).connect(exhaustGain).connect(engineBus);
+
+    // body: the pulses below 160 Hz - the idle's lumpy thrum through the floor
+    bodyGain = gainN(0.0001); bodyTrim = gainN(layerVol.body);
+    banks.connect(biquad('lowpass', 160, 0.7)).connect(bodyGain).connect(bodyTrim).connect(engineBus);
+
+    // six individual throttle bodies right behind the cabin: the induction honk (runner + airbox resonances, driven
+    // a little) and the pulse-gated rush of air through them - opens with the throttle, shrieks at the top end
+    intakeGain = gainN(0.0001); intakeTrim = gainN(layerVol.intake);
+    banks.connect(biquad('highpass', 250, 0.7)).connect(biquad('peaking', 900, 1.3, 8)).connect(biquad('peaking', 2100, 2, 6))
+      .connect(gainN(0.6)).connect(shaperN(1.8)).connect(gainN(0.45)).connect(intakeGain);
+    intakeNoiseBP = biquad('bandpass', 1300, 0.9);
+    const inGate = gainN(0);
+    env.connect(biquad('lowpass', 320, 0.7)).connect(inGate.gain);
+    loopNoise(1.7).connect(intakeNoiseBP).connect(inGate).connect(gainN(1.4)).connect(intakeGain);
+    intakeGain.connect(intakeTrim).connect(engineBus);
+
+    // mechanical: injector / valvetrain tick, high noise gated by the sharp edge of each pulse
+    const mechGate = gainN(0);
+    env.connect(biquad('lowpass', 1500, 0.7)).connect(mechGate.gain);
+    loopNoise(0.4).connect(biquad('highpass', 3400, 0.7)).connect(mechGate);
+    mechGain = gainN(0.0001); mechTrim = gainN(layerVol.mech);
+    mechGate.connect(mechGain).connect(mechTrim).connect(engineBus);
+
+    // secondary-air pump: the electric blower whine of a cold start
+    sapGain = gainN(0); sapTrim = gainN(layerVol.sap);
+    loopNoise(0.9).connect(biquad('bandpass', 1350, 1.5)).connect(gainN(0.9)).connect(sapGain);
+    sapOsc = oscN('sawtooth', 300); sapOsc.connect(biquad('lowpass', 1600, 1)).connect(gainN(0.12)).connect(sapGain);
+    sapGain.connect(sapTrim).connect(masterGain);
+
+    // starter: motor whine pulsing with the compression strokes it's dragging round
+    starterGain = gainN(0); starterTrim = gainN(layerVol.starter);
+    const starterAmp = gainN(0.55);
+    starterOsc = oscN('sawtooth', 100); starterLfo = oscN('sine', 18);
+    starterLfo.connect(gainN(0.45)).connect(starterAmp.gain);
+    starterOsc.connect(biquad('bandpass', 700, 0.8)).connect(starterAmp);
+    loopNoise(0.2).connect(biquad('bandpass', 2400, 1.2)).connect(gainN(0.25)).connect(starterAmp);
+    starterAmp.connect(starterGain).connect(starterTrim).connect(masterGain);
+
+    // PDK gear whine on output-shaft speed
+    gearFilter = biquad('bandpass', 1200, 1.4);
+    gearGain = gainN(0.0001); gearTrim = gainN(layerVol.gear);
+    gearFilter.connect(gearGain).connect(gearTrim).connect(masterGain);
+    gearOsc1 = oscN('triangle', 500); gearOsc2 = oscN('triangle', 500.7);
+    gearOsc1.connect(gearFilter); gearOsc2.connect(gainN(0.4)).connect(gearFilter);
+
+    // turbo kit (Tuning > Parts): two compressor whistles a little apart plus the air rush - silent on the NA engine
+    turboGain = gainN(0.0001); turboTrim = gainN(layerVol.turbo);
+    turboGain.connect(turboTrim).connect(masterGain);
+    turboAirFilter = biquad('bandpass', 1800, 1.1);
+    loopNoise(0.3).connect(biquad('highpass', 900, 0.7)).connect(turboAirFilter).connect(gainN(1.6)).connect(turboGain);
+    turboWhistles = [1, 1.024].map(k => { const w = oscN('sine', 2200*k); w.connect(gainN(0.07)).connect(turboGain); return [w, k]; });
+
+    // one-shot buses (mixer-trimmable)
+    shiftBus = gainN(1); shiftBus.connect(masterGain);
+    popBus = gainN(1); popBus.connect(masterGain);
+
+    const trims = { exhaust:exhaustTrim, body:bodyTrim, intake:intakeTrim, mech:mechTrim, sap:sapTrim, starter:starterTrim, gear:gearTrim, turbo:turboTrim };
+    const setTrim = id => f => { layerVol[id] = f; if(trims[id]) trims[id].gain.setTargetAtTime(f, actx.currentTime, 0.03); };
+    CarService.attachAudio(actx, masterGain, { randomFaults: true });
+    if(window.EngineMixer) window.EngineMixer.register({
+      title: '4.0 Flat-Six',
+      layers: [
+        { id:'master',  label:'Master',              value:layerVol.master,  set:(f)=>{ layerVol.master=f; if(masterGain) masterGain.gain.setTargetAtTime(soundOn?MASTER_BASE*f:0, actx.currentTime, 0.03); } },
+        { id:'exhaust', label:'Flat-Six Exhaust',    value:layerVol.exhaust, set:setTrim('exhaust') },
+        { id:'body',    label:'Engine Body',         value:layerVol.body,    set:setTrim('body') },
+        { id:'intake',  label:'Throttle Bodies',     value:layerVol.intake,  set:setTrim('intake') },
+        { id:'mech',    label:'Valvetrain',          value:layerVol.mech,    set:setTrim('mech') },
+        { id:'sap',     label:'Secondary Air Pump',  value:layerVol.sap,     set:setTrim('sap') },
+        { id:'starter', label:'Starter',             value:layerVol.starter, set:setTrim('starter') },
+        { id:'gear',    label:'PDK Gear Whine',      value:layerVol.gear,    set:setTrim('gear') },
+        { id:'turbo',   label:'Turbo Kit',           value:layerVol.turbo,   set:setTrim('turbo') },
+        { id:'shiftFx', label:'PDK Shift / Blip',    value:layerVol.shiftFx, set:(f)=>{ layerVol.shiftFx=f; } },
+        { id:'limiter', label:'Rev Limiter',         value:layerVol.limiter, set:(f)=>{ layerVol.limiter=f; } },
+        { id:'liftCrackle',label:'Overrun Crackle',  value:layerVol.liftCrackle, set:(f)=>{ layerVol.liftCrackle=f; } },
+        { id:'fan',     label:'Radiator Fans',       value:layerVol.fan,     set:(f)=>{ layerVol.fan=f; fanTrim.gain.setTargetAtTime(f, actx.currentTime, 0.03); } },
+      ],
+    });
+  }
+
+  // load: delivered torque fraction 0..1; thr: the throttle bodies' opening; cranking: the starter is turning it
+  function updateSound(rpmK, on, load, thr, cranking){
+    if(!actx) return;
+    const t = actx.currentTime;
+    starterGain.gain.setTargetAtTime(cranking && soundOn ? 0.13 : 0, t, cranking ? 0.015 : 0.05);
+    if(cranking){ starterOsc.frequency.setTargetAtTime(95 + engineOnTime*60, t, 0.05); starterLfo.frequency.setTargetAtTime(Math.max(6, rpmK*1000*3/60), t, 0.05); }
+    if(!on || !soundOn){
+      [exhaustGain, bodyGain, intakeGain, mechGain, gearGain].forEach(g => g.gain.setTargetAtTime(0.0001, t, 0.16));
+      limiterDepth.gain.setTargetAtTime(0, t, 0.05); limiterWasActive = false;
+      return;
+    }
+    const rpm = Math.max(120, rpmK*1000), pr = rpm/LOOP_RPM;
+    srcSoft.playbackRate.setTargetAtTime(pr, t, 0.012);
+    srcHard.playbackRate.setTargetAtTime(pr, t, 0.012);
+    const rev = clamp01((rpm - 700)/8300);
+    const overrun = thr < 0.02 && rpm > 1300 && !cranking;
+    const hardK = cranking ? 0 : Math.pow(clamp01(load*1.1), 0.8);
+    softMix.gain.setTargetAtTime(1 - hardK*0.85, t, 0.04);
+    hardMix.gain.setTargetAtTime(hardK, t, 0.04);
+    const comb = cranking ? 0.22 : 1, ovr = overrun ? 0.55 : 1; // not caught yet: soft compression puffs
+    exhaustGain.gain.setTargetAtTime(comb*ovr*(0.12 + load*0.4 + rev*0.32)*SND_HW.ex, t, 0.05);
+    mufflerLP.frequency.setTargetAtTime(Math.min(9500, (overrun ? 750 : 1000) + rev*3900 + load*2800), t, 0.08);
+    howlEQ.gain.setTargetAtTime(-3 + 12*clamp01((rpm - 5000)/4000)*(0.35 + 0.65*load), t, 0.1);
+    const drive = 0.6 + load*0.9 + rev*0.3;
+    exDrive.gain.setTargetAtTime(drive, t, 0.05); exPost.gain.setTargetAtTime(0.9/drive, t, 0.05);
+    bodyGain.gain.setTargetAtTime(comb*ovr*(0.32 - rev*0.12)*(0.6 + load*0.6), t, 0.06);
+    intakeGain.gain.setTargetAtTime(comb*Math.min(0.28, 0.008 + thr*(0.045 + rev*0.22))*SND_HW.intake, t, 0.05);
+    intakeNoiseBP.frequency.setTargetAtTime(800 + rev*2300 + thr*500, t, 0.08);
+    mechGain.gain.setTargetAtTime(comb*(0.012 + rev*0.04), t, 0.08);
+
+    // gear whine: mesh pitch on road speed, loudest in the low gears under load
+    const inGear = gearIdx >= 0 && !shift, mesh = 300 + speed*7.5;
+    gearOsc1.frequency.setTargetAtTime(mesh, t, 0.06);
+    gearOsc2.frequency.setTargetAtTime(mesh*1.0014, t, 0.06);
+    gearFilter.frequency.setTargetAtTime(Math.min(4500, mesh*1.2), t, 0.08);
+    const gl = (inGear && speed > 2) ? Math.min(1, 0.3 + thr*0.7)*Math.max(0.15, 1 - gearIdx*0.12) : 0;
+    gearGain.gain.setTargetAtTime(Math.max(0.0001, gl*0.03), t, 0.1);
+
+    // rev limiter (9,000): the fuel cut chops the whole engine bus, with a bang as it's first hit
+    const limiterActive = limiterCut && thr > 0.05;
+    limiterDepth.gain.setTargetAtTime(limiterActive ? 0.85*layerVol.limiter : 0, t, 0.02);
+    if(limiterActive && !limiterWasActive) burst(t, 0.1, 320, 110, 1.1, 8, 0.25*layerVol.limiter);
+    limiterWasActive = limiterActive;
+  }
+  // the kit's twins: whistle pitch glides up with boost (lagging on the way up, coasting down for seconds after a lift)
+  let turboSpin = 0;
+  function updateTurboSound(boost, running, dt){
+    if(!actx) return;
+    const t = actx.currentTime, b = clamp01(boost/Math.max(0.3, BOOST_PEAK));
+    turboSpin += (b - turboSpin)*(1 - Math.exp(-dt/(b > turboSpin ? 0.15 : 2.0)));
+    const f = (2000 + clamp01((rpmK - 0.85)/8.15)*2400 + turboSpin*4200)*(running ? 1 : 0.05);
+    turboWhistles.forEach(([w, k]) => w.frequency.setTargetAtTime(f*k, t, 0.25));
+    turboAirFilter.frequency.setTargetAtTime(f*0.6, t, 0.12);
+    turboGain.gain.setTargetAtTime(soundOn ? Math.max(0.0001, Math.min(0.06, (running ? 0.004 : 0) + turboSpin*turboSpin*0.06)*SND_HW.turbo) : 0.0001, t, 0.08);
+  }
+  // a lift on boost: the kit's diverter valves vent - a soft "pssh"
+  function playRecirc(k){
+    if(!actx || !soundOn || layerVol.turbo <= 0.01) return;
+    const t = actx.currentTime, src = actx.createBufferSource(), f = biquad('bandpass', 3000, 0.9), g = gainN(0.0001);
+    src.buffer = noiseBuf;
+    f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(850, t + 0.36);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime((0.035 + k*0.09)*layerVol.turbo, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    src.connect(f).connect(g).connect(masterGain); src.start(t, Math.random()*1.5); src.stop(t + 0.45);
+  }
+  // secondary air: on for the first ~80 s of a cold start
+  function updateSap(on){
+    if(!actx) return;
+    const t = actx.currentTime;
+    sapGain.gain.setTargetAtTime(on && soundOn ? 0.05 : 0, t, on ? 0.4 : 0.8);
+    sapOsc.frequency.setTargetAtTime(on ? 300 + Math.sin(t*0.7)*6 : 120, t, on ? 0.5 : 1.2);
+  }
+
+  // distorted noise burst through a falling bandpass - pops, bangs, clunks
+  function burst(pt, dur, freq, endFreq, q, drive, peak, bus){
+    const src = actx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const shaper = shaperN(drive), filter = biquad('bandpass', freq, q);
+    filter.frequency.setValueAtTime(freq, pt);
+    filter.frequency.exponentialRampToValueAtTime(endFreq, pt + dur*0.9);
+    const g = gainN(0.0001);
+    src.connect(shaper).connect(filter).connect(g).connect(bus || popBus);
+    g.gain.setValueAtTime(0.0001, pt);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(0.6, peak)), pt + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, pt + dur);
+    src.start(pt, Math.random()*1.5); src.stop(pt + dur + 0.02);
+  }
+  // the second clutch taking up drive: barely a nudge in Normal, a firm thump in Track
+  function playShiftClunk(k){
+    if(!actx || !soundOn || layerVol.shiftFx <= 0.01) return;
+    const t = actx.currentTime + 0.005, v = layerVol.shiftFx;
+    burst(t, 0.06, 170, 70, 1.3, 2.5, 0.14*k*v, shiftBus);
+    burst(t + 0.004, 0.02, 2600, 1500, 2.5, 2, 0.035*k*v, shiftBus);
+  }
+  // downshift: the PDK's own throttle blip - a gasp through the open throttle bodies (the rpm flare itself is the engine sound)
+  function playBlip(rpmK){
+    if(!actx || !soundOn || layerVol.shiftFx <= 0.01) return;
+    const t = actx.currentTime, k = clamp01((rpmK - 1.5)/6.5)*layerVol.shiftFx;
+    burst(t, 0.12, 1700, 650, 0.9, 1.5, 0.05 + 0.07*k, shiftBus);
+  }
+  // full-load upshift: the ignition cut that lets the clutches hand over fires a short crack into the exhaust
+  function playUpshiftCrack(rpmAtShift, load){
+    if(!actx || !soundOn || layerVol.shiftFx <= 0.01) return;
+    const k = clamp01((rpmAtShift - 6)/2.5) * clamp01(load*1.3) * MODES[mode].crack;
+    if(k < 0.2) return;
+    const t = actx.currentTime;
+    burst(t, 0.07, 520, 140, 1.2, 9, 0.3*k*layerVol.shiftFx);
+  }
+
+  // radiator fans: as car-tune.js runs them - on 9C past the thermostat, off again 5C past it
+  let fanGain, fanTrim, fanFilter, fanHum, fanOn = false;
+  function updateFan(){
+    fanOn = ignition && coolantC > CarTune.tstat() + (fanOn ? 5 : 9);
+    if(!actx) return;
+    const t = actx.currentTime, tau = fanOn ? 0.7 : 1.6;
+    fanGain.gain.setTargetAtTime(fanOn ? 0.3 : 0, t, tau);
+    fanFilter.frequency.setTargetAtTime(fanOn ? 1100 : 300, t, tau);
+    fanHum.frequency.setTargetAtTime(fanOn ? 140 : 30, t, tau);
+  }
+
+  /* ================= STATE + PHYSICS: 992 GT3 RS - 525 hp / 465 Nm, 1,450 kg, 7-speed PDK, rear-drive ================= */
+  const throttleSlider = $('throttle'), throttleVal = $('throttle-val'), powerBtn = $('power-btn');
+
+  // 4.0 flat-six full-load curve: 465 Nm @ 6,300, 525 PS @ 8,500 (434 Nm), still 405 Nm at the 9,000 cut
+  const TORQUE_CURVE = [[0,0],[500,250],[900,320],[1500,355],[2000,375],[2500,390],[3000,400],[3500,410],[4000,425],[4500,440],[5000,448],[5500,455],[6300,465],[7000,462],[7500,455],[8000,447],[8500,434],[9000,405],[9300,370],[9600,320]];
+  function torqueAt(rpm){
+    for(let i=1;i<TORQUE_CURVE.length;i++){
+      const [r1,t1] = TORQUE_CURVE[i];
+      if(rpm <= r1){ const [r0,t0] = TORQUE_CURVE[i-1]; return t0 + (t1-t0)*(rpm-r0)/(r1-r0); }
+    }
+    return TORQUE_CURVE[TORQUE_CURVE.length-1][1];
+  }
+  const frictionAt = rpm => 22 + rpm*0.011; // Nm dragged on a closed throttle - engine braking
+  const MASS = 1450, WHEEL_R = 0.362; // DIN kerb weight; 335/30 ZR21 rear
+  // the stock figures; the tune (car-tune.js) hands over its own - ratios and final drive from its Gearbox map and parts
+  let GEAR_RATIOS = [3.75, 2.38, 1.72, 1.34, 1.11, 0.96, 0.84]; // 7-speed PDK, GT3 RS (short) ratios
+  const REVERSE_RATIO = 3.42, DRIVELINE_EFF = 0.88;
+  let FINAL_DRIVE = 4.27;
+  // the engine and its light flywheel spin up with the car: ~0.2 kg m^2 seen through the gearing (+390 kg in 1st), plus the wheels
+  const massEff = ratio => MASS + 40 + 0.2*Math.pow(ratio/WHEEL_R, 2);
+  const WHEEL_KMH_PER_KRPM = 2*Math.PI*WHEEL_R*60;
+  const kmhPerKrpm = g => WHEEL_KMH_PER_KRPM/(GEAR_RATIOS[g]*FINAL_DRIVE); // at 9,000: ≈ [77, 121, 167, 215, 259, 300, 342]
+  const CDA = 0.87, AIR_RHO = 1.225, ROLL_DECEL = 0.13; // the RS's wing and downforce cost drag: 296 km/h flat out
+  const BRAKE_DECEL = 12.5;  // PCCB-sized brakes on 275 / 335 Cup tyres
+  const GRIP_BASE = 11.0;    // what the 335 rears put down, m/s^2, with the engine over them
+  let GRIP = GRIP_BASE;      // cup tyres and suspension raise it, worn tyres lower it (car-tune.js)
+  const IDLE_RPMK = 0.85, STOCK_SHIFT_K = 8.85;
+  let REV_LIMIT_K = 9.0, LAUNCH_RPM_K = 5.8, SHIFT_K = STOCK_SHIFT_K, SHIFT_KS = [], SHIFT_DUR_MUL = 1; // per-gear upshifts, the TCU flash's shift speed
+  let BOOST_PEAK = 0, boostBar = 0, boostFrac = 0, recircCooldown = 0; // the map's peak boost: 0 until a turbo kit is fitted
+
+  // ---- drive modes (the rotary switch on the wheel): pedal map, how fast the PDK shifts and where D shifts.
+  // dip: how far the drive torque sags while the clutches hand over (a dual-clutch shift never opens the driveline) ----
+  const MODES = {
+    normal:{ name:'Normal', curve:1.3,  tau:0.075, rev:20, up0:2.1, up1:7.4,  coast:1.3, part:2.4, kd:0.92, liftUp:true,  dur:0.24, dip:0.28, crack:0.35, lift:0.15 },
+    sport: { name:'Sport',  curve:1.0,  tau:0.05,  rev:26, up0:3.2, up1:8.5,  coast:2.3, part:3.8, kd:0.86, liftUp:false, dur:0.15, dip:0.18, crack:0.75, lift:0.35 },
+    track: { name:'Track',  curve:0.85, tau:0.035, rev:30, up0:4.2, up1:8.85, coast:3.1, part:4.8, kd:0.80, liftUp:false, dur:0.10, dip:0.10, crack:1,    lift:0.5  },
+  };
+  const MODE_OPTS = Object.keys(MODES);
+
+  const dynoGraphWrap = $('dyno-graph-wrap');
+  // ---- telemetry mini-graphs ----
+  const TELE_HISTORY_LEN = 90, TELE_SAMPLE_EVERY = 6;
+  let teleFrameCounter = 0;
+  const teleHistory = { temp:[], cons:[], fuel:[], avgspeed:[], fuelused:[], egr:[], oil:[] };
+  const teleEls = {};
+  Object.keys(teleHistory).forEach(k => teleEls[k] = { line:$(`tele-${k}-line`), val:$(`tele-${k}-val`) });
+  function teleUpdateLine(key, minVal, maxVal){
+    const hist = teleHistory[key];
+    if(hist.length < 2){ teleEls[key].line.setAttribute('points',''); return; }
+    teleEls[key].line.setAttribute('points', hist.map((v,i)=>{
+      const x = 6 + (i/(TELE_HISTORY_LEN-1))*(194-6), y = 60 - clamp01((v-minVal)/(maxVal-minVal))*50;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' '));
+  }
+  function telePush(key, value){ const h = teleHistory[key]; h.push(value); if(h.length > TELE_HISTORY_LEN) h.shift(); }
+  const kwToHp = kw => kw/0.7355; // metric hp - 386 kW = 525 hp
+  CarDyno.init({ fuel:'petrol', turbo:false, rpmMax:9400, hpMax:525, tqMax:465 });
+  const dynoToggleBtn = $('dyno-toggle-btn'), dynoPanel = document.querySelector('.dyno-panel');
+  function setDynoOpen(open){
+    dynoPanel.classList.toggle('dyno-collapsed', !open);
+    dynoToggleBtn.classList.toggle('active', open);
+    if(open) dynoGraphWrap.classList.remove('dyno-hidden');
+  }
+  dynoToggleBtn.addEventListener('click', ()=> setDynoOpen(dynoPanel.classList.contains('dyno-collapsed')));
+  $('dyno-close-btn').addEventListener('click', ()=> setDynoOpen(false));
+  window.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !dynoPanel.classList.contains('dyno-collapsed')) setDynoOpen(false); });
+
+  const clusterEl = $('cluster'), brakeBtn = $('brake-btn'), muteBtn = $('mute-btn'), refuelBtn = $('refuel-btn');
+  const transPBtn = $('trans-p-btn'), transRBtn = $('trans-r-btn'), transNBtn = $('trans-n-btn'), transDBtn = $('trans-d-btn');
+  const shiftUpBtn = $('shift-up-btn'), shiftDownBtn = $('shift-down-btn'), psmBtn = $('psm-btn');
+  const fuelBarFill = $('fuel-bar-fill'), fuelPct = $('fuel-pct'), ledRpmTxt = $('led-rpm-txt'), ledSpeedTxt = $('led-speed-txt'), oilTxt = $('oil-txt');
+  const engTempReadout = $('engtemp-readout'), hpReadout = $('hp-readout'), tqReadout = $('tq-readout'), rangeTxt = $('range-txt'), clk = $('clk'), boostReadout = $('boost-readout');
+  const WL = {};
+  document.querySelectorAll('.warning-lights > .wl').forEach(w => { WL[w.id.replace('wl-','')] = w; w.dataset.base = w.className; });
+  const setWl = (k, cls) => { const w = WL[k], c = w.dataset.base + (cls ? ' ' + cls : ''); if(w.className !== c) w.className = c; };
+
+  const savedState = window.__CAR_STATE__ || {};
+  let ignition=false, braking=0, speed=0, engineOnTime=0;
+  let odometer = savedState.odometer ?? 1250.0, trip=0.0, tripFuelUsedL=0.0, fuelFrac = savedState.fuelLevel ?? 1.0;
+  let wearPct = savedState.wearPct ?? 0;
+  let coolantC = 20, oilC = 20, overheatBuildup = 0, egrC = 23, oilPressureBar = 0, battV = 12.5, sapUntil = 0;
+  let torqueReq = 0, loadFrac = 0, dispHp = 0, dispTq = 0, dispConsumption = 0;
+  let rpmK = 0, gearIdx = -1, transmissionMode = 'P', pdkMode = 'D', shift = null, shiftCooldown = 0;
+  let zeroThrottleTime = 0, throttleTrend = 0, limiterCut = false;
+  const CRANK_S = 0.6, FLARE_S = 1.2;
+
+  // ---- headlights ----
+  const lightsBtn = $('lights-btn'), highBeamBtn = $('highbeam-btn');
+  let lightsOn = false, highBeamOn = false;
+  function setLights(on, high){
+    lightsOn = on; highBeamOn = on && high;
+    lightsBtn.classList.toggle('active', lightsOn);
+    highBeamBtn.classList.toggle('active', highBeamOn);
+  }
+  const toggleLights = ()=> setLights(!lightsOn, highBeamOn);
+  const toggleHighBeam = ()=> setLights(highBeamOn ? lightsOn : true, !highBeamOn);
+  lightsBtn.addEventListener('click', ()=>{ toggleLights(); lightsBtn.blur(); });
+  highBeamBtn.addEventListener('click', ()=>{ toggleHighBeam(); highBeamBtn.blur(); });
+
+  /* ---------------- messages: the "Vehicle" view's title lines carry them for a moment ---------------- */
+  let titleShown = null, upMsg = null, upMsgT = 0;
+  function flashMsg(l1, l2){ upMsg = [l1, l2 || '']; upMsgT = 2.4; }
+  function setTitle(l1, l2, cls){
+    const key = l1 + '|' + l2 + '|' + (cls || '');
+    if(key === titleShown) return;
+    titleShown = key;
+    vehT1.textContent = l1; vehT2.textContent = l2;
+    vehTitle.setAttribute('class', cls || '');
+  }
+
+  /* ---------------- settings: drive mode, PSM ---------------- */
+  let mode = 'normal', psm = 'on';
+  const PSM_NAME = { on:['PSM','On'], sport:['PSM Sport',''], off:['PSM','Off'] };
+  const modeBtns = [...document.querySelectorAll('#mode-seg button')];
+  function setMode(m, quiet){
+    mode = m;
+    modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+    modeTxt.textContent = MODES[m].name.toUpperCase();
+    $('spec-mode').textContent = MODES[m].name;
+    if(!quiet) flashMsg('Drive mode', MODES[m].name);
+  }
+  modeBtns.forEach(b => b.addEventListener('click', ()=>{ setMode(b.dataset.mode); b.blur(); }));
+  const cycleMode = dir => setMode(MODE_OPTS[(MODE_OPTS.indexOf(mode) + dir + MODE_OPTS.length) % MODE_OPTS.length]);
+  function setPsm(v, quiet){
+    psm = v;
+    psmBtn.classList.toggle('active', v !== 'on');
+    psmBtn.textContent = v === 'on' ? 'PSM' : v === 'sport' ? 'PSM Sport' : 'PSM Off';
+    if(!quiet) flashMsg(...PSM_NAME[v]);
+  }
+  const cyclePsm = ()=> setPsm(psm === 'on' ? 'sport' : psm === 'sport' ? 'off' : 'on');
+  psmBtn.addEventListener('click', ()=>{ cyclePsm(); psmBtn.blur(); });
+
+  // ---- the tune (car-tune.js): Map 1 / Map 2 are its calibration slots; a car without a saved tune has the stock map
+  // in 1 and Stage 1 in 2. Its Parts tab is where the turbo kit goes on ----
+  const mapBtns = [...document.querySelectorAll('#map-seg button')];
+  let currentMap = savedState.engineMap === 2 ? 2 : 1;
+  function setMap(n, quiet){
+    currentMap = n;
+    CarTune.setSlot(n);
+    if(!quiet) flashMsg('Map ' + n, CarTune.label(n).split(' · ')[0]);
+  }
+  function showMapNames(){
+    mapBtns.forEach(b => { const n = +b.dataset.map; b.classList.toggle('active', n === currentMap); b.title = `Map ${n}: ${CarTune.label(n)} (${n})`; });
+    $('spec-map').textContent = `Map ${currentMap} · ${CarTune.label(currentMap)}`;
+  }
+  mapBtns.forEach(b => b.addEventListener('click', ()=>{ setMap(+b.dataset.map); b.blur(); }));
+  CarTune.init({ engine:'GT3', torque:TORQUE_CURVE, rev:9000, shift:STOCK_SHIFT_K*1000, launch:5800, vmax:0, finalDrive:FINAL_DRIVE, gears:GEAR_RATIOS.slice(), wheelR:WHEEL_R,
+    slot: currentMap, slots: ['stock', 'stage1'], setMap:(n)=> setMap(n),
+    onChange(T){
+      REV_LIMIT_K = T.rev; SHIFT_K = T.shift; SHIFT_KS = T.shiftK; LAUNCH_RPM_K = T.launch; FINAL_DRIVE = T.finalDrive; GEAR_RATIOS = T.gears;
+      GRIP = GRIP_BASE*T.grip; SND_HW = T.sound; BURBLE_TUNE = T.burble; SHIFT_DUR_MUL = T.shiftCut[0]/0.22;
+      BOOST_PEAK = Math.max(0, ...[3, 4, 5, 6, 7, 8].map(k => CarTune.boostAt(k)));
+      showMapNames();
+    } });
+
+  // ---- traction + launch control ----
+  // Porsche's procedure: Sport or Track, in D or M, left foot hard on the brake, floor the throttle (the revs hold
+  // and "Launch Control" comes up), then let the brake go.
+  let tcIntervening = false, wheelspinK = 0, tcSlipK = 0, launchState = 'idle';
+  const launchReady = () => ignition && engineOnTime > CRANK_S && (transmissionMode === 'D' || transmissionMode === 'M') && mode !== 'normal' && gearIdx === 0;
+  function updateLaunch(pedalRaw){
+    tcIntervening = false; wheelspinK = 0; tcSlipK = 0;
+    if(launchState === 'idle'){ if(launchReady() && speed < 1 && braking >= 50 && pedalRaw >= 0.95) launchState = 'armed'; }
+    else if(launchState === 'armed'){ if(!launchReady() || pedalRaw < 0.9) launchState = 'idle'; else if(braking < 5) launchState = 'go'; }
+    else if(pedalRaw < 0.5 || braking > 30 || speed > 70 || gearIdx !== 0 || !ignition) launchState = 'idle';
+  }
+  // drive accel (m/s^2) the tyres can use: PSM cuts the excess, PSM Sport lets it slide (tightening toward PSM
+  // with speed, identical from ~200 km/h), off lets it all spin
+  function applyTraction(a){
+    if(launchState === 'armed') return 0;
+    if(a <= GRIP) return a;
+    if(launchState === 'go'){ tcSlipK = 0.3; return GRIP*1.02; }
+    const sportK = psm === 'sport' ? clamp01(1 - speed/200) : 0;
+    if(psm === 'on' || (psm === 'sport' && sportK < 0.05)){ tcIntervening = true; tcSlipK = Math.min(0.3, (a-GRIP)/GRIP); return GRIP*0.96; }
+    if(psm === 'sport'){ wheelspinK = Math.min(0.7*sportK, (a-GRIP)/GRIP*0.9); if(a > GRIP*(1 + 0.3*sportK)) tcIntervening = true; return GRIP*0.98; }
+    wheelspinK = Math.min(1.8, (a-GRIP)/GRIP*2.6);
+    return GRIP*0.92;
+  }
+
+  // ---- overrun: a lift from load at high revs puts a little fuel into a hot exhaust - a few pops in Normal,
+  // more in Sport and Track ----
+  let liftLoad = 0, liftArmed = false, liftCooldown = 0, overrunT = -1;
+  function updateLiftCrackle(req, dt){
+    const chance = Math.min(1, MODES[mode].lift*BURBLE_TUNE); // the map's burble setting: off, stock, more, most
+    liftLoad = Math.max(req*Math.min(1, rpmK/7.5), liftLoad - dt*1.5);
+    liftCooldown = Math.max(0, liftCooldown - dt);
+    if(req >= 0.15) liftArmed = true;
+    if(ignition && liftArmed && req < 0.08){
+      liftArmed = false;
+      if(liftLoad >= 0.55 && rpmK > 5.5 && liftCooldown <= 0){ liftCooldown = 1.2; if(Math.random() < chance) playLiftCrackle(liftLoad); }
+      overrunT = (rpmK > 3.5 && Math.random() < chance) ? 0 : -1;
+    }
+    if(overrunT < 0) return;
+    overrunT += dt;
+    if(!ignition || req >= 0.08 || rpmK < 2 || overrunT > 4){ overrunT = -1; return; }
+    if(Math.random() < (1 + clamp01((rpmK - 2)/6.5)*4)*Math.exp(-overrunT/1.5)*dt) playBurble(clamp01((rpmK - 2)/6.5));
+  }
+  function playLiftCrackle(load){
+    if(!actx || !soundOn || layerVol.liftCrackle <= 0.01) return;
+    const t = actx.currentTime, amt = layerVol.liftCrackle, count = 3 + Math.floor(Math.random()*5);
+    for(let i=0;i<count;i++){
+      const pt = t + 0.05 + Math.random()*Math.random()*0.9, bang = Math.random() < 0.2;
+      burst(pt, bang ? 0.11 : 0.045, bang ? 300 + Math.random()*200 : 900 + Math.random()*1200, bang ? 100 : 220, bang ? 1.1 : 1.6, bang ? 9 : 6, (bang ? 0.3 : 0.16)*Math.max(0.6, load)*amt*(0.5 + Math.random()*0.5));
+    }
+  }
+  function playBurble(rpmF){
+    if(!actx || !soundOn || layerVol.liftCrackle <= 0.01) return;
+    const t = actx.currentTime;
+    burst(t, 0.045, 700 + rpmF*900 + Math.random()*500, 220, 1.6, 6, 0.1*(0.4 + 0.6*rpmF)*layerVol.liftCrackle*(0.5 + Math.random()*0.5));
+  }
+
+  // ---- fuel: 64 L tank, reserve at 10 L ----
+  const REFUEL_RATE = 0.12, PETROL_KG_PER_L = 0.745;
+  let refueling = false, rangeKm = 0, slowIn = 0;
+  let rangePrevF = 0, rangePrevK = null, rangeWinF = 0, rangeWinK = 0;
+  const gaugeFuelFrac = () => Math.max(0, fuelFrac*TANK_SIZE_L - RESERVE_L*0.35)/(TANK_SIZE_L - RESERVE_L*0.35);
+
+  function needleSpring(k){
+    let x = 0, v = 0; const c = 2*Math.sqrt(k);
+    return (target, dt, kNow = k) => { const cc = kNow === k ? c : 2*Math.sqrt(kNow); v += (kNow*(target - x) - cc*v)*dt; x += v*dt; return x; };
+  }
+  const speedSpring = needleSpring(90), tachSpring = needleSpring(300), fuelSpring = needleSpring(3);
+
+  powerBtn.addEventListener('click', ()=>{
+    if(!ignition && fuelFrac <= 0) return; // dry tank: it won't fire
+    ignition = !ignition;
+    powerBtn.classList.toggle('active', ignition);
+    clusterEl.classList.toggle('lit', ignition); sideLit(ignition);
+    if(ignition){
+      engineOnTime = 0;
+      initAudio();
+      if(actx.state === 'suspended') actx.resume();
+      sapUntil = coolantC < 45 ? 80 : 0;
+      CarService.holdMessages(3); // the bulb check first
+    } else shutDown();
+  });
+  function shutDown(){
+    ignition = false;
+    powerBtn.classList.remove('active');
+    clusterEl.classList.remove('lit'); sideLit(false);
+    throttleSlider.value = 0; throttleVal.textContent = '0%';
+    if(speed < 3) setTransmission('P'); else setTransmission('N'); // switching off, the PDK drops into P
+    shift = null; launchState = 'idle';
+    setCruise(false);
+  }
+  const SND_ON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M19.5 5.5a9 9 0 0 1 0 13"/></svg>';
+  const SND_OFF_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>';
+  muteBtn.innerHTML = SND_ON_ICON;
+  muteBtn.addEventListener('click', ()=>{
+    soundOn = !soundOn;
+    muteBtn.classList.toggle('muted', !soundOn);
+    muteBtn.innerHTML = soundOn ? SND_ON_ICON : SND_OFF_ICON;
+    muteBtn.blur();
+    if(masterGain) masterGain.gain.setTargetAtTime(soundOn ? MASTER_BASE*layerVol.master : 0, actx.currentTime, 0.05);
+  });
+  const setRefueling = on => { refueling = on && fuelFrac < 1; refuelBtn.classList.toggle('active', refueling); };
+  refuelBtn.style.touchAction = 'none';
+  refuelBtn.addEventListener('contextmenu', e => e.preventDefault());
+  refuelBtn.addEventListener('pointerdown', e => { refuelBtn.setPointerCapture(e.pointerId); setRefueling(true); });
+  ['pointerup','pointercancel','lostpointercapture','blur'].forEach(ev => refuelBtn.addEventListener(ev, () => setRefueling(false)));
+  refuelBtn.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); if(!e.repeat) setRefueling(true); } });
+  refuelBtn.addEventListener('keyup', e => { if(e.key === 'Enter') setRefueling(false); });
+
+  /* ---------------- PDK: selector, paddles ---------------- */
+  const isDrive = () => transmissionMode === 'D' || transmissionMode === 'M';
+  function syncSelector(){
+    transPBtn.classList.toggle('active', transmissionMode === 'P');
+    transRBtn.classList.toggle('active', transmissionMode === 'R');
+    transNBtn.classList.toggle('active', transmissionMode === 'N');
+    transDBtn.classList.toggle('active', isDrive());
+    transDBtn.textContent = pdkMode;
+  }
+  function setTransmission(m){
+    const wasDrive = isDrive();
+    transmissionMode = m === 'DM' ? pdkMode : m;
+    if(m === 'D' || m === 'M') pdkMode = m;
+    if(isDrive() && !wasDrive){ gearIdx = speed > 3 ? pickGearForSpeed(speed) : 0; if(ignition) playShiftClunk(0.4); }
+    if(!isDrive()){ if(gearIdx >= 0 && ignition && m === 'R') playShiftClunk(0.4); gearIdx = -1; shift = null; }
+    syncSelector();
+  }
+  function setPdkMode(m){ pdkMode = m; if(isDrive()) transmissionMode = m; syncSelector(); }
+  function pickGearForSpeed(spd){
+    for(let g=0; g<7; g++) if(spd/kmhPerKrpm(g) <= 5.5) return g;
+    return 6;
+  }
+  // engine speed locked to the wheels in gear g; pulling away in 1st / 2nd the clutch slips, holding the revs where
+  // it takes up drive (higher the harder you push) until the wheels catch up
+  function gearRpm(g, spd){
+    const wheel = spd/kmhPerKrpm(g), bite = idleK + 0.35 + torqueReq*2.3;
+    const slip = g <= 1 ? clamp01(1 - spd/(g === 0 ? 14 : 22)) : 0;
+    return bite > wheel ? wheel + (bite - wheel)*slip : wheel;
+  }
+  let idleK = IDLE_RPMK;
+  // a dual-clutch shift: the next gear is already engaged, the clutches hand over (drive only sags), and the revs
+  // fall to the new gear; down, the PDK blips them up to match
+  function shiftTo(g){
+    if(g === gearIdx || g < 0 || g > 6) return;
+    const up = g > gearIdx, md = MODES[mode];
+    if(up) playUpshiftCrack(rpmK, loadFrac); else playBlip(gearRpm(g, speed));
+    shift = { t:0, dur: (up ? md.dur : md.dur*0.9 + 0.03)*SHIFT_DUR_MUL, up, fromRpm: rpmK, dip: md.dip };
+    gearIdx = g;
+    shiftCooldown = shift.dur + 0.12;
+  }
+  const refuse = () => { if(!matchMedia('(prefers-reduced-motion: reduce)').matches) prnd[3].animate([{opacity:1},{opacity:.15},{opacity:1},{opacity:.15},{opacity:1}], {duration:500}); };
+  // paddles: in D a pull drops the box into M and shifts
+  function paddle(dir){
+    if(!ignition || transmissionMode === 'R' || transmissionMode === 'P') return;
+    // out of N, a paddle drops it into M in gear (1st standing)
+    if(transmissionMode === 'N'){ setTransmission('M'); return; }
+    if(transmissionMode === 'D') setPdkMode('M');
+    if(gearIdx < 0){ gearIdx = 0; return; }
+    const g = gearIdx + dir;
+    if(g < 0 || g > 6) return refuse();
+    const target = gearRpm(g, speed);
+    if(dir < 0 && target > REV_LIMIT_K - 0.1) return refuse(); // would over-rev: the box says no
+    if(dir > 0 && target < 1.0 && speed > 5) return refuse();  // would lug
+    shiftTo(g);
+  }
+  transDBtn.addEventListener('click', ()=>{ setTransmission(transmissionMode === 'D' ? 'M' : transmissionMode === 'M' ? 'D' : 'DM'); transDBtn.blur(); });
+  transNBtn.addEventListener('click', ()=>{ setTransmission('N'); transNBtn.blur(); });
+  const selectPark = ()=>{ if(speed < 3){ if(cruiseActive) setCruise(false); setTransmission('P'); } }; // the pawl only goes in near standstill
+  transPBtn.addEventListener('click', ()=>{ selectPark(); transPBtn.blur(); });
+  const selectReverse = ()=>{
+    if(!ignition) return;
+    if(transmissionMode === 'R') setTransmission('N');
+    else if(speed < 3){ if(cruiseActive) setCruise(false); setTransmission('R'); } // won't select R while rolling
+  };
+  transRBtn.addEventListener('click', ()=>{ selectReverse(); transRBtn.blur(); });
+  shiftUpBtn.addEventListener('click', ()=>{ paddle(1); shiftUpBtn.blur(); });
+  shiftDownBtn.addEventListener('click', ()=>{ paddle(-1); shiftDownBtn.blur(); });
+  brakeBtn.addEventListener('mousedown', ()=>{ if(cruiseActive) setCruise(false); mouseBrakeDown = true; startBrakeLoop(); });
+  brakeBtn.addEventListener('mouseup', ()=> mouseBrakeDown = false);
+  brakeBtn.addEventListener('mouseleave', ()=> mouseBrakeDown = false);
+  brakeBtn.addEventListener('touchstart', ()=>{ if(cruiseActive) setCruise(false); mouseBrakeDown = true; startBrakeLoop(); });
+  brakeBtn.addEventListener('touchend', ()=> mouseBrakeDown = false);
+  throttleSlider.addEventListener('input', ()=>{
+    throttleVal.textContent = Math.round(throttleSlider.value) + '%';
+    throttleSlider.style.setProperty('--pct', throttleSlider.value + '%');
+  });
+
+  const wearPctTxt = $('wear-pct'), wearBarFill = $('wear-bar-fill');
+  $('repair-btn').addEventListener('click', ()=>{ wearPct = 0; updateWearDisplay(); });
+  function updateWearDisplay(){
+    wearPctTxt.textContent = Math.round(wearPct) + '%';
+    wearBarFill.style.width = Math.min(100, wearPct) + '%';
+  }
+  updateWearDisplay();
+
+  // D: the shift decision for this frame (returns the gear to be in)
+  function autoGear(pedalRaw){
+    const dl = MODES[mode];
+    let g = gearIdx < 0 ? pickGearForSpeed(speed) : gearIdx;
+    if(shift || shiftCooldown > 0 || CarDyno.hold) return g;
+    const cur = Math.max(gearRpm(g, speed), rpmK);
+    // floored past the kickdown point: drop to the lowest gear that won't over-rev, blipping down
+    if(!CarDyno.on && pedalRaw >= dl.kd && pedalRaw - throttleTrend > 0.15 && g > 0){
+      for(let c=0; c<g; c++) if(gearRpm(c, speed) <= SHIFT_K - 0.6) return c;
+    }
+    const kick = pedalRaw >= 0.97, sk = SHIFT_KS[g] ?? SHIFT_K; // the Gearbox map's shift point for this gear
+    const upThr = Math.min(sk, kick ? sk : dl.up0 + torqueReq*(dl.up1*sk/STOCK_SHIFT_K - dl.up0));
+    if(torqueReq > 0.02 && cur >= upThr && g < 6) return g + 1;
+    if(torqueReq > 0.55 && cur < dl.part && g > 0 && gearRpm(g-1, speed) < upThr - 0.3) return g - 1;
+    if(dl.liftUp && zeroThrottleTime > 0.6 && !braking && g < 6 && gearRpm(g+1, speed) >= dl.coast + 0.6) return g + 1;
+    if(g > 0 && cur < dl.coast && (zeroThrottleTime > 0.3 || braking) && gearRpm(g-1, speed) < SHIFT_K - 0.8) return g - 1;
+    if(speed < 4 && g > 0) return 0;
+    return g;
+  }
+
+  let lastT = performance.now(), prndShown = null;
+  function frame(now){
+    const dt = Math.max(0, Math.min(0.05, (now - lastT)/1000)); // the first rAF stamp can predate lastT
+    lastT = now;
+
+    // ---- cruise control: PI controller on the pedal ----
+    if(cruiseActive){
+      if(!ignition || braking || !isDrive() || gearIdx < 0) setCruise(false);
+      else {
+        const error = cruiseTargetSpeed - speed;
+        cruiseIntegral = Math.max(-100, Math.min(100, cruiseIntegral + error*dt));
+        throttleSlider.value = Math.round(clamp01(error*0.04 + cruiseIntegral*0.01)*100);
+        throttleSlider.dispatchEvent(new Event('input'));
+      }
+    }
+
+    if(ignition) engineOnTime += dt;
+    const cranking = ignition && engineOnTime < CRANK_S;
+    const running = ignition && !cranking;
+    const pedalRaw = running ? parseFloat(throttleSlider.value)/100 : 0;
+    const md = MODES[mode];
+    torqueReq += (Math.pow(pedalRaw, md.curve) - torqueReq)*(1 - Math.exp(-dt/md.tau));
+    if(pedalRaw === 0 && torqueReq < 0.002) torqueReq = 0;
+    throttleTrend += (pedalRaw - throttleTrend)*Math.min(1, dt/0.4);
+    if(pedalRaw < 0.02) zeroThrottleTime += dt; else zeroThrottleTime = 0;
+    updateLaunch(pedalRaw);
+    updateLiftCrackle(torqueReq, dt);
+
+    // ---- warm-up: the dry-sump oil heats far slower than the coolant ----
+    const load01 = clamp01(loadFrac)*clamp01(rpmK/8.5);
+    if(running) oilC += ((92 + load01*25) - oilC)*(0.006 + 0.03*load01)*dt;
+    else oilC += (20 - oilC)*0.0004;
+    idleK = IDLE_RPMK + clamp01((60 - oilC)/40)*0.35; // ~1,200 rpm fast idle from cold, 850 warm
+
+    // ---- turbo kit (Tuning > Parts): the engine makes its own share of the tuned curve and the twins the rest once
+    // they've spooled; with none fitted boostAt is 0, nothing spools and the gauge reads manifold vacuum ----
+    const bMap = running ? CarTune.boostAt(Math.max(rpmK, idleK)) : 0; // the map here, capped by what the turbos can make
+    const naF = 1/(1 + Math.max(0, bMap));
+    const boostWant = bMap > 0.02 ? clamp01((torqueReq - naF)/(1 - naF)) : 0;
+    boostFrac += (boostWant - boostFrac)*(1 - Math.exp(-dt/(boostWant > boostFrac ? 0.35 : 0.12)));
+    const boostShown = !running ? 0 : torqueReq < naF ? -0.75*(1 - torqueReq/naF) : boostFrac*bMap;
+    boostBar += (boostShown - boostBar)*Math.min(1, dt*8);
+    updateTurboSound(boostBar, running, dt);
+    recircCooldown = Math.max(0, recircCooldown - dt);
+    if(running && throttleTrend > 0.55 && pedalRaw < 0.15 && boostBar > 0.4 && recircCooldown <= 0){ playRecirc(boostBar/Math.max(0.3, BOOST_PEAK)); recircCooldown = 0.6; }
+
+    // ---- engine torque: the curve x the tune x what the turbos deliver x the pedal; fuel cut at the rev limiter;
+    // the tune's own cuts (misfires, a speed limiter if it sets one) ----
+    const tune = CarTune.tick({ dt, ignition: running, rpm: Math.max(rpmK, idleK)*1000, pedal: torqueReq, boost: boostBar, speed, gear: gearIdx, coolant: coolantC,
+      fuelCut: pedalRaw < 0.02 && rpmK > idleK + 0.3 && gearIdx >= 0 && speed > 8 });
+    if(rpmK >= REV_LIMIT_K) limiterCut = true;
+    else if(rpmK < REV_LIMIT_K - 0.15) limiterCut = false;
+    let frac = Math.min(torqueReq, naF + (1 - naF)*boostFrac)*tune.cut;
+    if(limiterCut || !running) frac = 0;
+    const wearMul = 1 - (wearPct/100)*0.1, rpm = rpmK*1000;
+    const engineTq = running ? torqueAt(rpm)*tune.tqMul*frac*wearMul - frictionAt(rpm)*Math.max(0, 1 - frac/0.05) : 0;
+    loadFrac = frac;
+
+    // ---- drivetrain ----
+    if(shiftCooldown > 0) shiftCooldown = Math.max(0, shiftCooldown - dt);
+    let shiftMul = 1;
+    if(shift){
+      shift.t += dt;
+      const p = clamp01(shift.t/shift.dur);
+      shiftMul = 1 - shift.dip*Math.sin(p*Math.PI); // no gap in the drive, only a sag while the clutches hand over
+      if(p >= 1){ playShiftClunk(mode === 'track' ? 0.45 : mode === 'sport' ? 0.3 : 0.18); shift = null; }
+    }
+    const v = speed/3.6;
+    const dragA = (0.5*AIR_RHO*CDA*v*v)/MASS + (speed > 0.5 ? ROLL_DECEL : 0);
+    const inGear = gearIdx >= 0 && isDrive();
+    // off the pedal near idle the clutch simply opens (no creep)
+    const decoupled = inGear && !shift && launchState !== 'go' && (launchState === 'armed' || (pedalRaw < 0.02 && gearRpm(gearIdx, speed) < idleK + 0.15));
+    let a = 0;
+    if(inGear && !decoupled){
+      const ratio = GEAR_RATIOS[gearIdx]*FINAL_DRIVE;
+      a = engineTq*ratio*(engineTq > 0 ? DRIVELINE_EFF : 1)*shiftMul/WHEEL_R/massEff(ratio);
+      if(a > 0 && !braking) a = applyTraction(a);
+    } else if(transmissionMode === 'R' && running && pedalRaw > 0.02){
+      const wheelF = Math.max(0, engineTq)*REVERSE_RATIO*FINAL_DRIVE*DRIVELINE_EFF/WHEEL_R;
+      a = Math.min(3.5, wheelF/massEff(REVERSE_RATIO*FINAL_DRIVE))*clamp01(1 - speed/30);
+    }
+    if(braking) a = Math.min(a, 0) - BRAKE_DECEL*(braking/100)*CarService.brakeMul();
+    if(!running && !braking) a = Math.min(a, 0);
+    speed = Math.max(0, speed + (a - dragA)*3.6*dt); // no cap: drag and the rev limiter set the top speed
+    if((braking && speed < 0.3) || transmissionMode === 'P') speed = 0; // P: the parking pawl
+
+    // ---- gear selection ----
+    if(running && isDrive()){
+      if(transmissionMode === 'M'){
+        if(gearIdx < 0) gearIdx = speed > 3 ? pickGearForSpeed(speed) : 0;
+        else if(!shift && shiftCooldown <= 0){
+          if(speed < 4 && gearIdx > 0) shiftTo(gearIdx - 1); // rolling to a stop: steps down to 1st
+          else if(gearIdx > 0 && gearRpm(gearIdx, speed) < 1.15 && gearRpm(gearIdx-1, speed) < REV_LIMIT_K - 0.4) shiftTo(gearIdx - 1); // anti-stall
+        }
+      } else {
+        const g = autoGear(pedalRaw);
+        if(gearIdx < 0) gearIdx = g; else if(g !== gearIdx) shiftTo(g);
+      }
+    }
+
+    // ---- engine speed ----
+    const coupled = inGear && !decoupled && gearIdx >= 0;
+    let targetRpmK;
+    if(!ignition) targetRpmK = 0;
+    else if(cranking) targetRpmK = 0.22;
+    else {
+      const flareT = engineOnTime - CRANK_S, cold = clamp01((60 - oilC)/40);
+      const flare = flareT < FLARE_S ? (0.6 + 0.6*cold)*Math.pow(1 - flareT/FLARE_S, 2)*clamp01(flareT/0.1) : 0; // catches with a flare, bigger cold
+      if(coupled) targetRpmK = gearRpm(gearIdx, speed);
+      else if(transmissionMode === 'R' && pedalRaw > 0.02) targetRpmK = Math.max(idleK + torqueReq*1.8, speed*REVERSE_RATIO*FINAL_DRIVE/WHEEL_KMH_PER_KRPM);
+      else targetRpmK = limiterCut ? REV_LIMIT_K - 0.3 : idleK + torqueReq*(REV_LIMIT_K + 0.1 - idleK); // free-revving
+      if(!coupled || speed < 3) targetRpmK = Math.max(targetRpmK, idleK + flare);
+      if(launchState === 'armed') targetRpmK = LAUNCH_RPM_K;
+      if(launchState === 'go') targetRpmK = Math.max(targetRpmK, Math.min(LAUNCH_RPM_K + speed*0.03, REV_LIMIT_K));
+      if(launchState !== 'armed') targetRpmK += wheelspinK + tcSlipK*0.4;
+      if(coupled && limiterCut) targetRpmK = Math.min(targetRpmK, REV_LIMIT_K);
+    }
+    if(!ignition) rpmK = 0;
+    else if(shift){ // up: revs fall to the new gear as the clutches hand over; down: the blip carries them up to match
+      const p = clamp01(shift.t/shift.dur), e = shift.up ? 1 - Math.pow(1 - p, 2.2) : Math.sin(p*Math.PI/2);
+      rpmK = shift.fromRpm + (Math.max(targetRpmK, idleK) - shift.fromRpm)*e;
+    } else {
+      const rate = cranking ? 20 : coupled && speed > 3 ? 30 : (targetRpmK > rpmK ? md.rev : 5);
+      rpmK += (targetRpmK - rpmK)*(1 - Math.exp(-rate*dt));
+    }
+    rpmK = Math.max(0, Math.min(REV_LIMIT_K + 0.06, rpmK));
+
+    // ---- cluster ----
+    const gearStr = !ignition || !isDrive() ? transmissionMode : String(Math.max(0, gearIdx) + 1);
+    rot(spdNdl, spdAng(speedSpring(speed, dt)));
+    rot(tachNdl, tachAng(tachSpring(rpmK, dt)));
+    const spdStr = String(Math.round(speed));
+    if(dSpd.textContent !== spdStr) dSpd.textContent = spdStr;
+    const prndKey = transmissionMode + gearStr;
+    if(prndKey !== prndShown){
+      prndShown = prndKey;
+      const on = 'PRN'.includes(transmissionMode) ? 'PRN'.indexOf(transmissionMode) : 3;
+      prnd[3].textContent = isDrive() ? transmissionMode + gearStr : pdkMode;
+      prnd.forEach((t, i) => t.setAttribute('class', i === on ? 'prnd on' : 'prnd'));
+    }
+    ledRpmTxt.textContent = Math.round(rpmK*1000).toLocaleString('en-US');
+    ledSpeedTxt.textContent = Math.round(speed) + ' km/h';
+
+    // ---- fuel: BSFC on the power made, plus the pumping of a 4-litre six ----
+    const enginePowerKw = running ? Math.max(0, engineTq)*rpm/9549 : 0;
+    const loadShare = clamp01(enginePowerKw/Math.max(30, torqueAt(rpm)*rpm/9549));
+    const bsfc = 255 + 180*Math.pow(1 - loadShare, 2);
+    const fuelFlowLph = running ? (1.3*Math.pow(rpmK/IDLE_RPMK, 0.8) + enginePowerKw*bsfc/1000/PETROL_KG_PER_L*tune.fuelMul)*(1 + (wearPct/100)*0.06) : 0;
+    const consumptionL100 = !running ? 0 : speed < 2 ? Math.min(60, fuelFlowLph*0.5) : Math.min(60, fuelFlowLph/speed*100);
+    const inReserve = fuelFrac*TANK_SIZE_L <= RESERVE_L;
+    CarService.tick({ dt, speed, braking, slip: Math.max(wheelspinK, tcSlipK, launchState === 'go' ? 0.35 : 0), engineWear: wearPct, ignition, lowFuel: inReserve });
+    if(ignition){
+      odometer += speed*dt/3600;
+      trip += speed*dt/3600;
+      const litersUsed = fuelFlowLph*dt/3600;
+      fuelFrac = Math.max(0, fuelFrac - litersUsed/TANK_SIZE_L);
+      tripFuelUsedL += litersUsed;
+    }
+    if(refueling){ fuelFrac = Math.min(1, fuelFrac + REFUEL_RATE*dt); if(fuelFrac >= 1) setRefueling(false); }
+    const fuelShown = fuelSpring(ignition ? gaugeFuelFrac() : 0, dt); // heavily damped, as on the car
+    if(rangePrevK === null){ rangePrevF = tripFuelUsedL; rangePrevK = trip; }
+    const rangeDF = Math.max(0, tripFuelUsedL - rangePrevF), rangeDK = Math.max(0, trip - rangePrevK), rangeKeep = Math.exp(-rangeDK/3);
+    rangePrevF = tripFuelUsedL; rangePrevK = trip;
+    rangeWinF = rangeWinF*rangeKeep + rangeDF; rangeWinK = rangeWinK*rangeKeep + rangeDK;
+    const rangeL100 = rangeWinK > 0.3 ? Math.max(8, Math.min(60, rangeWinF/rangeWinK*100)) : trip > 1 ? Math.max(8, Math.min(60, tripFuelUsedL/trip*100)) : 13.4; // WLTP combined until the trip says otherwise
+    rangeKm = Math.max(0, fuelFrac*TANK_SIZE_L)/rangeL100*100;
+    fuelBarFill.style.width = (fuelFrac*100).toFixed(1) + '%';
+    fuelPct.textContent = Math.round(fuelFrac*TANK_SIZE_L) + ' L';
+    if(ignition && fuelFrac <= 0) shutDown(); // ran dry
+    dispConsumption = running ? dispConsumption + (consumptionL100 - dispConsumption)*0.035 : 0;
+
+    // ---- coolant: warms to 87C, heat-soaks toward 120C only when held on the limiter ----
+    const isCoastCooling = torqueReq < 0.05 && rpmK < 3.0 && speed > 15 && coolantC > 83;
+    if(ignition){
+      if(rpmK >= REV_LIMIT_K - 0.05) overheatBuildup = Math.min(1, overheatBuildup + dt*0.0034);
+      else overheatBuildup = Math.max(0, overheatBuildup - dt*(isCoastCooling ? 0.05 : 0.018));
+      const baseTarget = isCoastCooling ? 80 : 87;
+      const targetC = baseTarget + Math.max(0, (overheatBuildup - 0.18)/0.82)*(160 - baseTarget);
+      const idleRate = 0.0009, loadRate = (rpmK/9)*0.0035*1.3, coastRate = isCoastCooling ? 0.007 : 0;
+      const combustionHeat = Math.min(1, engineOnTime/3);
+      let approachRate;
+      if(targetC <= coolantC) approachRate = idleRate + loadRate + coastRate;
+      else if(coolantC < 86) approachRate = (idleRate + loadRate)*1.2*combustionHeat + coastRate;
+      else approachRate = idleRate*0.4 + 0.0009 + coastRate;
+      coolantC += (targetC - coolantC)*approachRate;
+    } else {
+      coolantC += (20 - coolantC)*0.0006;
+      overheatBuildup = Math.max(0, overheatBuildup - dt*0.003);
+    }
+    if(tune.coolant != null) coolantC = tune.coolant; // car-tune.js's cooling: heat from the fuel burned, out through the radiator, pump + thermostat
+    coolantC = Math.max(15, Math.min(170, coolantC));
+    updateFan();
+    updateSap(running && engineOnTime < sapUntil);
+    engTempReadout.textContent = '+' + coolantC.toFixed(1) + '°C';
+    oilTxt.textContent = '+' + oilC.toFixed(1) + '°C';
+
+    // ---- engine wear: overheating, and revving it hard while the oil is still cold ----
+    if(ignition){
+      const wearRate = Math.max(0, coolantC - 112)*0.01 + (oilC < 60 && rpmK > 7 ? 0.03 : 0) + tune.wear; // plus whatever the tune takes out of it
+      if(wearRate > 0){ wearPct = Math.min(100, wearPct + wearRate*CarService.oilMul()*dt); updateWearDisplay(); }
+    }
+
+    // ---- boost / EGT / oil pressure / battery ----
+    boostReadout.textContent = (boostBar >= 0 ? '+' : '') + boostBar.toFixed(2) + ' bar';
+    const egtTarget = running ? tune.egt : 23; // the tune's exhaust model: mixture, timing, boost
+    egrC += (egtTarget - egrC)*(running ? 0.03 : 0.01);
+    egrC = Math.max(23, Math.min(1000, egrC));
+    const oilTargetBar = running ? Math.min(6.5, (1.2 + rpmK*0.55 + Math.max(0, 60 - oilC)*0.02)*(1 - (wearPct/100)*0.3)*tune.oilPress) : 0; // a worn or uprated pump
+    oilPressureBar += (oilTargetBar - oilPressureBar)*(ignition ? 0.15 : 0.08);
+    battV += ((cranking ? 10.8 : running ? 13.6 + 0.3*clamp01((rpmK - 1)/3) : 12.4) - battV)*0.08;
+
+    // ---- live power / torque ----
+    const liveHp = kwToHp(enginePowerKw), liveTq = Math.max(0, engineTq); // the gauges pin at 600, the readouts and dyno read the real figure
+    if(!running){ dispHp = 0; dispTq = 0; }
+    else { dispHp += (liveHp - dispHp)*0.05; dispTq += (liveTq - dispTq)*0.05; }
+    gaugeHp(dispHp); gaugeTq(dispTq); gaugeCool(coolantC); gaugeOilP(oilPressureBar);
+    hpReadout.textContent = Math.round(dispHp) + ' hp';
+    tqReadout.textContent = Math.round(dispTq) + ' Nm';
+
+    CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: running, rpm, throttle: pedalRaw, hp: liveHp, tq: liveTq, gear: gearIdx,
+      gearLabel: isDrive() ? transmissionMode + gearStr : transmissionMode, speed, coolant: coolantC, boost: boostBar, egt: egrC, oil: oilC });
+
+    // ---- tell-tales: bulb check at terminal 15, then what the car reports ----
+    const bulb = ignition && engineOnTime < 2.2;
+    const overheating = coolantC > 112, oilLow = running && engineOnTime > 2 && oilPressureBar < 0.5;
+    setWl('airbag', bulb ? 'on-red' : '');
+    setWl('belt', bulb ? 'on-red' : '');
+    setWl('engine', bulb || (ignition && (wearPct > 50 || overheating || CarTune.warnLight())) ? 'on-amber' : '');
+    setWl('abs', bulb ? 'on-amber' : (ignition && braking > 60 && speed > 5) ? 'on-amber blink' : '');
+    setWl('brake', ignition && (bulb || transmissionMode === 'P') ? 'on-red' : '');
+    setWl('psm', bulb ? 'on-amber' : !ignition ? '' : tcIntervening ? 'on-amber blink' : psm === 'sport' ? 'on-amber' : '');
+    setWl('psmoff', ignition && (bulb || psm === 'off') ? 'on-amber' : '');
+    setWl('battery', ignition && (bulb || !running) ? 'on-red' : '');
+    setWl('oil', ignition && (bulb || !running || oilLow) ? 'on-red' : '');
+    setWl('temp', ignition && (bulb || overheating) ? 'on-red' : '');
+    setWl('fuel', ignition && (bulb || inReserve) ? 'on-amber' : '');
+    setWl('lighton', ignition && lightsOn ? 'on-green' : '');
+    setWl('highbeam', ignition && highBeamOn ? 'on-blue' : '');
+
+    // ---- "Vehicle" title: warnings first, then launch control, then any message ----
+    upMsgT = Math.max(0, upMsgT - dt);
+    if(oilLow) setTitle('Oil pressure', 'Stop engine!', 'tw-r blinkfx');
+    else if(overheating) setTitle('Coolant temp.', 'Stop engine!', 'tw-r blinkfx');
+    else if(launchState !== 'idle') setTitle('Launch Control', launchState === 'go' ? 'active' : 'ready', 'tw-g');
+    else if(upMsgT > 0) setTitle(upMsg[0], upMsg[1]);
+    else if(inReserve) setTitle('Fuel level', 'Reserve', 'tw-a');
+    else setTitle('Vehicle', 'Personalised');
+
+    // ---- the screens' slower readouts, four times a second ----
+    if((slowIn -= dt) <= 0){
+      slowIn = 0.25;
+      setRow('cool', coolantC.toFixed(0), (coolantC - 40)/90);
+      setRow('oilt', oilC.toFixed(0), (oilC - 40)/110);
+      setRow('oilp', oilPressureBar.toFixed(1), oilPressureBar/7);
+      setRow('batt', battV.toFixed(1), (battV - 9)/7);
+      coolFill.setAttribute('d', coolantC > 60.5 ? arcPath(0,0,89,-60,cAng(coolantC)) : '');
+      fuelFill.setAttribute('d', fuelShown > 0.005 ? arcPath(0,0,89,240,fAng(fuelShown)) : '');
+      const rng = `${Math.round(rangeKm)}<tspan font-size="13" dx="4">km</tspan>`;
+      if(rangeCl.innerHTML !== rng) rangeCl.innerHTML = rng;
+      rangeTxt.textContent = Math.round(rangeKm) + ' km';
+      const tr = `${trip.toFixed(1)}<tspan font-size="11"> km</tspan>`, to = `${Math.floor(odometer)}<tspan font-size="11"> km</tspan>`;
+      if(odoTrip.innerHTML !== tr) odoTrip.innerHTML = tr;
+      if(odoTot.innerHTML !== to) odoTot.innerHTML = to;
+      const d = new Date(), hm = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      if(clk.textContent !== hm) clk.textContent = hm;
+      ccG.classList.toggle('on', cruiseActive);
+      ccTxt.textContent = cruiseActive ? Math.round(cruiseTargetSpeed) + ' km/h' : '– – –';
+      ccMark.setAttribute('visibility', cruiseActive ? 'visible' : 'hidden');
+      if(cruiseActive) rot(ccMark, spdAng(cruiseTargetSpeed));
+    }
+
+    // ---- telemetry mini-graphs ----
+    if(++teleFrameCounter >= TELE_SAMPLE_EVERY){
+      teleFrameCounter = 0;
+      const avgSpeedKmh = engineOnTime > 1 ? trip*3600/engineOnTime : 0, fuelUsedL = (1 - fuelFrac)*TANK_SIZE_L;
+      const samples = { temp:[coolantC,0,140], cons:[dispConsumption,0,60], fuel:[fuelFrac*TANK_SIZE_L,0,TANK_SIZE_L],
+                        avgspeed:[avgSpeedKmh,0,SPD_MAX], fuelused:[fuelUsedL,0,TANK_SIZE_L], egr:[egrC,0,1000], oil:[oilPressureBar,0,7] };
+      for(const [k,[val,lo,hi]] of Object.entries(samples)){ telePush(k, val); teleUpdateLine(k, lo, hi); }
+      teleEls.temp.val.textContent = coolantC.toFixed(1) + '°C';
+      teleEls.cons.val.textContent = dispConsumption.toFixed(1) + ' L/100km';
+      teleEls.fuel.val.textContent = (fuelFrac*TANK_SIZE_L).toFixed(1) + ' L';
+      teleEls.avgspeed.val.textContent = Math.round(avgSpeedKmh) + ' km/h';
+      teleEls.fuelused.val.textContent = fuelUsedL.toFixed(1) + ' L';
+      teleEls.egr.val.textContent = Math.round(egrC) + '°C';
+      teleEls.oil.val.textContent = oilPressureBar.toFixed(1) + ' bar';
+    }
+
+    updateSound(rpmK, ignition, loadFrac, torqueReq, cranking);
+    requestAnimationFrame(frame);
+  }
+
+  /* ================= KEYBOARD CONTROLS =================
+     W ramps the throttle at 100%/s; S / Space / the brake button ramp the brakes */
+  let wDown = false, throttleKeyRAF = null, throttleKeyLastT = null;
+  const THROTTLE_KEY_RATE = 100;
+  function throttleKeyStep(now){
+    if(throttleKeyLastT === null) throttleKeyLastT = now;
+    const dt = (now - throttleKeyLastT)/1000;
+    throttleKeyLastT = now;
+    const target = wDown ? 100 : 0;
+    let current = parseFloat(throttleSlider.value);
+    if(current < target) current = Math.min(target, current + THROTTLE_KEY_RATE*dt);
+    else if(current > target) current = Math.max(target, current - THROTTLE_KEY_RATE*dt);
+    throttleSlider.value = current;
+    throttleSlider.dispatchEvent(new Event('input'));
+    if(wDown || current !== target) throttleKeyRAF = requestAnimationFrame(throttleKeyStep);
+    else { throttleKeyRAF = null; throttleKeyLastT = null; }
+  }
+  function startThrottleKeyLoop(){ if(throttleKeyRAF === null){ throttleKeyLastT = null; throttleKeyRAF = requestAnimationFrame(throttleKeyStep); } }
+  let sDown = false, spaceDown = false, mouseBrakeDown = false, brakeRAF = null, brakeLastT = null;
+  const BRAKE_RATE = 250;
+  function brakeStep(now){
+    if(brakeLastT === null) brakeLastT = now;
+    const dt = (now - brakeLastT)/1000;
+    brakeLastT = now;
+    const active = sDown || spaceDown || mouseBrakeDown, target = active ? 100 : 0;
+    if(braking < target) braking = Math.min(target, braking + BRAKE_RATE*dt);
+    else if(braking > target) braking = Math.max(target, braking - BRAKE_RATE*dt);
+    if(active || braking !== target) brakeRAF = requestAnimationFrame(brakeStep);
+    else { brakeRAF = null; brakeLastT = null; }
+  }
+  function startBrakeLoop(){ if(brakeRAF === null){ brakeLastT = null; brakeRAF = requestAnimationFrame(brakeStep); } }
+
+  // ---- cruise control: F sets it (above 30 km/h); braking, N / R / P or ignition off cancel it ----
+  let cruiseActive = false, cruiseTargetSpeed = 0, cruiseIntegral = 0;
+  function setCruise(active){ cruiseActive = active; cruiseIntegral = 0; if(active) cruiseTargetSpeed = speed; }
+
+  window.addEventListener('keydown', (e)=>{
+    if(e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
+    if(e.key === ' ' || e.code === 'Space') e.preventDefault();
+    if(e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    switch(e.key.toLowerCase()){
+      case 'i': powerBtn.click(); break;
+      case 'm': if(isDrive()) setPdkMode(pdkMode === 'D' ? 'M' : 'D'); else setTransmission('DM'); break;
+      case 'k': setTransmission('D'); break;
+      case 'g': cycleMode(e.shiftKey ? -1 : 1); break;
+      case '1': case '2': setMap(+e.key); break;
+      case 'n': setTransmission('N'); break;
+      case 'r': selectReverse(); break;
+      case 'p': selectPark(); break;
+      case 'q': case '-': case '_': paddle(-1); break;
+      case 'e': case '=': case '+': paddle(1); break;
+      case 't': cyclePsm(); break;
+      case 'l': toggleLights(); break;
+      case 'h': toggleHighBeam(); break;
+      case 'f':
+        if(!ignition) break;
+        if(cruiseActive) setCruise(false);
+        else if(speed > 30 && gearIdx >= 0) setCruise(true);
+        break;
+      case ',': case '<': if(cruiseActive) cruiseTargetSpeed = Math.max(30, cruiseTargetSpeed - 5); break;
+      case '.': case '>': if(cruiseActive) cruiseTargetSpeed = Math.min(SPD_MAX, cruiseTargetSpeed + 5); break;
+      case 'w': if(cruiseActive) setCruise(false); wDown = true; startThrottleKeyLoop(); break;
+      case 's': if(cruiseActive) setCruise(false); sDown = true; startBrakeLoop(); break;
+      case ' ': if(cruiseActive) setCruise(false); spaceDown = true; startBrakeLoop(); break;
+    }
+  });
+  window.addEventListener('keyup', (e)=>{
+    switch(e.key.toLowerCase()){
+      case 'w': wDown = false; throttleSlider.value = 0; throttleSlider.dispatchEvent(new Event('input')); break;
+      case 's': sDown = false; break;
+      case ' ': spaceDown = false; break;
+    }
+  });
+
+  // initial state - after every declaration above, since these touch most of them
+  setMode('normal', true); setPsm('on', true); syncSelector(); setTitle('Vehicle', 'Personalised');
+  rot(spdNdl, spdAng(0)); rot(tachNdl, tachAng(0));
+  gaugeHp(0); gaugeTq(0); gaugeCool(coolantC); gaugeOilP(0);
+  requestAnimationFrame(frame);
+
+  // autosave: periodically and on tab close; engine_map is the tune's slot (Map 1 / Map 2), the tune itself rides along
+  function currentSaveData(){
+    return { odometer, fuel_level: fuelFrac, engine_wear_pct: wearPct, engine_map: currentMap };
+  }
+  setInterval(()=> CarAPI.save(currentSaveData()), 10000);
+  window.addEventListener('pagehide', ()=> CarAPI.save(currentSaveData()));
+  window.saveCarState = ()=> CarAPI.save(currentSaveData());
+})();
+</script>
+</body>
+</html>

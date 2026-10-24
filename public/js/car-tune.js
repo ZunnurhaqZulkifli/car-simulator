@@ -247,6 +247,66 @@
             soi: [0, 1, 1.5, 2, 2, 2, 2, 2, 2], rail: s.rail.map((r) => Math.min(2050, r + 250)), smoke: 1.08, tq: 560, rev: 5200, shift: 4800, egr: false, dpf: false }) },
       ],
     },
+    // 911 GT3 RS (992): the 4.0 naturally aspirated flat-six, 13.3:1 and 9,000 rpm. Its "stock" turbo is none - no
+    // boost, so the boost map does nothing - and a twin-turbo kit goes on like any turbo upgrade; it only lives with
+    // low-compression internals, intercoolers and a lot more fuel. na: knock comes with load, not boost
+    GT3: {
+      fuel: 'petrol', name: '4.0 NA flat-six', cyl: 6, maxRpm: 9400, tstat: 92, na: true,
+      axis: [1000, 2000, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000],
+      boost: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      afr: [13.0, 12.9, 12.8, 12.8, 12.7, 12.7, 12.7, 12.6, 12.6, 12.6, 12.6, 12.5, 12.5, 12.5, 12.5],
+      // written for RON 98 (Porsche's spec): on 95 it's knock-limited around peak torque - a little less power
+      margin: [0.6, 0.4, 0, -0.2, -0.3, -0.3, -0.2, 0, 0.3, 0.6, 0.9, 1.1, 1.3, 1.4, 1.5],
+      cylMargin: [0, 0.2, -0.2, 0, -0.3, -0.4],
+      turboOpts: [['stock', 'None (NA)', 'Naturally aspirated through six throttle bodies: no turbo, so the boost map does nothing.', { sound: { turbo: 0 } }],
+        ['twin', 'Twin-turbo kit', 'A turbo per bank on new headers: ~1.2 bar from 5,000 rpm. Needs low-compression internals, intercoolers and far more fuel.'],
+        ['big', 'Big twin kit', 'Larger twins: ~1.65 bar and an enormous top end, but little below 4,500 rpm.', { sound: { turbo: 1.3 } }]],
+      turbos: {
+        stock: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        twin: [0.05, 0.25, 0.6, 0.85, 1.05, 1.15, 1.2, 1.2, 1.2, 1.15, 1.1, 1.05, 1.0, 0.95, 0.9],
+        big: [0, 0.1, 0.3, 0.5, 0.75, 1.0, 1.25, 1.45, 1.6, 1.65, 1.65, 1.6, 1.55, 1.5, 1.45],
+      },
+      krpm: { stock: 0, twin: 190, big: 160 },
+      tq: 465, rod: 700, trans: { name: 'PDK 7-speed', cap: 700, uprated: 900, built: 1100 },
+      // the parts that read wrong on an NA engine: a turbo build's plumbing isn't there until a kit is, and the tank
+      // holds Super Plus as delivered
+      swap: {
+        intercooler: { opts: [['stock', 'None', 'Nothing to cool on the NA engine. With a turbo kit the charge goes in straight off the compressors - hot.', { ic: 0, soak: 0 }],
+          ['kit', 'Kit cores', 'Air-to-air cores behind the rear intakes, as on a 911 Turbo: what a turbo build needs.', { ic: 0.8, soak: 6 }],
+          ['big', 'Big cores', 'Larger cores: cooler, steadier intake temps over repeated pulls.', { ic: 0.88, soak: 3 }]] },
+        chargepipe: { opts: [['stock', 'Kit pipes', 'The turbo kit\'s own silicone and plastic pipes (nothing on the NA engine): hard pulls on high boost fatigue them until one splits.'],
+          ['alu', 'Aluminium', 'Aluminium pipes and silicone couplers: hold any boost and barely age.', { cpWear: 0.08 }]] },
+        diverter: { opts: [['stock', 'Kit diaphragm', 'The turbo kit\'s diaphragm valves (nothing on the NA engine): high boost tears them and they bleed boost.'],
+          ['piston', 'Uprated piston', 'Billet piston valves: hold any boost, a crisper whoosh, practically never wear.', { dvWear: 0.1, sound: { turbo: 1.05 } }]] },
+        intake: { opts: [['stock', 'Stock', 'Carbon airbox feeding the six throttle bodies.'],
+          ['open', 'Race intake', 'Freer filter and a bigger plenum: +1.5% flow up top and a louder induction howl.', { flow: 0.015, iat: 1, sound: { intake: 1.3, turbo: 1.15 } }]] },
+        downpipe: { label: 'Headers & cats', opts: [['stock', 'Stock', 'Factory stainless headers with their catalysts.'],
+          ['sport', 'Sport cats', '200-cell cats: +2.5% flow and cooler exhaust - a turbo kit spools sooner.', { flow: 0.025, egt: -15, spool: -100, sound: { ex: 1.15, turbo: 1.1 } }],
+          ['catless', 'Race headers', 'Equal-length race headers, no cats: +4% flow, the loudest. Off-road only - the cat monitor flags P0420.', { flow: 0.04, egt: -25, spool: -150, sound: { ex: 1.3, turbo: 1.2 }, catless: true }]] },
+        fuel: { opts: [['98', 'RON 98', 'Super Plus: what Porsche specifies for the GT3, and what the stock map is written for.', { octane: 2, k: 1 }],
+          ['95', 'RON 95', 'Regular premium: allowed, but the stock map is knock-limited on it around peak torque - a little less power.', { octane: 0, k: 1 }],
+          ['102', 'RON 102', 'Race fuel: ~5° more margin than RON 95 - what a turbo build on the stock fuel system runs.', { octane: 5, k: 1 }],
+          ['e85', 'E85', 'Ethanol: ~9° more margin and a cooler charge, but ~40% more fuel flow than a turbo build\'s pumps can give.', { octane: 9, k: 1.4, iat: -6 }]] },
+      },
+      presets: [
+        { id: 'stock', name: 'Stock', desc: 'Factory GT3 RS calibration: 525 hp / 465 Nm, 9,000 rpm, no speed limiter.', needs: {}, make: (e, s) => s },
+        { id: 'stage1', name: 'Stage 1', desc: 'ECU flash with sport cats on RON 98: more timing up top and 9,200 rpm. ~545 hp / 480 Nm.', needs: { downpipe: ['sport', 'catless'], fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, timing: e.axis.map((r) => (r < 4000 ? 0.5 : 1.5)), rev: 9200, shift: 9050, tq: 490 }) },
+        { id: 'stage2', name: 'Stage 2', desc: 'Race headers and intake, fast-road cams on uprated springs and an alloy radiator, 9,400 rpm: ~585 hp / 515 Nm.',
+          needs: { downpipe: ['catless'], intake: ['open'], cams: ['fast', 'race'], springs: ['uprated', 'titanium'], radiator: ['alu', 'race'], fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, timing: e.axis.map((r) => (r < 4000 ? 0.5 : 1.5)), afr: add(s.afr, -0.1), rev: 9400, shift: 9250, tq: 540, dpf: false }) }, // cat monitor off for the race headers
+        { id: 'twin', name: 'Twin-turbo', desc: 'The twin-turbo kit at ~0.7 bar on RON 102: built low-compression engine, intercoolers, port injection, uprated pumps, gearbox packs and a race radiator. ~850 hp / 750 Nm.',
+          needs: { turbo: ['twin', 'big'], internals: ['built'], gasket: ['mls', 'oring'], intercooler: ['kit', 'big'], chargepipe: ['alu'], diverter: ['piston'],
+            injection: ['port'], hpfp: ['uprated'], lpfp: ['uprated'], fuel: ['102'], trans: ['uprated', 'built'], radiator: ['race'] },
+          make: (e, s) => ({ ...s, boost: e.turbos.twin.map((c) => +Math.min(0.7, c * 0.95).toFixed(2)), afr: e.axis.map((r) => (r < 3000 ? 12.6 : 11.7)),
+            tq: 850, rev: 8600, shift: 8400, shiftSpeed: 1 }) },
+        { id: 'bigtwin', name: 'Big twins', desc: 'The big twin kit at ~0.9 bar on RON 102 with everything built: ~960 hp / 850 Nm. Runs hot flat out even on the race radiator.',
+          needs: { turbo: ['big'], internals: ['built'], gasket: ['oring'], intercooler: ['big'], chargepipe: ['alu'], diverter: ['piston'],
+            injection: ['port'], hpfp: ['uprated'], lpfp: ['uprated'], fuel: ['102'], trans: ['built'], radiator: ['race'] },
+          make: (e, s) => ({ ...s, boost: e.turbos.big.map((c) => +Math.min(0.9, c * 0.95).toFixed(2)), afr: e.axis.map((r) => (r < 3000 ? 12.6 : 11.8)),
+            tq: 1050, rev: 8600, shift: 8400, shiftSpeed: 1 }) },
+      ],
+    },
   };
 
   // ================= part catalogue: what fits, and what each option changes =================
@@ -768,7 +828,8 @@
     if (spans.knock) flag('med', 'knock', `Knock-limited at ${r('knock')} on ${part('fuel') === 'e85' ? 'E85' : 'RON ' + part('fuel')}: the ECU will pull timing there.`);
     if (spans.smoke) flag('med', 'smoke', `Visible smoke at ${r('smoke')} (lambda under 1.08).`);
     if (spans.fuelLim) flag('info', 'fuelLim', `Fuel held back by the ${fx.inj && part('injectors') === 'stock' ? 'injectors / ' : ''}smoke limiter at ${r('fuelLim')}.`);
-    if (spans.cap) flag('info', 'cap', `Boost map above what the ${part('turbo')} turbo can make at ${r('cap')}.`);
+    if (spans.cap) flag('info', 'cap', E.na && part('turbo') === 'stock' ? 'The boost map does nothing without a turbo kit (Parts → Turbocharger).'
+      : `Boost map above what the ${part('turbo')} turbo can make at ${r('cap')}.`);
     if (spans.limiter) flag('info', 'limiter', `Torque limiter caps output at ${fmt(c.tq)} Nm (${r('limiter')}).`);
     const coolMax = ambient() + (peakFor(pts).hp * 0.7355 / TH.eta * TH.share + TH.idle) / (TH.ua * fx.radUA * Math.min(1, fx.wpFlow) * 1.6);
     if (coolMax > 108) flag('high', 'cool', `Cooling can't hold it flat out: ~${Math.round(coolMax)} °C at full power and speed - fit a bigger radiator (Parts → Cooling).`);
@@ -1106,7 +1167,7 @@
   function petrolTick(c, m, i, dt, firing, load, fuelCut) {
     const pedal = clamp01(i.pedal);
     knockLevel = ease(knockLevel, 6 + clamp01(i.rpm / (E.maxRpm * 0.95)) * 9 + Math.random() * 3, 0.25, dt);
-    const boosted = !fuelCut && pedal > 0.45 && i.boost > 0.2;
+    const boosted = !fuelCut && pedal > 0.45 && (i.boost > 0.2 || E.na); // an NA engine knocks on load alone
     let any = false;
     cyl.forEach((k, n) => {
       if (k.dead) return;
@@ -1225,7 +1286,7 @@
   function misfires(c, m, i, dt, firing, load, fuelCut) {
     if (fuelCut) return;
     missCool = Math.max(0, missCool - dt);
-    const ign = E.fuel === 'petrol' ? Math.pow(clamp01((wearOf('plugs') - 55) / 45), 2) * clamp01(i.boost / 1.2) * 0.05 +
+    const ign = E.fuel === 'petrol' ? Math.pow(clamp01((wearOf('plugs') - 55) / 45), 2) * clamp01(E.na ? load : i.boost / 1.2) * 0.05 +
       Math.pow(clamp01((wearOf('coils') - 60) / 40), 2) * 0.03 * load * fx.coilSpark + Math.pow(clamp01((wearOf('valves') - 80) / 20), 2) * 0.02 : 0;
     const inj = E.fuel === 'diesel' ? Math.pow(clamp01((wearOf('injectors') - 60) / 40), 2) * 0.03 : 0;
     const cold = E.fuel === 'diesel' && startCold && wearOf('glow') > 70 ? 0.04 : 0;
@@ -1537,6 +1598,7 @@
     api.on = true;
     api.fuel = E.fuel;
     P = [...PARTS[E.fuel](), ...(E.parts || []).map((p) => ({ ...p, opts: p.opts.map((o) => opt(...o)) }))]; // plus the engine's own (a hybrid's eDrive)
+    if (E.swap) P = P.map((p) => (E.swap[p.k] ? { ...p, label: E.swap[p.k].label || p.label, opts: E.swap[p.k].opts.map((o) => opt(...o)) } : p)); // its own wording of a part
     CURVE_DEF.boost.max = Math.max(2.8, Math.ceil(Math.max(...Object.values(E.turbos).flat()) * 2 + 0.6) / 2);
     Object.entries(E.curveMax || {}).forEach(([k, v]) => { CURVE_DEF[k].max = Math.max(CURVE_DEF[k].max, v); });
     stockCal = stockFor(c);
@@ -1599,13 +1661,17 @@
     // wearable parts join the Servicing tab and Diagnostics
     if (window.CarService && CarService.addPart) {
       WEAR[E.fuel].forEach((d) => {
-        const removed = () => (d.key === 'cat' && fx.catless) || (d.key === 'dpf' && !fx.dpf) || (d.key === 'egr' && fx.egrBlank) || (d.key === 'swirl' && fx.swirlBlank);
+        // a turbo build's plumbing on an NA engine: not there until the kit (or its intercoolers) is
+        const kit = E.na && ['turbo', 'chargepipe', 'diverter', 'intercooler'].includes(d.key);
+        const unfitted = () => kit && (part('turbo') === 'stock' || (d.key === 'intercooler' && part('intercooler') === 'stock'));
+        const removed = () => unfitted() || (d.key === 'cat' && fx.catless) || (d.key === 'dpf' && !fx.dpf) || (d.key === 'egr' && fx.egrBlank) || (d.key === 'swirl' && fx.swirlBlank);
+        const gone = () => (unfitted() ? 'Not fitted' : 'Removed');
         const p = CarService.addPart({
           key: 'tune-' + d.key, code: d.code, module: d.module || 'ECM', label: d.label, group: d.group, title: d.title, msg: d.msg,
           value: clamp(w[d.key] || 0, 0, 100),
           // Servicing shows wear, Diagnostics health (like the other parts); a removed part says so in both
-          read: d.removable ? (v) => (removed() ? 'Removed' : d.soot ? Math.round(v) + '% soot' : Math.round(v) + '%') : null,
-          diag: d.removable ? (v) => (removed() ? 'Removed' : d.soot ? Math.round(v) + '% soot' : Math.round(100 - v) + '%') : null,
+          read: d.removable || kit ? (v) => (removed() ? gone() : d.soot ? Math.round(v) + '% soot' : Math.round(v) + '%') : null,
+          diag: d.removable || kit ? (v) => (removed() ? gone() : d.soot ? Math.round(v) + '% soot' : Math.round(100 - v) + '%') : null,
           rate: () => { const v = removed() ? 0 : pending[d.key] || 0; pending[d.key] = 0; return v; },
           onService: d.key === 'pistons' ? () => rebuild('Blown engine rebuilt: new pistons, rods and bearings') :
             d.key === 'turbo' ? () => { if (limp === 'P0299') { limp = null; apply(); } } : null,
@@ -1947,7 +2013,7 @@
     document.head.appendChild(style);
     root = CarService.sections.tune;
     root.classList.add('ct');
-    mapKey = CURVES()[0];
+    mapKey = E.na ? 'timing' : CURVES()[0]; // an NA engine's boost map is flat at zero until a kit goes on
     root.innerHTML = `
       <div class="ct-head">
         <div><div class="cs-section-title">Tuning</div><div class="ct-eng">${esc(E.name)} · ${esc(E.trans.name)}</div></div>
@@ -1991,7 +2057,7 @@
     const c = ch, deg = (v) => (v >= 0 ? '+' : '') + v.toFixed(1) + '°';
     const egtW = (hot, max) => (c.egt > max ? 'bad' : c.egt > hot ? 'warn' : '');
     const common = () => [
-      ['TURBO', fmt(c.turbo) + 'k rpm', c.over > 0.3 ? 'bad' : c.over > 0.07 ? 'warn' : ''],
+      ['TURBO', E.na && part('turbo') === 'stock' ? 'NA' : fmt(c.turbo) + 'k rpm', c.over > 0.3 ? 'bad' : c.over > 0.07 ? 'warn' : ''],
       ['IAT', Math.round(c.iat) + '°C', c.iat > 65 ? 'bad' : c.iat > 50 ? 'warn' : ''],
     ];
     const rows = E.fuel === 'petrol' ? () => [...common(),

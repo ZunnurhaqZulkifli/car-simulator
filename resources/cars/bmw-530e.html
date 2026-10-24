@@ -1783,6 +1783,7 @@
     const popCount = 2 + Math.round(loadFactor*2); // 2-4 pops, more under harder load
     for(let i=0;i<popCount;i++){
       const pt = t + i*(0.02 + Math.random()*0.01); // tight, rapid-fire spacing
+      CarDyno.pop(pt - t, 0.5 + 0.5*loadFactor);
       const bufSize = Math.floor(actx.sampleRate * 0.1);
       const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
       const data = buf.getChannelData(0);
@@ -1816,6 +1817,7 @@
     const crackleCount = 3 + Math.floor(Math.random()*4); // 3-6 pops, randomised
     for(let i=0;i<crackleCount;i++){
       const pt = t + Math.random()*0.16; // scattered in time, not evenly spaced like the upshift pop
+      CarDyno.pop(pt - t, 0.5);
       const bufSize = Math.floor(actx.sampleRate * 0.07);
       const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
       const data = buf.getChannelData(0);
@@ -2027,6 +2029,7 @@
   }
   // one exhaust pop: distorted noise burst through a falling bandpass
   function liftPop(pt, bang, freq, peak){
+    CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5);
     const dur = bang ? 0.13 : 0.05;
     const bufSize = Math.floor(actx.sampleRate * dur);
     const buf = actx.createBuffer(1, bufSize, actx.sampleRate);

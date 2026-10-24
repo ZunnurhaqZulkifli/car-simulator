@@ -32,8 +32,8 @@
   #carpage { width: 1100px; height: 510px; border: 0; } /* the car page at a fixed width; the CSS3D layer places and scales it */
 </style>
 <script type="importmap">{ "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
 } }</script>
 </head>
 <body>
@@ -76,6 +76,7 @@ import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import NORDSCHLEIFE from './js/nordschleife.js';
 
 // The drivable cars (?car=, picked in the garage at home). Each runs on its own car page - engine, gearbox, gauges -
 // with a model of the same car as its body. A model's parts are found by matching "material|mesh|parent" names:
@@ -109,10 +110,11 @@ const CARS = {
     // its lights are layered so that no layer's glow shows through: a soft red glow is laid over each tail light instead
     tail: { overlay: true, keep: v => v.y > 0.75 && v.y < 1 && Math.abs(v.x) > 0.45 }, // the clusters at the rear corners
     lamps: { head: /LightEmissiveA_Material1\|/, tail: /LightEmissiveA_Material1\|/ },
-    exhaustX: 0.4,
+    exhaustX: 0.4, exhaustBoth: true, // tips both sides
   },
   m5: {
-    name: 'BMW M5 CS', page: 'bmw-m5-cs', model: '/models/bmw-m5-competition.glb', length: 4.983, wheelbase: 2.982, redline: 7200, grip: 2.3,
+    name: 'BMW M5 CS', page: 'bmw-m5-cs', model: '/models/bmw-m5-competition.glb', length: 4.983, wheelbase: 2.982, redline: 7200, 
+    grip: 2.3,
     credit: ['2021 BMW M5 Competition', 'https://sketchfab.com/3d-models/2021-bmw-m5-competition-29a4c13761cb40e6a050871bd40a0963'],
     glass: /^bMAT_Glass1\|(?!bSM_FrontKit)/, glassPlain: true, cabin: /\|(bD_Body|bSM_Interior)_/, // (not the headlight lenses)
     wheels: /Wheel1A_3D|\|bSM_(Hub|Disk)_/, tyre: /Wheel1A_3D/, // the calipers (bSM_Brake_) stay put
@@ -121,23 +123,24 @@ const CARS = {
     // one light material for every lamp: its rear half (tail lights, third brake light) glows
     tail: { re: /^bMAT_Lights1\|/, fromMap: true, idle: 0.25, brake: 6, keep: v => v.y > 0.8 }, // (signals: up in the clusters, not on the bumper)
     lamps: { head: /^bMAT_Lights1\|bSM_FrontKit/, tail: /^bMAT_Lights1\|bSM_RearKit/, mirror: /^bMAT_Lights1\|bANC_Door_[LR]_0[456]_/ },
-    exhaustX: 0.5,
+    exhaustX: 0.5, exhaustBoth: true, // tips both sides
   },
   m140: {
-    name: 'BMW M140i xDrive', page: 'bmw-140i', model: '/models/bmw-m140i.glb', length: 4.324, wheelbase: 2.69, redline: 7400, grip: 1.5,
+    name: 'BMW M140i xDrive', page: 'bmw-140i', model: '/models/bmw-m140i.glb', length: 4.324, wheelbase: 2.69, redline: 7400, 
+    grip: 1.8,
     credit: ['2018 BMW M140i', 'https://sketchfab.com/3d-models/2018-bmw-m140i-24f09cc46773424fb2a3922427f1c37d', 'by'],
     paint: /^iBody1\|/, glass: /^iGlass_Clear_Windshield1\|/, glassPlain: true, cabin: /^iInterior1\|/,
     wheels: /^(iRim1|iTyres1|iBreak1)\|/, tyre: /^iTyres1\|/, // the (blue) calipers stay put
     steering: { near: [-0.37, 0.86, 0.2] }, // its cabin has no steering wheel: the built one, here
     tail: { overlay: true }, // its lights are already full red, so they can't glow brighter: a red glow goes over them
     lamps: { head: /^iWhite_Glow1\|/, tail: /^iRed_Glow1\|/, mirror: /^iMirror1\|/ },
-    exhaustX: 0.5,
+    exhaustX: 0.5, exhaustBoth: true, // tips both sides
   },
   // a BeamNG car cut down to an M Sport 320d, its wheels, tyres and steering wheel fitted and its cabin's parts named cabin_
   f30: {
     name: 'BMW 320d', page: 'bmw-320d', model: '/models/bmw-320d-f30.glb', length: 4.633, wheelbase: 2.81, redline: 5500,
-    credit: ['BMW 3 Series MK6 (F30)', 'https://sketchfab.com/3d-models/bmw-3-series-mk6-f30-2011-2018-087efd9833714af2a68561bde9181985', 'by',
-      'DEMON_SCARY1235', 'https://sketchfab.com/szymonpasterczyk734'],
+    credit: ['BMW 3 Series MK6 (F30)', 'https://sketchfab.com/3d-models/bmw-3-series-mk6-f30-2011-2018-087efd9833714af2a68561bde9181985', 'by', 'DEMON_SCARY1235', 'https://sketchfab.com/szymonpasterczyk734'],
+    grip: 1.6,
     paint: /^F30paint\|/, paintColor: 0x1f3866, glass: /^F30_glass\|/, glassPlain: true, cabin: /\|cabin_/, // blue, like the garage photo
     wheels: /\|wheel_/, tyre: /^F30_tyre\|/,
     steering: { re: /\|cabin_steering$/, near: [-0.366, 0.777, 0.339], look: 0.2 }, // its dials sit high, over the rim
@@ -149,17 +152,30 @@ const CARS = {
   // cognac seats, and every part named by its role
   m550: {
     name: 'BMW M550d xDrive', page: 'bmw-550d-mk2', model: '/models/bmw-m550d-g30.glb', length: 4.963, wheelbase: 2.975, redline: 6200,
-    credit: ['BMW 5-Series Sedan (G30) LCI', 'https://sketchfab.com/3d-models/bmw-5-series-sedan-g30-lci-c2910a4e0d154f2ebdc41e6265eaaac3', 'by',
-      'Mona x Supercars', 'https://sketchfab.com/Car2022'],
+    credit: ['BMW 5-Series Sedan (G30) LCI', 'https://sketchfab.com/3d-models/bmw-5-series-sedan-g30-lci-c2910a4e0d154f2ebdc41e6265eaaac3', 'by', 'Mona x Supercars', 'https://sketchfab.com/Car2022'],
+    grip: 2.2,
     paint: /\|paint_(body|parts)\|/, paintColor: 0x403c38, glass: /\|glass\|/, glassPlain: true, cabin: /\|cabin_/, // dark graphite, like the garage photo
     wheels: /\|wheel_/, tyre: /\|wheel_tyre_\d\|/,
     steering: { re: /\|cabin_wheel\|/, near: [-0.395, 0.92, 0.385] }, // (it shares its mesh with the centre console)
     tail: { re: /\|tail_lights\|/, fromMap: true, idle: 0.25, brake: 6 },
     lamps: { head: /\|head_accents\|/, tail: /\|tail_lights\|/ },
-    exhaustX: 0.5,
+    exhaustX: 0.5, exhaustBoth: true, // tips both sides
+  },
+  // merged by material under shuffled names: turned nose-first, its parts named by role (the rest cabin_ - its outside
+  // trims in those meshes are symmetric, so mirroring them is harmless) and its rims blacked
+  e60: {
+    name: 'BMW M5 E60', page: 'bmw-m5-e60', model: '/models/bmw-m5-e60.glb', length: 4.855, wheelbase: 2.889, redline: 8250,
+    credit: ['BMW M5 (E60)', 'https://sketchfab.com/3d-models/bmw-m5-e60-02b103c91e0947cb940a769851e69dd6', 'by', 'GT Cars: Hyperspeed', 'https://sketchfab.com/Car2022'],
+    grip: 2.0,
+    paint: /\|paint_\d+\|/, paintColor: 0xf2f2ee, glass: /\|glass_1\|/, glassPlain: true, cabin: /\|cabin_/, // Alpine White
+    wheels: /\|wheel_/, tyre: /\|wheel_tyre_1\|/,
+    steering: { re: /\|cabin_/, near: [-0.377, 0.903, 0.45], look: 0.13 }, // spread over several meshes: found by its rim
+    tail: { overlay: true },
+    lamps: { head: /\|head_lights_1\|/, tail: /\|tail_lights_1\|/ },
+    exhaustX: 0.5, exhaustBoth: true, // tips both sides
   },
 };
-CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', page: 'bmw-530e', redline: 6500, paintColor: 0x1a3363 }; // the M550d's body, in blue like the garage photo
+CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', grip: 2.2, page: 'bmw-530e', redline: 6500, paintColor: 0x1a3363 }; // the M550d's body, in blue like the garage photo
 // ?car= takes a key above or the car page's slug (the main menu's Drive links); ?test_drive=1 runs the car page
 // without saving - for trying things out, the drive otherwise saves the car like its own page does
 const query = new URLSearchParams(location.search), TEST_DRIVE = query.has('test_drive');
@@ -211,8 +227,13 @@ function steerInput(cur, want, dt) {
   console.assert(s > 0.35 && s < 0.45, 'a 0.1 s tap should give about 40% of the lock', s);
 }
 
-// log depth: no flicker between road and paint far away; alpha: the cluster's "hole" lets the CSS3D layer below show
-const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, alpha: true });
+// reversed depth: no flicker between road and paint far away, and unlike log depth no depth written per pixel (that
+// made the GPU shade everything hidden behind the cabin; three r182: r183 on lights Lambert from scene.environment,
+// washing out the world); alpha: the cluster's "hole" lets the CSS3D layer below show
+const renderer = new THREE.WebGLRenderer({ antialias: true, reversedDepthBuffer: true, alpha: true });
+// r182 sorts see-through things by clip z, which reversed depth turns round (nearest first): the nearest faded smoke
+// puff's depth then blanked every denser one behind it. Sorted back to front again here
+renderer.setTransparentSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || a.z - b.z || a.id - b.id);
 renderer.setPixelRatio(devicePixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 Object.assign(renderer.domElement.style, { position: 'fixed', inset: '0', zIndex: 1 });
@@ -247,7 +268,7 @@ scene.add(sun);
 
 // The world: the autobahn top-speed oval and, east of it, a mountain loop, joined by a two-lane link road that leaves
 // the autobahn on the left (a keep-left exit) and runs out along a valley; a city between the links, a racetrack south
-// of the hills. Each road is a curve through control points, sampled every ~3 m into P (points) and L (left vectors);
+// of the hills and the Nürburgring Nordschleife in the hills north of them. Each road is a curve through control points, sampled every ~3 m into P (points) and L (left vectors);
 // offsets are metres from its centre line, + = left of travel.
 function makeRoad(points, closed, half, dip = 1.5) {
   const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x, y, z)), closed);
@@ -260,7 +281,7 @@ function makeRoad(points, closed, half, dip = 1.5) {
 }
 // autobahn: ~17.1 km, 3 lanes each way - two 4.8 km straights joined by 1.2 km-radius bends (~4 m/s² at 250 km/h).
 // Its eastern straight runs north along x 2000 from z -3600 (dead straight from -3300 to 900), past the second U-turn,
-// the fuel station, the valley road, the first U-turn and the direct road
+// the fuel stations, the valley road, its on-ramp, the first U-turn and the direct road
 const autobahnPts = [], BEND_R = 1200, XC = 2000 - BEND_R, Z0 = -3600, Z1 = Z0 + 4800; // the oval's middle: x XC
 for (const s of [1, -1]) { // a straight, then the bend after it
   for (let k = 0; k < 16; k++) autobahnPts.push([XC + s * BEND_R, 0, s > 0 ? Z0 + k * 300 : Z1 - k * 300]);
@@ -312,7 +333,14 @@ const nearestSample = (r, x, z) => {
 const UP = [[11.9, 0, -340], [16, 0, -280], [22, 0, -230], [26, 0, -190], [26, 1.2, -160], [26, 4, -120], [26, 6.4, -80], [26, 7.3, -45]];
 const uturn = (mid, dir) => Object.assign(makeRoad([...UP, ...Array.from({ length: 13 }, (_, k) => [26 * Math.cos(k * Math.PI / 12), 7.3, 26 * Math.sin(k * Math.PI / 12)]),
   ...UP.map(([o, y, z]) => [-o, y, z]).reverse()].map(([o, y, z]) => [2000 + dir * o, y, mid + dir * z]), false, 4.5, 0), { mid, dir });
-const UTURNS = [uturn(-600, 1), uturn(-3240, -1)];
+const UTURNS = [uturn(-150, 1), uturn(-3240, -1)];
+// the on-ramp, the way from home onto the autobahn: off the valley road's westbound lane at x 2480, a 324 m left-hander
+// round to alongside the northbound carriageway, then into its left lane - with the traffic going its way, 200 m
+// before the U-turn's slip road leaves for southbound. One lane
+const k1At = (x, o) => { const i = nearestSample(K1, x, -1232); return [K1.P[i].x + K1.L[i].x * o, 0, K1.P[i].z + K1.L[i].z * o]; };
+const ON = makeRoad([k1At(2480, -2.25), k1At(2430, -6), k1At(2390, -11),
+  ...Array.from({ length: 7 }, (_, k) => [2350 - 324 * Math.sin(k * Math.PI / 12), 0, -1222 + 324 * (1 - Math.cos(k * Math.PI / 12))]),
+  [2026, 0, -860], [2022, 0, -820], [2016, 0, -770], [2011.9, 0, -710], [2011.9, 0, -680]], false, 5, 0.05);
 // the village: old stone houses round a church square at 80 m, on flattened land in the middle of the mountain loop.
 // Winding country roads lead to it from three places on the loop: one through it from the second west hairpin to the
 // eastern valley (CR), one from its square down to the southern run (SL); a little lane loops round its upper end (VL)
@@ -401,9 +429,36 @@ const PL = makeRoad([[2730, 0, -2352], [2800, 0, -2362], [2870, 0, -2376], [2930
   [3730, 0, -2376], [3800, 0, -2362], [3870, 0, -2352]], false, 6, 0);
 const PG = makeRoad([[2990, 0, -2395], [3100, 0, -2395], [3210, 0, -2395]], false, 8, 0); // the garages' floors (not drawn)
 const PIT = { x: 3100, z: -2396 };
-const ROADS = [A, M, K1, K2, D, Y, V, S, ...STREETS, T, TR, PL, PG, ...UTURNS, CR, SL, VL];
+// the Nürburgring Nordschleife (js/nordschleife.js): the real 20.7 km lap, its climbs and drops too, in the hills north
+// of the mountains - 9.5 m of asphalt, grass verges and Armco either side (half: out past the Armco). Its pits are on
+// Döttinger Höhe, the long straight that ends the lap: the pit lane on its left, 22 m out (half: from the track's
+// verge to the garage doors), the twelve garages beside it, the team's (NR_PIT) across from the start / finish line
+// (RIG), and the Ring road in to the pit lane's top end from the mountain loop below the summit
+const NR = makeRoad(NORDSCHLEIFE, true, 8.5);
+const RIG = nearestSample(NR, 5000, 3200); // on the levelled stretch
+const nAt = (i, o) => [NR.P[i].x + NR.L[i].x * o, NR.P[i].y, NR.P[i].z + NR.L[i].z * o];
+const NPL = makeRoad([[-130, 3], [-115, 8], [-100, 16], [-85, 22], [-40, 22], [0, 22], [40, 22], [85, 22], [100, 16], [115, 8], [130, 3]]
+  .map(([k, o]) => nAt(RIG + k, o)), false, 13.5, 0.05);
+const NPG = makeRoad([-37, 0, 37].map(k => nAt(RIG + k, 37)), false, 8, 0.05); // the garages' floors (not drawn)
+const tNR = NR.curve.getTangentAt(RIG / NR.N);
+const NR_PIT = { x: NR.P[RIG].x + NR.L[RIG].x * 38, y: NR.P[RIG].y, z: NR.P[RIG].z + NR.L[RIG].z * 38, rot: Math.atan2(-tNR.z, tNR.x) }; // local +x along the lane
+const PITS = [{ ...PIT, rot: 0, at: 'pits' }, { ...NR_PIT, at: 'ring' }]; // the team's garages, each with its ?at= for a car swapped there
+const [njx, , njz] = nAt(RIG - 65, 22), NJ = nearestSample(NPL, njx, njz); // where the Ring road meets the pit lane
+const nplAt = o => [NPL.P[NJ].x + NPL.L[NJ].x * o, NPL.P[NJ].y, NPL.P[NJ].z + NPL.L[NJ].z * o];
+const NA = makeRoad([atM(4560, 1720), [4548, 295.5, 1780], [4545, 295, 1860], [4550, 294.5, 1960], [4580, 282, 2150], [4640, 262, 2450],
+  [4700, 242, 2750], [4760, 225, 3000], [4780, 215, 3150], nplAt(58), nplAt(28), nplAt(0)], false, 5.6);
+// roadside fuel stations and workshops, each on a flat apron straight out from the road's left (a fuel station's 46 m
+// deep and 40 wide, a workshop's 66 by 18): on the valley road past the track road, and on the Ring road by the loop
+const apron = (r, i, len, half) => makeRoad([0, 1, 2, 3].map(k => [r.P[i].x + r.L[i].x * len * k / 3, r.P[i].y, r.P[i].z + r.L[i].z * len * k / 3]), false, half, 0.05);
+const SIDE = [[K1, 3900, -1230, true], [K1, 4010, -1225, false], [NA, 4548, 1835, true], [NA, 4548, 1925, false]].map(([r, x, z, fuel]) => {
+  const i = nearestSample(r, x, z), half = fuel ? 20 : 9;
+  return { r, i, fuel, half, apron: apron(r, i, fuel ? 46 : 66, half) };
+});
+const ROADS = [A, M, K1, K2, D, Y, V, S, ...STREETS, T, TR, PL, PG, ...UTURNS, CR, SL, VL, ON, NR, NPL, NPG, NA, ...SIDE.map(p => p.apron)];
 
-const IS = nearestSample(A, 2000, -2650); // the fuel station's autobahn sample: 650 m past the start, on the keep-left side
+// the autobahn's fuel stations, [sample, side]: northbound 650 m past the start on its keep-left side, and southbound
+// 650 m further north
+const A_STATIONS = [[nearestSample(A, 2000, -2650), 1], [nearestSample(A, 2000, -2000), -1]];
 
 // Collisions: what stands in the car's way - walls, guardrails, buildings, posts, trees - kept as capsules (a segment
 // a-b and r round it; a = b for a post or a tree) standing from y0 to y1, in 40 m cells, each in every cell that a car
@@ -437,30 +492,30 @@ function strip(r, o1, y1, o2, y2, color, on = () => true) {
 }
 const dashed = i => i % 6 < 2; // 6 m dash, 12 m gap
 const paint = (r, o, w, on) => strip(r, o - w / 2, 0.02, o + w / 2, 0.02, 0xeeeeee, on);
-const nearStation = (i, m) => Math.abs(i - IS) <= m;
+const nearStation = (i, m, s) => A_STATIONS.some(([at, side]) => side === s && Math.abs(i - at) <= m);
 const awayFrom = (r, p, m) => i => Math.hypot(r.P[i].x - p.x, r.P[i].z - p.z) > m;
 // where something joins a road, the edge on that side opens - no line or guardrail within m of the spot
 const spot = (r, i, m) => ({ x: r.P[i].x, z: r.P[i].z, m });
 const opens = (r, spots) => (i, s) => spots.some(p => Math.hypot(r.P[i].x - p.x, r.P[i].z - p.z) < p.m &&
   Math.sign((p.x - r.P[i].x) * r.L[i].x + (p.z - r.P[i].z) * r.L[i].z) === s);
 
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(16000, 16000), new THREE.MeshLambertMaterial({ color: 0x5a7a4a }));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(24000, 24000), new THREE.MeshLambertMaterial({ color: 0x5a7a4a }));
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = -0.1; // just under the terrain, which takes over round the mountains
 scene.add(ground);
 
-// autobahn: asphalt, median wall, lines, guardrails - the outer one open at the fuel station and both exits, both
-// (and the hard shoulder lines) where the U-turns' slip roads leave and join
+// autobahn: asphalt, median wall, lines, guardrails - the outer ones open at the fuel stations, the northbound one at
+// both exits and the on-ramp too, both (and the hard shoulder lines) where the U-turns' slip roads leave and join
 strip(A, -16.75, 0.01, 16.75, 0.01, 0x3a3a3c);
 strip(A, 0, 0, 0, 0.9, 0xb0b0a8);
-strip(A, 16.75, 0.012, 46, 0.012, 0x4a4a4c, i => nearStation(i, 22)); // fuel station forecourt
-const exits = i => awayFrom(A, EXIT1, 280)(i) && awayFrom(A, EXIT2, 240)(i), slips = i => UTURNS.every(u => awayFrom(A, { x: 2000, z: u.mid - 280 * u.dir }, 70)(i));
+for (const [at, s] of A_STATIONS) strip(A, s * 16.75, 0.012, s * 46, 0.012, 0x4a4a4c, i => Math.abs(i - at) <= 22); // fuel station forecourts
+const exits = i => awayFrom(A, EXIT1, 280)(i) && awayFrom(A, EXIT2, 240)(i) && awayFrom(A, { x: 2017, z: -790 }, 110)(i), slips = i => UTURNS.every(u => awayFrom(A, { x: 2000, z: u.mid - 280 * u.dir }, 70)(i));
 for (const s of [1, -1]) {
   paint(A, s * 2.5, 0.3);           // inner edge line
   paint(A, s * 6.25, 0.15, dashed); // lane lines
   paint(A, s * 10, 0.15, dashed);
   paint(A, s * 13.75, 0.3, slips);  // hard shoulder line
-  strip(A, s * 17.5, 0, s * 17.5, 0.75, 0x9aa0a6, i => slips(i) && (s < 0 || (!nearStation(i, 24) && exits(i))));
+  strip(A, s * 17.5, 0, s * 17.5, 0.75, 0x9aa0a6, i => slips(i) && !nearStation(i, 24, s) && (s < 0 || exits(i)));
 }
 // the U-turns: asphalt, edge lines, parapets and the deck's edges (down to the ground where it's low) once clear of
 // the autobahn's carriageways, the deck's underside, and piers - every ~20 m, either side of the autobahn and in its
@@ -486,6 +541,20 @@ for (const U of UTURNS) {
   for (let i = 0; i < U.N; i += 7) if (U.P[i].y > 1.8 && Math.abs(U.P[i].x - 2000) > 22) pier(i);
   for (const o of [20, 0, -20]) pier(nearestSample(U, 2000 + o, U.mid + U.dir * Math.sqrt(26 ** 2 - o ** 2)));
 }
+// the on-ramp: asphalt, edge lines, gravel shoulders and guardrails - each edge's only once it's clear of the valley
+// road and the autobahn
+{
+  const apart = (i, s) => {
+    const x = ON.P[i].x + ON.L[i].x * s * 5, z = ON.P[i].z + ON.L[i].z * s * 5, k = K1.P[nearestSample(K1, x, z)];
+    return Math.hypot(k.x - x, k.z - z) > 7 && x > 2019;
+  };
+  strip(ON, -4.2, 0.013, 4.2, 0.013, 0x3a3a3c);
+  for (const s of [1, -1]) {
+    paint(ON, s * 3.6, 0.2, i => apart(i, s));
+    strip(ON, s * 4.2, 0.009, s * 5, 0.009, 0x77706a, i => apart(i, s));
+    strip(ON, s * 4.8, 0, s * 4.8, 0.75, 0x9aa0a6, i => apart(i, s));
+  }
+}
 // two-lane roads: dashed centre line, gravel shoulders, guardrails, and skirts down their edges into the ditch beside
 // them; open(i, side) says where an edge opens for a road joining it
 function twoLane(r, open = () => false, rails = () => true) {
@@ -498,13 +567,16 @@ function twoLane(r, open = () => false, rails = () => true) {
     strip(r, s * 5.2, 0, s * 5.2, 0.75, 0x9aa0a6, i => rails(i) && !open(i, s));
   }
 }
-twoLane(M, opens(M, [spot(K1, K1.N - 6, 24), spot(K2, 6, 24), spot(V, 5, 75), spot(CR, 6, 24), spot(CR, CR.N - 6, 24), spot(SL, SL.N - 6, 24)]));
+const sideSpots = r => SIDE.filter(p => p.r === r).map(p => spot(p.apron, 1, p.half + 4)); // its roadside aprons
+twoLane(M, opens(M, [spot(K1, K1.N - 6, 24), spot(K2, 6, 24), spot(V, 5, 75), spot(CR, 6, 24), spot(CR, CR.N - 6, 24), spot(SL, SL.N - 6, 24), spot(NA, 6, 24)]));
 // the links have no rails where they run over the autobahn or into the loop
-twoLane(K1, opens(K1, [spot(D, 3, 12), spot(S, 0, 14), spot(AV, 3, 12), spot(TR, 3, 12)]), i => K1.P[i].x > 2170 && awayFrom(K1, K1.P[K1.N], 25)(i));
+twoLane(K1, opens(K1, [spot(D, 3, 12), spot(S, 0, 14), spot(AV, 3, 12), spot(TR, 3, 12), spot(ON, 8, 60), ...sideSpots(K1)]), i => K1.P[i].x > 2170 && awayFrom(K1, K1.P[K1.N], 25)(i));
 twoLane(K2, opens(K2, [spot(AV, AV.N, 24)]), i => K2.P[i].x > 2170 && awayFrom(K2, K2.P[0], 25)(i));
 twoLane(TR, undefined, i => awayFrom(TR, TR.P[0], 15)(i) && awayFrom(TR, TR.P[TR.N], 50)(i));
 strip(D, -3, 0.011, 3, 0.011, 0x77746e); // concrete drive
 strip(S, -9, 0.011, 9, 0.011, 0x77746e); // the mechanic's apron
+twoLane(NA, opens(NA, sideSpots(NA)), i => awayFrom(NA, NA.P[0], 25)(i) && awayFrom(NA, NA.P[NA.N], 45)(i));
+for (const p of SIDE) strip(p.apron, -p.half, 0.012, p.half, 0.012, p.fuel ? 0x4a4a4c : 0x77746e, i => i >= 2); // the roadside aprons, from the road's edge
 // the viewpoint lay-by: asphalt, a stone wall along its edge, benches, a coin telescope and a sign
 strip(V, -8.5, 0.013, 8.5, 0.013, 0x45454a);
 strip(V, 8.5, 0, 8.5, 0.9, 0x8d8579);
@@ -697,6 +769,50 @@ for (const r of STREETS) {
   scene.add(lamp);
 }
 
+// a group at (x, y, z) turned rot about the vertical, in the scene: a site things are built on in its own axes
+const site = (x, y, z, rot) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; scene.add(g); return g; };
+const siteBox = (g, w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
+  b.position.set(x, y, z);
+  g.add(b);
+};
+// the start / finish line across a track w wide, its gantry and start lights, on a site at the line (local +x along
+// the track, +z to its right)
+function startLine(g, w) {
+  const flag = document.createElement('canvas'), fg = flag.getContext('2d');
+  flag.width = 2; flag.height = 14;
+  for (let a = 0; a < 2; a++) for (let b = 0; b < 14; b++) { fg.fillStyle = (a + b) % 2 ? '#111' : '#f4f4f4'; fg.fillRect(a, b, 1, 1); }
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(3, w).rotateX(-Math.PI / 2),
+    new THREE.MeshLambertMaterial({ map: Object.assign(new THREE.CanvasTexture(flag), { magFilter: THREE.NearestFilter, colorSpace: THREE.SRGBColorSpace }) }));
+  line.position.y = 0.022;
+  g.add(line);
+  for (const z of [-1, 1]) siteBox(g, 0.5, 7.5, 0.5, 0xd6d6d0, 0, 3.75, z * (w / 2 + 2.5)); // the gantry
+  siteBox(g, 1.2, 1.2, w + 5.5, 0x24272b, 0, 7.6, 0);
+  for (let k = -2; k <= 2; k++) siteBox(g, 0.1, 0.5, 0.5, 0x6a0000, -0.65, 7.6, k * 1.2, THREE.MeshBasicMaterial); // start lights
+}
+// twelve garages, 14 m wide, open to the pit lane 16 m in front of the team's (the site's origin; local +x along the
+// lane, +z towards it): the team's has its shutter up, a sign, a fuel rig and a tool chest, the rest are shut
+function pitGarages(g) {
+  const gBox = (...a) => siteBox(g, ...a);
+  gBox(168, 0.05, 16, 0x5e6266, -7, 0.02, 1);                             // floor
+  gBox(168.6, 6, 0.3, 0xe8e8e8, -7, 3, -7.2);                             // back wall
+  for (let k = 0; k <= 12; k++) gBox(0.3, 6, 16, 0xe8e8e8, -91 + 14 * k, 3, 1); // walls between
+  gBox(170, 0.4, 18, 0x3a3d42, -7, 6.2, 0.5);                             // roof
+  gBox(168.6, 1.4, 0.3, 0xe8e8e8, -7, 5.3, 9.1);                          // over the doors
+  for (let k = 0; k < 12; k++) if (k !== 6) gBox(13.4, 4.6, 0.15, 0x8a9099, -84 + 14 * k, 2.3, 8.9); // shutters
+  gBox(0.9, 1.9, 0.9, 0xd0302a, -5.2, 0.95, -4.5);                        // fuel rig
+  gBox(1.6, 1.1, 0.6, 0xc0392b, 5, 0.55, -5.8);                           // tool chest
+  gBox(4, 0.05, 1.2, 0xfffbe8, 0, 5.95, 1, THREE.MeshBasicMaterial);      // ceiling light
+  for (const x of [-3.4, 3.4]) gBox(0.08, 0.03, 12, 0xf2c200, x, 0.06, 1); // bay lines
+  const c = document.createElement('canvas'), ctx = c.getContext('2d');
+  c.width = 512; c.height = 64;
+  ctx.fillStyle = '#1c4f8a'; ctx.fillRect(0, 0, 512, 64);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 40px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('PIT  ·  SERVICE  ·  FUEL', 256, 34);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(12, 1.5), new THREE.MeshBasicMaterial({ map: Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace }) }));
+  sign.position.set(0, 5.3, 9.3); // faces the pit lane (+z)
+  g.add(sign);
+}
 // the racetrack: asphalt with white edge lines, red and white kerbs through the bends, gravel on their outsides, a
 // concrete wall all round 45 m out (open where the track road comes in, and along the pits), the start / finish line
 // under its gantry, a grandstand over the main straight and the pit lane and garages across from it. Walls and
@@ -721,21 +837,12 @@ for (const r of STREETS) {
     strip(T, s * 45, 0, s * 45, 1.1, 0xd6d6d0, i => !open(i, s) && !(s > 0 && pits(i)) && clear(i, s * 45));
   }
   const sf = T.P[ISF]; // the main straight runs east along z -2350; its left (the pits) is to -z
-  const flag = document.createElement('canvas'), fg = flag.getContext('2d');
-  flag.width = 2; flag.height = 14;
-  for (let a = 0; a < 2; a++) for (let b = 0; b < 14; b++) { fg.fillStyle = (a + b) % 2 ? '#111' : '#f4f4f4'; fg.fillRect(a, b, 1, 1); }
-  const line = new THREE.Mesh(new THREE.PlaneGeometry(3, 14).rotateX(-Math.PI / 2),
-    new THREE.MeshLambertMaterial({ map: Object.assign(new THREE.CanvasTexture(flag), { magFilter: THREE.NearestFilter, colorSpace: THREE.SRGBColorSpace }) }));
-  line.position.set(sf.x, 0.022, sf.z);
-  scene.add(line);
+  startLine(site(sf.x, 0, sf.z, 0), 14);
   const tBox = (w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
     b.position.set(sf.x + x, y, sf.z + z);
     scene.add(b);
   };
-  for (const z of [-9.5, 9.5]) tBox(0.5, 7.5, 0.5, 0xd6d6d0, 0, 3.75, z);             // the gantry
-  tBox(1.2, 1.2, 19.5, 0x24272b, 0, 7.6, 0);
-  for (let k = -2; k <= 2; k++) tBox(0.1, 0.5, 0.5, 0x6a0000, -0.65, 7.6, k * 1.2, THREE.MeshBasicMaterial); // start lights
   for (let t = 0; t < 4; t++) tBox(180, 1.5 + t * 2, 6, t % 2 ? 0x2b5d9b : 0x3a6fb0, 0, 0.75 + t, 55 + t * 6); // grandstand tiers
   tBox(184, 0.4, 30, 0xe4e4e0, 0, 12, 64);                                          // its roof
   for (const x of [-88, 0, 88]) tBox(0.6, 12, 0.6, 0xbfc2c6, x, 6, 78);
@@ -743,31 +850,35 @@ for (const r of STREETS) {
   strip(PL, -6, 0.012, 6, 0.012, 0x38383a);
   for (const s of [1, -1]) paint(PL, s * 5.7, 0.2);
   strip(PL, -14, 0, -14, 1.1, 0xd6d6d0, i => PL.P[i].x > 2935 && PL.P[i].x < 3665);
-  // twelve garages, 14 m wide, open to the pit lane; the team's (PIT, at the start line) has its shutter up, a sign,
-  // a fuel rig and a tool chest, the rest are shut
-  const W0 = PIT.x - 14 * 6.5, gBox = (w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
-    b.position.set(x, y, z);
-    scene.add(b);
-  };
-  gBox(168, 0.05, 16, 0x5e6266, W0 + 84, 0.02, -2395);                    // floor
-  gBox(168.6, 6, 0.3, 0xe8e8e8, W0 + 84, 3, -2403.2);                    // back wall
-  for (let k = 0; k <= 12; k++) gBox(0.3, 6, 16, 0xe8e8e8, W0 + 14 * k, 3, -2395); // walls between
-  gBox(170, 0.4, 18, 0x3a3d42, W0 + 84, 6.2, -2395.5);                   // roof
-  gBox(168.6, 1.4, 0.3, 0xe8e8e8, W0 + 84, 5.3, -2386.9);                // over the doors
-  for (let k = 0; k < 12; k++) if (k !== 6) gBox(13.4, 4.6, 0.15, 0x8a9099, W0 + 14 * k + 7, 2.3, -2387.1); // shutters
-  gBox(0.9, 1.9, 0.9, 0xd0302a, PIT.x - 5.2, 0.95, -2400.5);            // fuel rig
-  gBox(1.6, 1.1, 0.6, 0xc0392b, PIT.x + 5, 0.55, -2401.8);              // tool chest
-  gBox(4, 0.05, 1.2, 0xfffbe8, PIT.x, 5.95, -2395, THREE.MeshBasicMaterial); // ceiling light
-  for (const x of [-3.4, 3.4]) gBox(0.08, 0.03, 12, 0xf2c200, PIT.x + x, 0.06, -2395); // bay lines
-  const c = document.createElement('canvas'), g = c.getContext('2d');
-  c.width = 512; c.height = 64;
-  g.fillStyle = '#1c4f8a'; g.fillRect(0, 0, 512, 64);
-  g.fillStyle = '#fff'; g.font = 'bold 40px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText('PIT  ·  SERVICE  ·  FUEL', 256, 34);
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(12, 1.5), new THREE.MeshBasicMaterial({ map: Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace }) }));
-  sign.position.set(PIT.x, 5.3, -2386.7); // faces the pit lane (+z)
-  scene.add(sign);
+  pitGarages(site(PIT.x, 0, PIT.z, 0)); // the team's at the start line
+}
+// the Nordschleife: asphalt, white edge lines, red and white kerbs through the corners, grass verges, skirts down into
+// the ditch, Armco either side - on the left, along the pits, concrete out to the pit lane instead, and a wall between
+// them. The pit lane: asphalt, white edges (open where the Ring road comes in), concrete in front of the garages; the
+// start / finish line across the track from the team's garage
+{
+  const TURN = Array.from({ length: NR.N }, (_, i) => { // 1 bending left here, -1 right, 0 straight (or wider than 300 m)
+    const a = NR.P[i + 1], b = NR.P[(i + 2) % NR.N], k = ((b.x - a.x) * NR.L[i].x + (b.z - a.z) * NR.L[i].z) / Math.hypot(b.x - a.x, b.z - a.z);
+    return Math.abs(k) > 4.5 / 300 ? Math.sign(k) : 0;
+  });
+  const pits = (i, m) => Math.abs(i - RIG) <= m; // within m samples of the line: the pit lane leaves and joins 130 out
+  strip(NR, -4.75, 0.01, 4.75, 0.01, 0x333336);
+  for (const s of [1, -1]) {
+    paint(NR, s * 4.5, 0.25);
+    strip(NR, s * 4.75, 0.015, s * 6, 0.015, 0xd11f1f, i => TURN[i] && i % 2 === 0); // kerbs
+    strip(NR, s * 4.75, 0.015, s * 6, 0.015, 0xf2f2f2, i => TURN[i] && i % 2 === 1);
+    strip(NR, s * 4.75, 0.006, s * 8.5, 0.006, 0x557a45, i => s < 0 || !pits(i, 100));
+    strip(NR, s * 8.5, -2.5, s * 8.5, 0.006, 0x4a6a3c, i => s < 0 || !pits(i, 130));
+    strip(NR, s * 8, 0, s * 8, 0.75, 0x9aa0a6, i => s < 0 || !pits(i, 130));
+  }
+  strip(NR, 4.75, 0.006, 20, 0.006, 0xa9a69e, i => pits(i, 100));
+  strip(NR, 13, 0, 13, 1.1, 0xd6d6d0, i => pits(i, 80)); // the pit wall
+  const road = opens(NPL, [spot(NA, NA.N - 4, 14)]);
+  strip(NPL, -6, 0.012, 6, 0.012, 0x38383a);
+  for (const s of [1, -1]) paint(NPL, s * 5.7, 0.2, i => !road(i, s));
+  strip(NPL, 6, 0.008, 13.5, 0.008, 0xa9a69e, i => pits(nearestSample(NR, NPL.P[i].x, NPL.P[i].z), 85));
+  startLine(site(NR.P[RIG].x, NR.P[RIG].y, NR.P[RIG].z, NR_PIT.rot), 9.5);
+  pitGarages(site(NR_PIT.x, NR_PIT.y, NR_PIT.z, NR_PIT.rot));
 }
 // Road samples in 40 m cells, so any point finds the roads near it: [road, sample index]
 const cells = new Map();
@@ -801,11 +912,12 @@ function onRoad(x, z, near) {
   return { d, out, y, on };
 }
 
-// The land round the mountains: a terrain mesh over the box below, flat at its edges where it meets the plain (y 0).
+// The land round the mountains and the Nordschleife: a terrain mesh over the box below, flat at its edges where it
+// meets the plain (y 0).
 // Near a road it follows the road (a ditch alongside, so the coarse grid never pokes through the asphalt); away from
 // it, the roads' general height plus peaks and valleys that grow with distance; valley floors stop at the plain
-const LAND = { x0: 2100, x1: 6700, z0: -2000, z1: 2400 };
-const coarse = ROADS.filter(r => r !== T && !UTURNS.includes(r) && !STREETS.includes(r)).flatMap(r => r.P.filter((_, i) => i % 25 === 0)), noise = new ImprovedNoise(); // (the flat city and track, and the flyover, don't shape the hills)
+const LAND = { x0: 2100, x1: 9705, z0: -2000, z1: 7405 };
+const coarse = ROADS.filter(r => r !== T && !UTURNS.includes(r) && !STREETS.includes(r)).flatMap(r => r.P.filter((_, i) => i % 50 === 0)), noise = new ImprovedNoise(); // (the flat city and track, and the flyover, don't shape the hills; every 150 m keeps the bigger land quick to build)
 function terrainAt(x, z) {
   const edge = Math.min(x - LAND.x0, LAND.x1 - x, z - LAND.z0, LAND.z1 - z);
   if (edge <= 0) return -0.1; // the plain
@@ -826,7 +938,8 @@ function terrainAt(x, z) {
 // what the car rests on: the road itself on a road, the land off it (near: the car's height, see onRoad)
 const surfaceAt = (x, z, near) => { const r = onRoad(x, z, near); return r.on ? r.y : terrainAt(x, z); };
 
-{ // the terrain mesh, ~15 m grid, coloured grass, then rock where steep or high, then snow
+{ // the terrain mesh, ~15 m grid, coloured grass, then rock where steep or high, then snow (high only round the
+  // mountain loop: the Nordschleife's hills, as high, stay green)
   const w = LAND.x1 - LAND.x0, h = LAND.z1 - LAND.z0;
   const tg = new THREE.PlaneGeometry(w, h, Math.round(w / 15), Math.round(h / 15)).rotateX(-Math.PI / 2)
     .translate((LAND.x0 + LAND.x1) / 2, 0, (LAND.z0 + LAND.z1) / 2);
@@ -834,7 +947,8 @@ const surfaceAt = (x, z, near) => { const r = onRoad(x, z, near); return r.on ? 
   for (let i = 0; i < tp.count; i++) tp.setY(i, terrainAt(tp.getX(i), tp.getZ(i)));
   tg.computeVertexNormals();
   for (let i = 0; i < tp.count; i++) {
-    const y = tp.getY(i), up = tg.attributes.normal.getY(i);
+    const x = tp.getX(i), z = tp.getZ(i), up = tg.attributes.normal.getY(i);
+    const y = tp.getY(i) - 1000 * THREE.MathUtils.smoothstep(Math.hypot(Math.max(3700 - x, 0, x - 6200), Math.max(-1100 - z, 0, z - 1800)), 0, 400);
     c.setHex(y > 240 ? 0xf2f4f6 : up < 0.72 || y > 200 ? 0x7d776e : 0x5a7a4a);
     col.push(c.r, c.g, c.b);
   }
@@ -842,20 +956,20 @@ const surfaceAt = (x, z, near) => { const r = onRoad(x, z, near); return r.on ? 
   scene.add(new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ vertexColors: true })));
 }
 
-// trees: along the autobahn, round the racetrack outside its walls, and on gentle grass slopes round the mountains
-// and the village's roads (not in town or the village) - clear of every road (3 m past its edge) and the forecourt; one that runs out of tries by a road isn't
-// planted
-const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(2, 8, 6).translate(0, 4, 0), new THREE.MeshLambertMaterial({ color: 0x2f5a2a }), 10000);
+// trees: along the autobahn, round the racetrack outside its walls, on gentle grass slopes round the mountains and the
+// village's roads (not in town or the village), and the forest the Nordschleife runs through, thickest by the track -
+// clear of every road (3 m past its edge) and the forecourts; one that runs out of tries by a road isn't planted
+const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(2, 8, 6).translate(0, 4, 0), new THREE.MeshLambertMaterial({ color: 0x2f5a2a }), 16000);
 const m = new THREE.Matrix4();
 for (let k = 0; k < trees.count; k++) {
-  const hills = k >= 6000 && k < 9200, track = k >= 9200, r = track ? T : hills ? [M, M, K1, K2, CR, SL][k % 6] : A;
+  const hills = k >= 6000 && k < 9200, track = k >= 9200 && k < 10000, ring = k >= 10000, r = ring ? NR : track ? T : hills ? [M, M, K1, K2, CR, SL][k % 6] : A;
   let x, z, y, i, o, g, tries = 0;
   do {
     i = Math.floor(Math.random() * r.N);
-    o = (track ? 85 + Math.random() * 200 : hills ? 14 + Math.random() * 300 : 25 + Math.random() * 120) * (Math.random() < 0.5 ? -1 : 1);
+    o = (track ? 85 + Math.random() * 200 : ring ? 12 + Math.random() ** 2 * 160 : hills ? 14 + Math.random() * 300 : 25 + Math.random() * 120) * (Math.random() < 0.5 ? -1 : 1);
     x = r.P[i].x + r.L[i].x * o; z = r.P[i].z + r.L[i].z * o; y = terrainAt(x, z); g = onRoad(x, z);
-  } while (tries++ < 20 && (g.d < (track ? 55 : 14) || g.out < 3 || (r === A && o > 0 && nearStation(i, 30)) || inCity(x, z, 20) || Math.hypot(x - VIL.x, z - VIL.z) < VIL.r + 30 ||
-    (hills && (y > 200 || Math.abs(terrainAt(x + 4, z) - y) > 3 || Math.abs(terrainAt(x, z + 4) - y) > 3))));
+  } while (tries++ < 20 && (g.d < (track ? 55 : 14) || g.out < 3 || (r === A && nearStation(i, 30, Math.sign(o))) || inCity(x, z, 20) || Math.hypot(x - VIL.x, z - VIL.z) < VIL.r + 30 ||
+    ((hills || ring) && ((hills && y > 200) || Math.abs(terrainAt(x + 4, z) - y) > 3 || Math.abs(terrainAt(x, z + 4) - y) > 3))));
   if (g.d < (track ? 55 : 14) || g.out < 3) { trees.setMatrixAt(k, m.makeScale(0, 0, 0)); continue; }
   trees.setMatrixAt(k, m.makeTranslation(x, y, z));
   solid(x, z, x, z, 1.8); // the cone, at bumper height
@@ -863,33 +977,34 @@ for (let k = 0; k < trees.count; k++) {
 scene.add(trees);
 
 // self-checks: the car rests exactly on the mountain and link roads, the drive and the lay-by, the village's roads, the
-// flyovers and the autobahn under them, and no climb is steeper than 12%
-for (const r of [M, K1, K2, D, V, S, ...STREETS, T, TR, CR, SL, VL]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z) - r.P[i].y) < 0.05, 'the car should rest on the road', i);
+// Nordschleife and its roads, the aprons, the flyovers and the autobahn under them, and no climb is steeper than 12%
+for (const r of [M, K1, K2, D, V, S, ...STREETS, T, TR, CR, SL, VL, ON, NR, NPL, NA, ...SIDE.map(p => p.apron)]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z) - r.P[i].y) < 0.05, 'the car should rest on the road', i);
 for (const r of [...UTURNS, A]) for (let i = 0; i < r.N; i++) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z, r.P[i].y) - r.P[i].y) < 0.05, 'the car should rest on the road, not the one over or under it', i);
 let steepest = 0;
-for (const r of [M, K2, AV, CR, SL]) for (let i = 0; i < r.N; i++) steepest = Math.max(steepest, Math.abs(r.P[i + 1].y - r.P[i].y) / Math.hypot(r.P[i + 1].x - r.P[i].x, r.P[i + 1].z - r.P[i].z));
+for (const r of [M, K2, AV, CR, SL, NA]) for (let i = 0; i < r.N; i++) steepest = Math.max(steepest, Math.abs(r.P[i + 1].y - r.P[i].y) / Math.hypot(r.P[i + 1].x - r.P[i].x, r.P[i + 1].z - r.P[i].z));
 console.assert(steepest < 0.12, 'mountain grades should stay under 12%', steepest);
 
-// fuel station: canopy, two pump islands, a shop and a sign. Local +Z runs along the road, +X away from it
-const tS = A.curve.getTangentAt(IS / A.N), station = new THREE.Group();
-station.position.set(A.P[IS].x + A.L[IS].x * 31, 0, A.P[IS].z + A.L[IS].z * 31);
-station.rotation.y = Math.atan2(tS.x, tS.z);
-const sBox = (w, h, d, color, x, y, z) => {
-  const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color }));
-  b.position.set(x, y, z);
-  station.add(b);
-};
-const canopy = new THREE.Mesh(new THREE.BoxGeometry(16, 0.8, 26), new THREE.MeshBasicMaterial({ color: 0xe6e6e6 })); // lit by its own lights
-canopy.position.y = 5.2;
-station.add(canopy);
-sBox(16.2, 0.3, 26.2, 0x1f9d55, 0, 5.3, 0);  // green band round its edge
-for (const x of [-5, 5]) for (const z of [-9, 9]) sBox(0.4, 5, 0.4, 0xdddddd, x, 2.5, z);
-for (const x of [-3, 3]) for (const z of [-5, 5]) { sBox(0.7, 1.7, 1.1, 0xf5f5f5, x, 0.85, z); sBox(0.72, 0.3, 1.12, 0x1f9d55, x, 1.55, z); } // pumps
-sBox(14, 4, 10, 0xd9cfbf, 15, 2, 0);         // shop
-sBox(0.1, 1.6, 8, 0x2a3440, 7.95, 1.7, 0);   // shop window
-sBox(0.3, 9, 0.3, 0xcccccc, -10, 4.5, 16);   // sign
-sBox(0.25, 2.4, 2.4, 0x1f9d55, -10, 8.6, 16);
-scene.add(station);
+// fuel stations: canopy, two pump islands, a shop and a sign, on a site o m out from road r's sample i on side s
+// (local +Z along the road, +X away from it): the autobahn's, and the roadside ones on their aprons
+const away = (r, i, s) => Math.atan2(s * r.L[i].x, s * r.L[i].z); // turned so local +z points away from road r on side s
+const STATIONS = [];
+function fuelStation(r, i, s, o) {
+  const station = site(r.P[i].x + r.L[i].x * s * o, r.P[i].y, r.P[i].z + r.L[i].z * s * o, away(r, i, s) - Math.PI / 2);
+  const sBox = (...a) => siteBox(station, ...a);
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(16, 0.8, 26), new THREE.MeshBasicMaterial({ color: 0xe6e6e6 })); // lit by its own lights
+  canopy.position.y = 5.2;
+  station.add(canopy);
+  sBox(16.2, 0.3, 26.2, 0x1f9d55, 0, 5.3, 0);  // green band round its edge
+  for (const x of [-5, 5]) for (const z of [-9, 9]) sBox(0.4, 5, 0.4, 0xdddddd, x, 2.5, z);
+  for (const x of [-3, 3]) for (const z of [-5, 5]) { sBox(0.7, 1.7, 1.1, 0xf5f5f5, x, 0.85, z); sBox(0.72, 0.3, 1.12, 0x1f9d55, x, 1.55, z); } // pumps
+  sBox(14, 4, 10, 0xd9cfbf, 15, 2, 0);         // shop
+  sBox(0.1, 1.6, 8, 0x2a3440, 7.95, 1.7, 0);   // shop window
+  sBox(0.3, 9, 0.3, 0xcccccc, -10, 4.5, 16);   // sign
+  sBox(0.25, 2.4, 2.4, 0x1f9d55, -10, 8.6, 16);
+  STATIONS.push(station.position);
+}
+for (const [i, s] of A_STATIONS) fuelStation(A, i, s, 31);
+for (const p of SIDE) if (p.fuel) fuelStation(p.r, p.i, 1, 24);
 
 // home: the garage, open to the drive (north), with the house beside it. Local +Z is north, +X east
 {
@@ -917,15 +1032,12 @@ scene.add(station);
   scene.add(home);
 }
 
-// the mechanic's workshop: one wide bay open to the road (south), a lift, a tool chest and a sign. Local +Z is north
-{
-  const shop = new THREE.Group();
-  shop.position.set(SHOP.x, 0, SHOP.z);
-  const wBox = (w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
-    b.position.set(x, y, z);
-    shop.add(b);
-  };
+// workshops: one wide bay open to the road, a lift, a tool chest and a sign, on a site with local +Z away from the
+// road - the mechanic's north of the valley road, and the roadside ones on their aprons, 58 m out
+const SHOPS = [];
+function workshop(x, y, z, rot) {
+  const shop = site(x, y, z, rot);
+  const wBox = (...a) => siteBox(shop, ...a);
   const WALL = 0xc9ccd1;
   wBox(14, 0.05, 12, 0x5e6266, 0, 0.03, 0);                        // floor
   for (const x of [-7, 7]) wBox(0.3, 5, 12, WALL, x, 2.5, 0);      // side walls
@@ -946,8 +1058,10 @@ scene.add(station);
   sign.position.set(0, 4.5, -6.16);
   sign.rotation.y = Math.PI; // faces the road
   shop.add(sign);
-  scene.add(shop);
+  SHOPS.push({ x, z, rot });
 }
+workshop(SHOP.x, 0, SHOP.z, 0);
+for (const p of SIDE) if (!p.fuel) workshop(p.r.P[p.i].x + p.r.L[p.i].x * 58, p.r.P[p.i].y, p.r.P[p.i].z + p.r.L[p.i].z * 58, away(p.r, p.i, 1));
 
 // the village's buildings, the same every drive (a seeded random): stone houses along its lanes, one or two
 // storeys, each turned to face its lane with a door and small windows front and back, a chimney and a gabled roof of
@@ -1099,7 +1213,8 @@ function move(car, steer, dt) {
 // and the roads connect clear of every wall, pier and house: a car anywhere in a lane of the autobahn (under the
 // flyovers too), the links, the flyovers (at their height) or the village's roads touches nothing
 for (const [r, lanes, name] of [[A, [-11.9, -8.1, -4.4, 4.4, 8.1, 11.9], 'autobahn'], [K1, [-2.25, 2.25], 'valley road'], [K2, [-2.25, 2.25], 'direct road'],
-  ...UTURNS.map(u => [u, [0], 'U-turn']), [CR, [-1.6, 1.6], 'country road'], [SL, [-1.6, 1.6], 'south lane'], [VL, [0], 'village loop']]) for (const o of lanes) {
+  ...UTURNS.map(u => [u, [0], 'U-turn']), [CR, [-1.6, 1.6], 'country road'], [SL, [-1.6, 1.6], 'south lane'], [VL, [0], 'village loop'],
+  [ON, [0], 'on-ramp'], [NR, [-2.4, 2.4], 'Nordschleife'], [NPL, [0], 'Ring pit lane'], [NA, [-2.25, 2.25], 'Ring road']]) for (const o of lanes) {
   for (let i = 0; i < r.N; i++) {
     const t = r.curve.getTangentAt(i / r.N), x = r.P[i].x + r.L[i].x * o, z = r.P[i].z + r.L[i].z * o, c = { x, z, y: r.P[i].y, heading: Math.atan2(t.x, t.z) };
     collide(c);
@@ -1674,8 +1789,12 @@ camera.add(hudAnchor);
 
 // fuel: stopped on the forecourt with the engine off, the car page's own pump runs (its refuel button, held: it fills
 // at its own rate and stops when full); starting the engine or driving off stops it
-const inPit = () => Math.abs(state.x - PIT.x) < 5 && Math.abs(state.z - PIT.z) < 7; // in the team's garage at the track
-const atPump = () => (Math.hypot(state.x - station.position.x, state.z - station.position.z) < 15 || inPit()) && Math.abs(state.speed) < 0.5;
+const inSite = (o, w, d) => { // the car within ±w along site o's local x and ±d along its z
+  const dx = state.x - o.x, dz = state.z - o.z, c = Math.cos(o.rot), s = Math.sin(o.rot);
+  return Math.abs(dx * c - dz * s) < w && Math.abs(dx * s + dz * c) < d;
+};
+const inPit = () => PITS.find(p => inSite(p, 5, 7)); // in the team's garage at a track
+const atPump = () => (STATIONS.some(p => Math.hypot(state.x - p.x, state.z - p.z) < 15) || !!inPit()) && Math.abs(state.speed) < 0.5;
 let fueling = false;
 function refuel(on) {
   if (on === fueling) return;
@@ -1685,7 +1804,7 @@ function refuel(on) {
 }
 
 // the garage: stop inside it and the car list opens; picking another car restarts the drive in it, here (at home, or
-// in the pit garage: ?at=pits)
+// in a pit garage: ?at=pits at the racetrack, ?at=ring at the Nordschleife)
 const garageEl = document.getElementById('garage');
 for (const id of ['garage-cars', 'pit-cars']) document.getElementById(id).innerHTML = Object.values(CARS).map(c =>
   `<button data-car="${c.page}"${c === CAR ? ' class="on"' : ''}>${c.name}${c === CAR ? ' · driving now' : ''}</button>`).join('');
@@ -1712,14 +1831,14 @@ shopEl.addEventListener('click', e => {
   shopEl.hidden = true;
   if (b.dataset.tab) setPanel(true, b.dataset.tab);
 });
-const inShop = () => Math.abs(state.x - SHOP.x) < 4 && Math.abs(state.z - SHOP.z) < 5;
+const inShop = () => SHOPS.some(p => inSite(p, 4, 5));
 // the pit garage: the mechanic's menu and the car list in one, and the fuel rig (atPump)
 const pitEl = document.getElementById('pit');
 let pitClosed = false;
 pitEl.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b || b.dataset.car === CAR.page) return;
-  if (b.dataset.car) return swapCar(b.dataset.car, 'pits');
+  if (b.dataset.car) return swapCar(b.dataset.car, inPit()?.at ?? 'pits');
   pitClosed = true;
   pitEl.hidden = true;
   if (b.dataset.tab) setPanel(true, b.dataset.tab);
@@ -1794,6 +1913,7 @@ frame.addEventListener('load', () => {
     html:not(.drive-pump) #refuel-btn { visibility: hidden !important; }
   </style>`);
   const tick = w.CarDyno.tick;
+  w.CarDyno.pop = backfire;
   w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = w.CarTune.ch.smoke; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; carPage.tc = !!i.tc; carPage.spin = i.spin || 0; tick(i); };
   const serviceTick = w.CarService.tick; // the brake pedal (0-100) only reaches CarService
   w.CarService.tick = i => { carPage.braking = i.braking; carPage.ignition = i.ignition; return serviceTick.call(w.CarService, i); };
@@ -1839,7 +1959,8 @@ frame.addEventListener('load', () => {
 if (location.protocol === 'file:') document.getElementById('hud').textContent = 'Open this through the app (http://sim-app.test/drive.html) - the car runs from there.';
 else frame.src = `/car/${CAR.page}/raw${TEST_DRIVE ? '?test_drive=1' : ''}`;
 document.getElementById('credit').innerHTML = `${CAR.name.replace('BMW ', '')} model: <a href="${CAR.credit[1]}" target="_blank">${CAR.credit[0]}</a>
-  by <a href="${CAR.credit[4] || 'https://sketchfab.com/ddiaz-design'}" target="_blank">${CAR.credit[3] || 'Ddiaz Design'}</a>, <a href="http://creativecommons.org/licenses/${CAR.credit[2] || 'by-nc-sa'}/4.0/" target="_blank">CC ${(CAR.credit[2] || 'by-nc-sa').toUpperCase()} 4.0</a>`;
+  by <a href="${CAR.credit[4] || 'https://sketchfab.com/ddiaz-design'}" target="_blank">${CAR.credit[3] || 'Ddiaz Design'}</a>, <a href="http://creativecommons.org/licenses/${CAR.credit[2] || 'by-nc-sa'}/4.0/" target="_blank">CC ${(CAR.credit[2] || 'by-nc-sa').toUpperCase()} 4.0</a>
+  · Nordschleife: <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>`;
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -1849,16 +1970,19 @@ addEventListener('resize', () => {
 });
 
 // every drive starts at home, on the drive just out of the garage, facing down it to the valley road - or, after a
-// swap in the pit garage, on the pit lane outside it, pointing to the exit
-const atPits = query.get('at') === 'pits', startHeading = atPits ? Math.PI / 2 : 0;
-const state = { x: atPits ? PIT.x : HOME.x, z: atPits ? -2380 : HOME.z + 14, heading: startHeading, speed: 0, steer: 0 };
+// swap in a pit garage, on the pit lane outside it (16 m along its site's z), pointing to the exit
+const startPit = PITS.find(p => p.at === query.get('at')), startHeading = startPit ? Math.PI / 2 + startPit.rot : 0;
+const state = { x: startPit ? startPit.x + 16 * Math.sin(startPit.rot) : HOME.x, z: startPit ? startPit.z + 16 * Math.cos(startPit.rot) : HOME.z + 14, heading: startHeading, speed: 0, steer: 0 };
 
 // mini map, north-up: +Z is up and +X is drawn on the left, so the map turns the same way the view does
 const mapEl = document.getElementById('map'), map = mapEl.getContext('2d');
 mapEl.width = mapEl.clientWidth * devicePixelRatio;
 mapEl.height = mapEl.clientHeight * devicePixelRatio;
 map.scale(devicePixelRatio, devicePixelRatio);
-const MAP_ROADS = [A, M, K1, K2, ...STREETS, T, TR, PL, CR, SL, VL];
+const MAP_ROADS = [A, M, K1, K2, ...STREETS, T, TR, PL, CR, SL, VL, ON, NR, NPL, NA];
+// fuel, home, mechanics, the viewpoint, the start lines, the pit garages, the village
+const MARKERS = [...STATIONS.map(p => [p, '#2ecc71']), [HOME, '#4fa8ff'], ...SHOPS.map(p => [p, '#ff8c1a']), [V.P[Math.round(V.N / 2)], '#ffd23f'],
+  [T.P[ISF], '#ffffff'], [NR.P[RIG], '#ffffff'], ...PITS.map(p => [p, '#ff8c1a']), [VIL, '#c08a5a']];
 const all = MAP_ROADS.flatMap(r => r.P), xs = all.map(p => p.x), zs = all.map(p => p.z);
 const [minX, maxX, minZ, maxZ] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
 const mapS = Math.min((mapEl.clientWidth - 24) / (maxX - minX), (mapEl.clientHeight - 24) / (maxZ - minZ));
@@ -1874,7 +1998,7 @@ function drawMap() {
   map.lineWidth = 4;
   map.strokeStyle = '#9a9a9a';
   map.stroke(roadPath);
-  for (const [p, color] of [[station.position, '#2ecc71'], [HOME, '#4fa8ff'], [SHOP, '#ff8c1a'], [V.P[Math.round(V.N / 2)], '#ffd23f'], [T.P[ISF], '#ffffff'], [PIT, '#ff8c1a'], [VIL, '#c08a5a']]) { // fuel, home, mechanic, viewpoint, start line, pit garage, village
+  for (const [p, color] of MARKERS) {
     map.fillStyle = color;
     map.beginPath(); map.arc(...toMap(p.x, p.z), 4.5, 0, Math.PI * 2); map.fill();
   }
@@ -1885,30 +2009,81 @@ function drawMap() {
   map.beginPath(); map.moveTo(0, -8); map.lineTo(5.5, 6); map.lineTo(-5.5, 6); map.closePath(); map.fill();
   map.restore();
 }
-// exhaust smoke at the car page's own smoke opacity (CarTune.ch.smoke, 0-100 %): soft puffs left behind in the world
+// the exhaust tips: EXHAUST's side, or both sides (CAR.exhaustBoth) - smoke and flame come out of each
+const SIDES = CAR.exhaustBoth ? [1, -1] : [1];
+// exhaust smoke at the car page's own smoke opacity (CarTune.ch.smoke, 0-100 %): a thick black diesel stream blown out
+// the pipe and left hanging in the world - with two tips, every other puff out of each, a thinner stream from both
 const puffTex = blob('#fff');
 const puffs = Array.from({ length: 160 }, () => {
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0x6a6a6a, transparent: true, depthWrite: true })); // diesel grey, still visible over asphalt
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0x1a1a1a, transparent: true, depthWrite: true })); // sooty near-black
   s.visible = false;
   scene.add(s);
   return { s, age: 1, alpha: 0, vel: new THREE.Vector3() };
 });
+const puffBack = new THREE.Vector3();
 let puffDue = 0, puffNext = 0;
 function smoke(dt, pct) {
-  for (puffDue += pct / 100 * 1200 * dt; puffDue >= 1; puffDue--) { // up to 60 puffs a second at 100 %
-    const p = puffs[puffNext++ % puffs.length];
-    p.s.position.copy(EXHAUST).applyEuler(car.rotation).add(car.position);
-    p.vel.set(Math.random() - 0.5, 0.4 + Math.random() * 0.4, Math.random() - 0.5).multiplyScalar(0.8);
+  const k = Math.min(1, Math.sqrt((pct || 0) / 40)); // overdone on purpose: 10 % is already half a cloud, 40 % on the full black wall (pct is undefined on a petrol car)
+  puffBack.set(0, 0, -1).applyEuler(car.rotation);
+  for (puffDue += k * 40 * dt; puffDue >= 1; puffDue--) { // up to 40 puffs a second x 3.5 s fits the pool of 160
+    const p = puffs[puffNext % puffs.length];
+    p.s.position.set(EXHAUST.x * SIDES[puffNext++ % SIDES.length], EXHAUST.y, EXHAUST.z).applyEuler(car.rotation).add(car.position);
+    p.vel.set((Math.random() - 0.5) * 0.3, 0.4 + 0.4 * Math.random(), (Math.random() - 0.5) * 0.3).addScaledVector(puffBack, 1 + 2 * k - state.speed * 0.4); // blown out the back in a tight stream, then dragged along in the car's wake
     p.age = 0;
-    p.alpha = 0.2 + 0.6 * pct / 100;
+    p.alpha = 0.35 + 0.35 * k;
   }
   for (const p of puffs) {
     p.s.visible = p.age < 1;
     if (!p.s.visible) continue;
-    p.age += dt / 2; // lives 2 s, growing and fading
+    p.age += dt / 3.5; // lives 3.5 s, widening to a 2.2 m plume as it thins
     p.s.position.addScaledVector(p.vel, dt);
-    p.s.scale.setScalar(0.4 + p.age * 3);
-    p.s.material.opacity = p.alpha * (1 - p.age);
+    p.vel.x *= 1 - dt * 0.8; p.vel.z *= 1 - dt * 0.8; // the blast dies off, the hot soot keeps rising
+    p.s.scale.setScalar(0.35 + 1.85 * Math.sqrt(p.age)); // starts pipe-sized, so it reads as a stream rather than a cloud
+    p.s.material.opacity = p.alpha * (1 - p.age) ** 1.5;
+  }
+}
+
+// backfire: every pop or bang the car page fires into its exhaust (CarDyno.pop, timed to its sound) spits flame out of
+// the tips - a crackle a short flicker, a bang or an upshift's crack a longer, bigger lick. Additive, so it glows
+const FLAME = [ // along the jet (0 the tip .. 1 its end), size (m), colour, brightness
+  [0, 0.5, 0xff6a1a, 0.3], // the flash round the tip
+  [0.15, 0.15, 0xfff2c8, 1], // white-hot core
+  [0.4, 0.21, 0xffa63a, 0.9],
+  [0.7, 0.23, 0xff6418, 0.7],
+  [1, 0.17, 0xc23a0c, 0.45],
+];
+const flameSprites = Array.from({ length: 60 }, () => {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  s.visible = false;
+  scene.add(s);
+  return s;
+});
+const pops = []; // { t: s until it fires, then minus its age; life (s); size }
+function backfire(delay, size) {
+  // two tips share the pop, so each spits a smaller flame
+  if (pops.length < 24) pops.push({ t: delay, life: 0.05 + 0.09 * size + Math.random() * 0.03, size: size * (0.8 + 0.4 * Math.random()) / Math.sqrt(SIDES.length) });
+}
+function flames(dt) {
+  for (const s of flameSprites) s.visible = false;
+  let n = 0;
+  for (let i = pops.length; i--;) {
+    const p = pops[i];
+    if ((p.t -= dt) > 0) continue;
+    const age = -p.t / p.life;
+    if (age >= 1) { pops.splice(i, 1); continue; }
+    const e = Math.sin(Math.PI * Math.sqrt(age)); // flares at once, then dies away
+    const len = (0.25 + 0.45 * p.size) * e;
+    for (const side of SIDES) {
+      if (n + FLAME.length > flameSprites.length) return;
+      for (const [along, size, colour, glow] of FLAME) {
+        const s = flameSprites[n++];
+        s.material.color.setHex(colour);
+        s.position.set(side * EXHAUST.x + (Math.random() - 0.5) * 0.03, EXHAUST.y + along * len * 0.1, EXHAUST.z - along * len).applyEuler(car.rotation).add(car.position);
+        s.scale.setScalar(size * (0.6 + 0.8 * p.size) * e * (0.8 + 0.4 * Math.random()));
+        s.material.opacity = glow * e;
+        s.visible = true;
+      }
+    }
   }
 }
 
@@ -2039,6 +2214,7 @@ renderer.setAnimationLoop(() => {
   for (const [mt, full] of modelTail) mt.emissiveIntensity = full * (braking ? CAR.tail.brake : CAR.tail.idle);
   for (const g of modelTailGlow) g.opacity = braking ? 1 : 0;
   smoke(dt, carPage.smoke);
+  flames(dt);
   tyres(dt, roll, handbrake && Math.abs(roll) > 1, rollers);
   const pump = atPump();
   refuel(pump && !carPage.ignition);
@@ -2046,7 +2222,7 @@ renderer.setAnimationLoop(() => {
   pumpEl.textContent = fueling ? 'Refuelling - start the engine (I) to stop' : `${inPit() ? 'In the pit box' : 'At the pump'}: switch the engine off (I) to refuel`;
   frame.contentWindow.throttleLimit = limits.throttle;
   frame.contentWindow.brakeLimit = limits.brake * (pad.b || 1); // the phone's brake slider: how far its held S opens
-  const parked = inGarage(), pitted = inPit(), atShop = inShop() || pitted, html = frame.contentWindow.document.documentElement;
+  const parked = inGarage(), pitted = inPit(), atShop = inShop() || !!pitted, html = frame.contentWindow.document.documentElement; // (toggle's force must be a boolean: undefined flips the class every frame)
   if (!parked) garageClosed = false;
   garageEl.hidden = !parked || garageClosed || panelOpen || Math.abs(state.speed) > 0.6;
   if (!inShop()) shopClosed = false;
