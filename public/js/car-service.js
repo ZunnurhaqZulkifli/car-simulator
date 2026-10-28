@@ -52,10 +52,10 @@
       title: 'Coolant level low', msg: 'Stop safely and top up coolant. Risk of overheating.' },
     // brakes: pads wear faster once they're past their fade temperature; worn-out pads score the discs metal on metal
     { key: 'brake', code: 'C1170', module: 'ABS', col: 'brake_wear_pct', label: 'Brake pads', group: 'Brakes',
-      rate: (t) => t.brakeWork * 0.003 * hw.padWear * (1 + Math.max(0, brakeT - hw.fade) / 200),
+      rate: (t) => t.brakeWork * 0.0024 * hw.padWear * (1 + Math.max(0, brakeT - hw.fade) / 200),
       title: 'Brake pads worn', msg: 'Stopping distance increased. Replace the brake pads immediately.' },
     { key: 'discs', code: 'C1171', module: 'ABS', store: true, label: 'Brake discs', group: 'Brakes',
-      rate: (t) => t.brakeWork * 0.0009 * hw.discWear * (1 + Math.max(0, brakeT - 550) / 250) + (byKey.brake.value >= 100 ? t.brakeWork * 0.01 : 0),
+      rate: (t) => t.brakeWork * 0.00072 * hw.discWear * (1 + Math.max(0, brakeT - 550) / 250) + (byKey.brake.value >= 100 ? t.brakeWork * 0.01 : 0),
       title: 'Brake discs worn', msg: 'Discs below minimum thickness. Braking reduced - replace the discs.' },
     { key: 'fluid', code: 'C1105', module: 'ABS', store: true, label: 'Brake fluid', group: 'Brakes', rate: (t) => t.dt * 0.0015 + t.km * 0.02 + t.boiling * t.dt * 0.6,
       read: (v) => Math.round(hw.boil - v / 100 * 80) + ' °C bp',
