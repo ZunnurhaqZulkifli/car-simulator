@@ -2597,7 +2597,7 @@
 
     // gearLabel R: the driving page (drive.html) rolls the car backwards on it
     CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
-      gearLabel: transmissionMode==='R' ? 'R' : `${transmissionMode==='M' || transmissionMode==='S' ? transmissionMode : 'D'}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
+      gearLabel: transmissionMode==='R' || transmissionMode==='N' ? transmissionMode : `${transmissionMode==='M' || transmissionMode==='S' ? transmissionMode : 'D'}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
 
     // ---- warning lights: startup bulb-check, then live conditions ----
     if(!ignition){

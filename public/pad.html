@@ -30,9 +30,8 @@
 
   /* the sides: a paddle over each pedal, as the wheel's paddles sit over your thumbs */
   .side { display: grid; grid-template-rows: clamp(58px, 21vh, 84px) minmax(0, 1fr); gap: 10px; min-height: 0; }
-  .side:has(#hb) { grid-template-rows: clamp(58px, 21vh, 84px) minmax(0, 1fr) clamp(48px, 17vh, 72px); }
-  /* the handbrake, under the brake: held, like the lever */
-  #hb { font-weight: 600; border-radius: 12px 12px 22px 22px; background: linear-gradient(#262a2f, #1d2024); }
+  /* the handbrake: the Drive tab's whole bottom row, held like the lever */
+  #hb { grid-column: 1 / -1; font-weight: 600; letter-spacing: .02em; background: linear-gradient(#262a2f, #1d2024); }
   #hb.down { background: #2a1517; border-color: var(--m-red); box-shadow: inset 0 0 0 1px var(--m-red); }
   .paddle { font: 400 40px/1 var(--num); border-radius: 22px 22px 12px 12px; background: linear-gradient(#30353c, #22262b);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
@@ -85,9 +84,22 @@
   nav button[aria-selected=true] { background: var(--raised); color: var(--text); box-shadow: inset 0 -2px 0 var(--m-light); }
   .tab { flex: 1; min-height: 0; display: grid; gap: 8px; grid-auto-rows: minmax(0, 1fr); }
   .tab[hidden] { display: none; }
-  #tab-drive { grid-template-columns: repeat(6, 1fr); }
+  #tab-drive { grid-template-columns: repeat(var(--n, 7), 1fr); } /* the signals at the ends, by the thumbs; the gears and DSC between */
   #tab-setup { grid-template-columns: repeat(4, 1fr); }
-  #tab-car { grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(0, 64px); }
+  #tab-car { grid-template-columns: repeat(6, 1fr); grid-auto-rows: minmax(0, 64px); }
+  #tab-car > :nth-child(-n+2) { grid-column: span 3; } /* Lights, High beam; under them Beam - / level / + */
+  #tab-car > :nth-child(n+3) { grid-column: span 2; }
+  #tab-view { grid-template-columns: 2fr 1fr; }
+  /* D with its sport program beside it: the one it's in lit */
+  .key.ds b, .key.ds i { font-style: normal; font-weight: 400; }
+  .key.ds i { margin-left: 6px; font-size: .62em; opacity: .4; }
+  .key.ds.sport b { opacity: .4; }
+  .key.ds.sport i { opacity: 1; color: var(--m-light); }
+  /* the look-around touchpad */
+  #look { grid-row: span 2; display: flex; align-items: center; justify-content: center; border-radius: 14px; border: 1px dashed var(--line); color: var(--dim);
+          background: radial-gradient(circle, rgba(255, 255, 255, .07) 1px, transparent 1.5px) 0 0 / 18px 18px, var(--panel); }
+  #look > * { pointer-events: none; } /* offsets stay the pad's own, turned round or not */
+  #look.down { border-color: var(--m-light); }
   .key { min-height: 0; font-weight: 600; line-height: 1.1; }
   .key.sel { font: 400 24px var(--num); }
   .key.on { border-color: var(--m-light); box-shadow: inset 0 0 0 1px var(--m-light); }
@@ -116,7 +128,6 @@
 <section class="side">
   <button class="paddle" id="up" aria-label="Shift up">+</button>
   <div class="pedal" data-k="b" role="slider" aria-label="Brake" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span>Brake</span><b>0</b><i></i></div>
-  <button id="hb">Handbrake</button>
 </section>
 <main>
   <header>
@@ -134,10 +145,16 @@
     <button role="tab" data-tab="drive" aria-selected="true">Drive</button>
     <button role="tab" data-tab="setup" aria-selected="false">Setup</button>
     <button role="tab" data-tab="car" aria-selected="false">Car</button>
+    <button role="tab" data-tab="view" aria-selected="false">View</button>
   </nav>
   <div class="tab" id="tab-drive" role="tabpanel"><p class="empty">Open the drive page on the Mac to get this car's controls</p></div>
   <div class="tab" id="tab-setup" role="tabpanel" hidden></div>
   <div class="tab" id="tab-car" role="tabpanel" hidden></div>
+  <div class="tab" id="tab-view" role="tabpanel" hidden>
+    <div id="look" role="application" aria-label="Look around: drag to turn the camera"><span>Drag to look around</span></div>
+    <button class="key" id="cam" aria-label="Switch between the chase and in-car view">Chase / in-car</button>
+    <button class="key" id="cam-reset">Reset view</button>
+  </div>
 </main>
 <section class="side">
   <button class="paddle" id="down" aria-label="Shift down">−</button>
@@ -145,14 +162,14 @@
 </section>
 <div class="cover" id="intro">
   <h1>Hold your phone sideways, like a wheel</h1>
-  <p>Tilt to steer. Brake on the left with the handbrake under it, throttle on the right, the shift paddles above them.</p>
+  <p>Tilt to steer. Brake on the left, throttle on the right, with the shift paddles above them.</p>
   <button id="go">Start driving</button>
 </div>
 <script>
 const FULL_LOCK = 40, DEAD = 2; // degrees the phone turns for full lock, and a still zone round straight ahead
 const pad = { s: 0, t: 0, b: 0, h: 0 }; // s: -1-1, + = left (as A on the drive page); t, b: 0-1; h: the handbrake, held
 const $ = id => document.getElementById(id);
-let ws, car = null, carJson = '', lastTele = 0, pressed = { label: '', at: 0 };
+let ws, car = null, carJson = '', lastTele = 0, pressed = { label: '', at: 0 }, gearMode = '';
 const send = m => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(m));
 
 // how far the phone is turned clockwise, like a wheel, from level in landscape (held either way round): world "up"
@@ -202,17 +219,31 @@ for (const el of document.querySelectorAll('.pedal')) {
   el.onpointermove = e => el.hasPointerCapture(e.pointerId) && set(e);
   el.onpointerup = el.onpointercancel = () => { pad[k] = 0; draw(); };
 }
-// the handbrake: on while held
-$('hb').onpointerdown = e => { $('hb').setPointerCapture(e.pointerId); $('hb').classList.add('down'); pad.h = 1; };
-$('hb').onpointerup = $('hb').onpointercancel = () => { $('hb').classList.remove('down'); pad.h = 0; };
+// the look-around touchpad: drags add up between sends (lx / ly, as the Mac's two-finger swipe moves it)
+const look = { x: 0, y: 0 };
+let lookFrom = null;
+$('look').onpointerdown = e => { $('look').setPointerCapture(e.pointerId); $('look').classList.add('down'); lookFrom = [e.offsetX, e.offsetY]; };
+$('look').onpointermove = e => {
+  if (!lookFrom) return;
+  look.x += e.offsetX - lookFrom[0]; look.y += e.offsetY - lookFrom[1];
+  lookFrom = [e.offsetX, e.offsetY];
+};
+$('look').onpointerup = $('look').onpointercancel = () => { $('look').classList.remove('down'); lookFrom = null; };
 
-// buttons tap the car's own keys on the drive page; o.drive taps one of the drive page's (signals, view)
+// buttons tap the car's own keys on the drive page (o.keyOf: which, at the time); o.drive taps one of the drive page's
+// (signals, view), o.msg sends its own message, o.hold sets pad[o.hold] while held (the handbrake)
 const codeOf = k => /^[a-z]$/.test(k) ? 'Key' + k.toUpperCase() : /^\d$/.test(k) ? 'Digit' + k : { ',': 'Comma', '.': 'Period' }[k];
 function hook(b, o) {
   const fire = shiftKey => {
     pressed = { label: b.textContent, at: Date.now() };
-    send(o.msg || (o.mode ? { mode: o.mode } : o.drive ? { tap: o.drive, drive: 1 } : { tap: { key: o.key, code: codeOf(o.key), shiftKey } }));
+    const key = o.keyOf ? o.keyOf() : o.key;
+    send(o.msg || (o.mode ? { mode: o.mode } : o.drive ? { tap: o.drive, drive: 1 } : { tap: { key, code: codeOf(key), shiftKey } }));
   };
+  if (o.hold) {
+    b.onpointerdown = e => { b.setPointerCapture(e.pointerId); b.classList.add('down'); pad[o.hold] = 1; };
+    b.onpointerup = b.onpointercancel = () => { b.classList.remove('down'); pad[o.hold] = 0; };
+    return b;
+  }
   let held = null;
   b.onpointerdown = () => {
     b.classList.add('down');
@@ -226,7 +257,7 @@ function hook(b, o) {
 function key(o) {
   const b = document.createElement('button');
   b.className = 'key' + (o.cls ? ' ' + o.cls : '');
-  b.textContent = o.label;
+  if (o.html) b.innerHTML = o.html; else b.textContent = o.label;
   if (o.aria) b.setAttribute('aria-label', o.aria);
   if (o.gear) b.dataset.gear = o.gear;
   if (o.mode) b.dataset.mode = o.mode;
@@ -236,27 +267,37 @@ function key(o) {
 hook($('down'), { key: 'q' });
 hook($('up'), { key: 'e' });
 hook($('ign'), { key: 'i' });
+hook($('cam'), { drive: { key: 'c', code: 'KeyC' } });
+hook($('cam-reset'), { msg: { look: 'reset' } });
 
 // this car's controls, from its own key hints: the drive keys in their places, then whatever set-up keys it has
 const KNOWN = new Set(['i', 'w', 's', 'space', 'shift', 'q', 'e', 'm', 'k', 'g', 'n', 'r', '1', '2', '3', 'f', ',', '.', 'l', 'h', 't']); // (T: the traction button)
+// the gear keys: D's sport program - S or DS on G, or the E60's D / S on M - and a manual gate on M (the rest of
+// G - the M cars' Drivelogic, the GT3's drive mode - goes to Setup)
+const SPORT_G = /s gearbox|^ds$|^s$/i, SPORT_M = /d \/ s/i;
 const nice = s => s.replace(/ gate$/, '').replace(/^./, c => c.toUpperCase());
 function build() {
   const h = car.hints, isM = /M1/.test(h['1'] || ''), fill = (id, list) => $(id).replaceChildren(...list.filter(Boolean).map(key));
-  fill('tab-drive', [
+  const sport = SPORT_G.test(h.g || '') ? 'g' : SPORT_M.test(h.m || '') ? 'm' : '', sportName = /^ds$/i.test(h.g || '') ? 'DS' : 'S';
+  const top = [
+    { label: '◀', drive: { key: 'ArrowLeft', code: 'ArrowLeft' }, aria: 'Indicate left' },
     { label: 'R', key: 'r', gear: 'R', cls: 'sel', aria: 'Reverse' },
     { label: 'N', key: 'n', gear: 'N', cls: 'sel', aria: 'Neutral' },
-    { label: 'D', key: 'k', gear: 'D', cls: 'sel', aria: 'Drive' },
-    h.m && { label: nice(h.m), key: 'm', gear: 'M' },
-    h.g && { label: nice(h.g), key: 'g', gear: 'S' },
+    // D, and pressed again in D its sport program (and back)
+    sport ? { html: `<b>D</b><i>${sportName}</i>`, keyOf: () => gearMode === 'D' ? sport : 'k', gear: 'D', id: 'ds', cls: 'sel ds', aria: `Drive - again for ${sportName}` }
+          : { label: 'D', key: 'k', gear: 'D', cls: 'sel', aria: 'Drive' },
+    h.m && !SPORT_M.test(h.m) && { label: 'M', key: 'm', gear: 'M', cls: 'sel', aria: 'Manual' },
     { label: 'DSC', id: 'tc', msg: { traction: 1 }, aria: 'Traction control: next setting' }, // labelled with the car's own setting (showTele)
-    { label: '◀', drive: { key: 'ArrowLeft', code: 'ArrowLeft' }, aria: 'Indicate left' },
+    { label: '▶', drive: { key: 'ArrowRight', code: 'ArrowRight' }, aria: 'Indicate right' },
+  ].filter(Boolean);
+  $('tab-drive').style.setProperty('--n', top.length);
+  fill('tab-drive', [...top, { label: 'Handbrake', id: 'hb', hold: 'h' }]);
+  const store = /store/.test(h['1'] || '');
+  fill('tab-setup', [
     h.f && { label: 'Cruise', key: 'f' },
     h[','] && { label: '−5', key: ',', aria: 'Cruise 5 km/h slower' },
     h['.'] && { label: '+5', key: '.', aria: 'Cruise 5 km/h faster' },
-    { label: '▶', drive: { key: 'ArrowRight', code: 'ArrowRight' }, aria: 'Indicate right' },
-  ]);
-  const store = /store/.test(h['1'] || '');
-  fill('tab-setup', [
+    h.g && sport !== 'g' && { label: nice(h.g), key: 'g' }, // Drivelogic, drive mode
     ...(car.modes || []).map(([mode, label]) => ({ label, mode })), // Comfort / Sport / Eco Pro
     ...(isM ? [{ label: 'M1', key: '1', cls: 'm', store }, { label: 'M2', key: '2', cls: 'm', store }]
             : ['1', '2', '3'].map(k => h[k] && { label: `Map ${k}`, key: k })),
@@ -265,7 +306,6 @@ function build() {
   fill('tab-car', [
     h.l && { label: 'Lights', key: 'l', id: 'lights' },
     h.h && { label: 'High beam', key: 'h', id: 'high' },
-    { label: 'Camera', drive: { key: 'c', code: 'KeyC' }, aria: 'Switch between the chase and in-car view' },
     { label: 'Beam −', msg: { beam: -1 }, aria: 'Headlights dimmer' },
     { label: 'Beam +', msg: { beam: 1 }, aria: 'Headlights brighter' },
   ]);
@@ -285,7 +325,9 @@ function showTele({ g, v, r, on, dm, tc, hl, beam }) {
   [...$('revs').children].forEach((s, i) => s.classList.toggle('lit', i < lit));
   $('revs').classList.toggle('flash', r >= redline * 0.97);
   $('ign').classList.toggle('on', on);
-  for (const b of document.querySelectorAll('[data-gear]')) b.classList.toggle('on', b.dataset.gear === (g || '')[0]);
+  gearMode = /^D?S/.test(g || '') ? 'S' : (g || '')[0]; // R, N, D, S (S or DS), M - or P
+  for (const b of document.querySelectorAll('[data-gear]')) b.classList.toggle('on', b.dataset.gear === gearMode || (b.dataset.gear === 'D' && gearMode === 'S'));
+  $('ds')?.classList.toggle('sport', gearMode === 'S');
   for (const b of document.querySelectorAll('[data-mode]')) b.classList.toggle('on', b.dataset.mode === dm);
   const tcBtn = $('tc');
   if (tcBtn) {
@@ -337,8 +379,12 @@ $('go').onclick = async () => {
   };
   ws.onclose = () => setTimeout(connect, 1000);
 })();
-// a steady 30 Hz: the drive page lets go of everything when it hears nothing for half a second
-setInterval(() => send(pad), 33);
+// a steady 30 Hz: the drive page lets go of everything when it hears nothing for half a second. Look-around drags
+// ride along, turned to the Mac trackpad's sense (fingers left, deltaX +) and doubled for the smaller pad
+setInterval(() => {
+  send(look.x || look.y ? { ...pad, lx: -look.x * 2, ly: -look.y * 2 } : pad);
+  look.x = look.y = 0;
+}, 33);
 setInterval(() => {
   const open = ws.readyState === WebSocket.OPEN, live = open && Date.now() - lastTele < 1500;
   $('dot').className = live ? 'live' : open ? 'wait' : '';

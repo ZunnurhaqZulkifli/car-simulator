@@ -2213,17 +2213,22 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
 }).catch(e => console.warn(`${CAR.name} model not loaded - keeping the built car:`, e));
 
 const keys = new Set();
-// camera orbit: two-finger trackpad swipe arrives as wheel events; W swings it back behind the car
+// camera orbit: two-finger trackpad swipe arrives as wheel events (and the phone pad's touchpad as the same deltas);
+// W, or the pad's Reset view, swings it back behind the car
 const PITCH = 0.3, CAM_DIST = 8.4; // default chase: ~8 m behind, ~3.5 m up
 // and the car framed as high above the cluster panel as the M3 sits over its own (the shortest cluster), whatever this
 // car's cluster height: its middle this far (tan of the angle) above the panel's top
 const CHASE_GAP = 0.3;
 let orbitYaw = 0, orbitPitch = PITCH;
+function lookBy(dx, dy) {
+  orbitYaw += dx * 0.005;
+  orbitPitch = Math.min(1.4, Math.max(0.05, orbitPitch - dy * 0.005));
+}
+const resetLook = () => { orbitYaw = 0; orbitPitch = PITCH; };
 addEventListener('wheel', e => {
   e.preventDefault(); // stop the swipe from scrolling or navigating back
   if (e.ctrlKey) return; // pinch, not a swipe
-  orbitYaw += e.deltaX * 0.005;
-  orbitPitch = Math.min(1.4, Math.max(0.05, orbitPitch - e.deltaY * 0.005));
+  lookBy(e.deltaX, e.deltaY);
 }, { passive: false });
 let inCar = false;
 function onKey(e) {
@@ -2234,7 +2239,7 @@ function onKey(e) {
   if (e.code === 'Tab' || e.code === 'Slash' || e.code === 'ArrowUp' || e.code === 'ArrowDown' || (e.code === 'Space' && own(e))) e.preventDefault(); // this page's keys, not focus or scrolling
   if (e.repeat) return;
   if (e.code === 'Tab') setPanel(!panelOpen);
-  if (e.code === 'KeyW') orbitYaw = 0, orbitPitch = PITCH;
+  if (e.code === 'KeyW') resetLook();
   if (e.code === 'KeyC') setView(!inCar);
   if (e.code === 'Backquote') toggleTeleport();
   if (e.code === 'Backslash') toggleWeather();
@@ -2338,7 +2343,7 @@ showLimits();
 
 // phone pad (scripts/pad-relay.mjs, public/pad.html). From the phone: tilt steering (-1-1, + = left), throttle /
 // brake sliders (0-1) and the handbrake (h, held) at 30 Hz, taps of the car's keys, its drive modes, its traction
-// switch and the headlights' brightness. To it: gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
+// switch, the headlights' brightness, look-around drags (lx / ly, as trackpad deltas) and a view reset. To it: gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
 // on, 2 high beam) and their brightness, this car's key hints (the buttons it shows), its drive modes and the
 // cluster's set-up pop-ups. The throttle opens the car page's accelerator directly; the brake
 // holds S with the brake limiter set to the slider (in the loop below), so the pedal ramps as S does
@@ -2353,6 +2358,7 @@ function padInput(m) {
   }
   if (!b !== !pad.b) w.dispatchEvent(new w.KeyboardEvent(b ? 'keydown' : 'keyup', { key: 's', code: 'KeyS' }));
   Object.assign(pad, { s, t, b, h: !!m.h, at: performance.now() });
+  if (m.lx || m.ly) lookBy(Math.max(-500, Math.min(500, +m.lx || 0)), Math.max(-500, Math.min(500, +m.ly || 0))); // its touchpad
 }
 // a tap of one of the car's keys, straight into the car page - so its C (chassis) and O (M Sound) get past this page's
 // own C and O - or into this page for its own keys (signals, view)
@@ -2408,6 +2414,7 @@ function showPadLink(url) { // the relay copies the phone's link to the clipboar
     else if (m.mode) [...frame.contentDocument.querySelectorAll('.mode-btn')].find(b => b.dataset.mode === m.mode)?.click();
     else if (m.traction) cycleTraction();
     else if (m.beam) nudgeBeam(m.beam);
+    else if (m.look) resetLook(); // { look: 'reset' }
     else if ('t' in m) padInput(m);
     else if ('phone' in m) showPadLink(m.phone);
   };
