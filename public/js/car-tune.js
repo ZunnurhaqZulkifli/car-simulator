@@ -362,7 +362,7 @@
       opt('hf', 'High flow', '~30% more flow through the engine and radiator.', { wpFlow: 1.3 })] },
     { k: 'thermostat', group: 'Cooling', label: 'Thermostat', opts: [
       opt('stock', fuel === 'petrol' ? '92 °C' : '88 °C', 'Factory map thermostat.'),
-      opt('low', fuel === 'petrol' ? '82 °C' : '80 °C', 'Opens ~10 °C earlier: cooler running, a little more knock margin, slower warm-up.', { tstat: -10 })] },
+      opt('low', fuel === 'petrol' ? '82 °C' : '80 °C', 'Opens ~10 °C earlier: cooler running, a little more knock margin, slower warm-up.', { tstat: fuel === 'petrol' ? -10 : -8 })] },
     { k: 'oilcooler', group: 'Cooling', label: 'Oil cooler', opts: [
       opt('stock', 'Stock', 'Oil-to-coolant heat exchanger.'),
       opt('big', 'Big oil cooler', 'Extra air-cooled oil cooler: much cooler oil on long hard runs.', { oilCool: 1.9 })] },

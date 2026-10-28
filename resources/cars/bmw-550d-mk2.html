@@ -2228,11 +2228,13 @@
     prevThrottleForBov = throttlePct;
     // cold engine makes less power - rich warm-up mixture, high oil/friction drag, the ECU holds it
     // back until the coolant is warm. 70% by 30C, full power only at ~90C operating temp.
-    const coldPowerMul = 0.7 + 0.3 * Math.max(0, Math.min(1, (coolantC - 30) / 60));
+    // warmShift: operating temp follows the fitted thermostat (88C stock, 80C with the low-temp one)
+    const warmShift = CarTune.tstat() - 88;
+    const coldPowerMul = 0.7 + 0.3 * Math.max(0, Math.min(1, (coolantC - 30) / (60 + warmShift)));
     const wearPowerMul = (1 - (wearPct/100)*0.1) * coldPowerMul; // wear: up to 10% loss at 100%; combined with the cold-engine penalty
     // cold fast idle: the ECU holds a raised idle through the whole warm-up, only dropping to normal
     // idle once the engine reaches operating temp (~82C -> 88C)
-    const idleK = IDLE_RPMK + Math.max(0, Math.min(1, (88 - coolantC) / 6)) * 0.5;
+    const idleK = IDLE_RPMK + Math.max(0, Math.min(1, (88 + warmShift - coolantC) / 6)) * 0.5;
 
     // real drag physics instead of an artificial speed governor: acceleration tapers naturally
     // toward the point where engine force = aerodynamic drag + rolling resistance
@@ -2607,7 +2609,7 @@
       wlBattery.className = wlBelt.className = wlGlow.className = 'wl';
       const overheating = coolantC > 112;
       wlEngine.className = (overheating || wearPct > 50 || CarTune.warnLight()) ? 'wl on-red' : 'wl';
-      wlTemp.className = overheating ? 'wl on-red blink' : (coolantC < 87 ? 'wl on-blue' : 'wl'); // blue until the engine reaches operating temp
+      wlTemp.className = overheating ? 'wl on-red blink' : (coolantC < 87 + warmShift ? 'wl on-blue' : 'wl'); // blue until the engine reaches operating temp
       wlOil.className = (engineOnTime > 2 && oilPressureBar < 0.5) ? 'wl on-red blink' : 'wl';
       wlAbs.className = (braking && speed > 5) ? 'wl on-amber blink' : 'wl';
       wlTc.className = tcOn && tcIntervening ? 'wl on-amber blink' : 'wl'; // flickers while DSC cuts power

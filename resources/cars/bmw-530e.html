@@ -2530,13 +2530,15 @@
     }
     prevThrottleForBov = throttlePct;
     // cold engine makes less power until warm; wear costs up to 10% - only the engine's share is affected
-    const coldPowerMul = 0.7 + 0.3 * Math.max(0, Math.min(1, (coolantC - 30) / 60));
+    // warmShift: operating temp follows the fitted thermostat (92C stock, 82C with the low-temp one)
+    const warmShift = CarTune.tstat() - 92;
+    const coldPowerMul = 0.7 + 0.3 * Math.max(0, Math.min(1, (coolantC - 30) / (60 + warmShift)));
     const wearPowerMul = engineRunning ? (1 - (wearPct/100)*0.1) * (0.85 + 0.15*coldPowerMul) : 1;
     // parked and charging from the engine (BATTERY CONTROL / charge-sustaining): the idle is raised a
     // little to put the generator to work, and revving it harder (N/P) charges harder - see the energy split
     const wantCharge = (eDriveMode === 'save' && soc < 0.8) || soc < SOC_MIN + 0.04;
     const parkedCharging = engineRunning && wantCharge && speed < 1;
-    const idleK = IDLE_RPMK + Math.max(0, Math.min(1, (88 - coolantC) / 6)) * 0.5 + (parkedCharging ? 0.4 : 0);
+    const idleK = IDLE_RPMK + Math.max(0, Math.min(1, (88 + warmShift - coolantC) / 6)) * 0.5 + (parkedCharging ? 0.4 : 0);
 
     const AIR_RHO = 1.225, DRAG_CDA = 0.62;
     const dragDecel_ms2 = (0.5*AIR_RHO*DRAG_CDA*v_ms*v_ms)/MASS;
