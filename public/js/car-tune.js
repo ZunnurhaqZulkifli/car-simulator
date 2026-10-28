@@ -307,6 +307,27 @@
             tq: 1050, rev: 8600, shift: 8400, shiftSpeed: 1 }) },
       ],
     },
+    // 335i (E90 LCI): the N55 3.0 straight-six on one twin-scroll turbo, Valvetronic and direct injection - the stock
+    // map runs ~0.85 bar and tapers up top; the petrol presets (stage 1-3) build on it
+    N55: {
+      fuel: 'petrol', name: 'N55B30 3.0 turbo I6', cyl: 6, maxRpm: 7200, tstat: 92,
+      axis: [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000],
+      boost: [0.35, 0.8, 0.85, 0.85, 0.85, 0.85, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55],
+      afr: [13.0, 12.8, 12.6, 12.5, 12.4, 12.3, 12.2, 12.1, 12.0, 11.9, 11.8, 11.8, 11.7],
+      margin: [1.4, 0.8, 0.8, 1.0, 1.3, 1.6, 1.9, 2.2, 2.5, 2.8, 3.0, 3.2, 3.3],
+      cylMargin: [0, 0.2, 0, -0.3, -0.2, -0.6], // cylinder 6 runs hottest
+      turbos: {
+        stock: [0.45, 1.0, 1.15, 1.2, 1.2, 1.2, 1.15, 1.1, 1.05, 1.0, 0.95, 0.9, 0.85],
+        hybrid: [0.3, 0.8, 1.2, 1.5, 1.65, 1.7, 1.7, 1.65, 1.6, 1.55, 1.45, 1.35, 1.25],
+        big: [0.1, 0.35, 0.75, 1.2, 1.6, 1.95, 2.15, 2.2, 2.2, 2.15, 2.1, 2.0, 1.9],
+      },
+      krpm: { stock: 220, hybrid: 200, big: 165 },
+      tq: 400, rod: 600, trans: { name: 'ZF 6HP21', cap: 500, uprated: 650, built: 800 },
+      swap: { // the E9x has an air-to-air front-mount, not the B58's water-to-air
+        intercooler: { opts: [['stock', 'Stock', 'Front-mounted air-to-air: heat-soaks over repeated pulls.', { ic: 0.8, soak: 10 }],
+          ['big', 'Big front-mount', 'Larger stepped core: cooler, steadier intake temps.', { ic: 0.9, soak: 4 }]] },
+      },
+    },
   };
 
   // ================= part catalogue: what fits, and what each option changes =================
