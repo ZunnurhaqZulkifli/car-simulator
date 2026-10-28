@@ -10,7 +10,31 @@
   #hud { position: fixed; z-index: 2; left: 12px; top: 12px; color: #fff; background: rgba(0, 0, 0, .5); padding: 8px 12px; border-radius: 6px; }
   #pump, #rollers { margin-top: 4px; color: #7dff9a; font-weight: 600; }
   #padlink { margin-top: 4px; color: #8cc8ff; font-weight: 600; }
-  #map { position: fixed; z-index: 2; right: 12px; top: 12px; width: 200px; height: 290px; background: rgba(0, 0, 0, .5); border-radius: 8px; }
+  #map { position: fixed; z-index: 2; right: 12px; top: 12px; width: 200px; height: 290px; background: rgba(0, 0, 0, .5); border-radius: 8px; cursor: pointer; }
+  #tele { position: fixed; z-index: 2; left: 12px; bottom: 12px; contain: layout paint; padding: 12px 14px 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .08);
+          background: rgba(8, 9, 11, .62); color: #e9edf2; font: 600 10px/1.2 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  #tele header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; color: #8b939d; letter-spacing: .16em; text-transform: uppercase; }
+  #tele header span { flex: 1; }
+  #tele header b { padding: 2px 6px; border-radius: 4px; border: 1px solid #353a41; color: #555c66; letter-spacing: .08em; }
+  #tele header b.on { border-color: #ffb020; background: #ffb020; color: #121212; }
+  .t-main { display: flex; gap: 14px; }
+  #t-gg { display: block; width: 200px; height: 200px; }
+  .t-gnum { display: flex; justify-content: space-between; margin-top: 8px; color: #8b939d; letter-spacing: .12em; }
+  .t-gnum b { margin-left: 5px; color: #fff; font-size: 17px; letter-spacing: 0; }
+  .t-peak { margin-top: 3px; color: #6c747e; letter-spacing: .04em; }
+  .t-pedal { display: flex; flex-direction: column; align-items: center; gap: 5px; color: #8b939d; }
+  .t-pedal div { position: relative; width: 12px; height: 200px; border-radius: 6px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+  .t-pedal i { position: absolute; inset: 0; border-radius: inherit; transform-origin: bottom; transform: scaleY(0); will-change: transform; }
+  #t-thr { background: linear-gradient(#6dffa0, #1fa84f); }
+  #t-brk { background: linear-gradient(#ff7a6b, #c0261a); }
+  .t-car { width: 100px; text-align: center; color: #8b939d; }
+  #wear { display: block; width: 100px; height: 200px; margin-bottom: 8px; color: #fff; }
+  .t-temps { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .08); }
+  .t-temps div { display: grid; gap: 4px; }
+  .t-temps div[hidden] { display: none; }
+  .t-temps span { color: #8b939d; letter-spacing: .14em; text-transform: uppercase; }
+  .t-temps b { color: var(--c, #e9edf2); font-size: 17px; }
+  .t-temps i { height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--c, #e9edf2) var(--p, 0%), rgba(255, 255, 255, .1) 0); }
   .menu { position: fixed; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 300px; padding: 18px 20px;
           border-radius: 12px; background: rgba(15, 16, 18, .92); color: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); }
   .menu h2 { margin: 0 0 6px; font-size: 18px; }
@@ -25,7 +49,17 @@
   #panel-close { position: fixed; z-index: 4; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px;
                  border: 1px solid #3a3d42; background: rgba(15, 16, 18, .9); color: #fff; font: 13px system-ui, sans-serif; cursor: pointer; }
   #panel-close:hover, #panel-close:focus-visible { border-color: #4fa8ff; }
-  .panel-open #hud, .panel-open #map, .panel-open #credit { visibility: hidden; }
+  .panel-open #hud, .panel-open #map, .panel-open #tele, .panel-open #credit, .panel-open #teleport, .panel-open #weather, .panel-open #laptime { visibility: hidden; }
+  #laptime { position: fixed; z-index: 2; right: 12px; top: 310px; width: 200px; box-sizing: border-box; padding: 8px 12px; border-radius: 8px;
+             background: rgba(0, 0, 0, .5); color: #fff; font: 12px system-ui, sans-serif; }
+  #laptime span { color: #aab0b8; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+  #laptime b { display: block; margin: 2px 0; font: 600 28px ui-monospace, monospace; }
+  #laptime i { font: 12px ui-monospace, monospace; }
+  #laptime .best { color: #6fe08a; }
+  #teleport-places { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; }
+  #weather { width: min(520px, calc(100vw - 72px)); }
+  #weather .wx-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); column-gap: 8px; margin-bottom: 10px; }
+  #wx-now { cursor: pointer; }
   kbd { padding: 0 5px; border: 1px solid #555; border-radius: 4px; font: 12px ui-monospace, monospace; }
   #credit { position: fixed; z-index: 2; right: 12px; bottom: 8px; font-size: 11px; color: rgba(255, 255, 255, .75); text-shadow: 0 1px 2px #000; }
   #credit a { color: inherit; }
@@ -37,9 +71,9 @@
 } }</script>
 </head>
 <body>
-<div id="hud">I start · W gas · S brake · Space handbrake · A/D steer · R reverse · ←/→ signal · C in-car view · two-finger swipe to look around
+<div id="hud">I start · W gas · S brake · Space handbrake · A/D steer · R reverse · ←/→ signal · L lights, H high beam · C in-car view · two-finger swipe to look around
   <div><kbd>F</kbd> cruise control, <kbd>,</kbd><kbd>.</kbd> set speed -5 / +5 km/h · <kbd>↑</kbd><kbd>↓</kbd> throttle limit <b id="lim-throttle">100%</b> · <kbd>O</kbd><kbd>P</kbd> brake limit <b id="lim-brake">100%</b></div>
-  <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <a href="/" style="color:inherit">main menu</a></div>
+  <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <kbd>`</kbd> or click the map: teleport · <kbd>/</kbd> Nordschleife lap timer <b id="lap-on">on</b> · <kbd>\</kbd> time &amp; weather <b id="wx-now"></b> · <a href="/" style="color:inherit">main menu</a></div>
   <div id="pump" hidden></div>
   <div id="rollers" hidden>On the dyno rollers - Dyno mode is on (<kbd>Tab</kbd> car menu, Dyno) - switch it off to drive</div>
   <div id="padlink" hidden></div>
@@ -66,8 +100,52 @@
   <div id="pit-cars"></div>
   <button class="menu-leave" data-leave>Back to the track</button>
 </div>
+<div id="teleport" class="menu" hidden>
+  <h2>Teleport</h2>
+  <p>The car lands there stopped, facing along the road.</p>
+  <div id="teleport-places"></div>
+  <button class="menu-leave" data-leave>Keep driving</button>
+</div>
+<div id="weather" class="menu" hidden>
+  <h2>Time &amp; weather</h2>
+  <p id="wx-note"></p>
+  <div id="weather-opts"></div>
+  <button class="menu-leave" data-leave>Keep driving</button>
+</div>
 <button id="panel-close" hidden>Back to driving <kbd>Tab</kbd></button>
 <canvas id="map" aria-label="Mini map"></canvas>
+<div id="laptime" hidden><span>Nordschleife</span><b id="lap-now">-:--.-</b>Last <i id="lap-last">-</i> · Best <i id="lap-best">-</i></div>
+<!-- track telemetry: the g-g circle, the pedals, the temperatures that matter on a track day and the worn parts, seen
+     from above (nose up) - each takes the colour of its most worn part, white (as new) to red (worn out) -->
+<section id="tele" aria-label="Telemetry">
+<header><span>Telemetry</span><b id="t-tc">TC</b><b id="t-slip">Slip</b></header>
+<div class="t-main">
+<div>
+  <canvas id="t-gg" aria-label="G-meter"></canvas>
+  <div class="t-gnum"><span>LAT<b id="t-lat">0.00</b></span><span>LONG<b id="t-lon">0.00</b></span></div>
+  <div class="t-peak" id="t-peak"></div>
+</div>
+<div class="t-pedal"><div><i id="t-thr"></i></div>T</div>
+<div class="t-pedal"><div><i id="t-brk"></i></div>B</div>
+<div class="t-car">
+<svg id="wear" viewBox="0 0 80 160" role="img" aria-label="Worn parts" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+  <rect x="10" y="6" width="60" height="148" rx="18" fill="none" stroke-width="1.5" opacity=".5"/>
+  <g data-wear="tyres" stroke="none"><rect x="4" y="22" width="10" height="24" rx="2"/><rect x="66" y="22" width="10" height="24" rx="2"/><rect x="4" y="112" width="10" height="24" rx="2"/><rect x="66" y="112" width="10" height="24" rx="2"/></g>
+  <g data-wear="brakes" stroke="none"><rect x="16" y="27" width="3" height="14" rx="1"/><rect x="61" y="27" width="3" height="14" rx="1"/><rect x="16" y="117" width="3" height="14" rx="1"/><rect x="61" y="117" width="3" height="14" rx="1"/></g>
+  <g data-wear="springs" fill="none"><path d="M25 22l4 2-8 4 8 4-8 4 8 4-8 4 4 2M55 22l4 2-8 4 8 4-8 4 8 4-8 4 4 2M25 112l4 2-8 4 8 4-8 4 8 4-8 4 4 2M55 112l4 2-8 4 8 4-8 4 8 4-8 4 4 2"/></g>
+  <g data-wear="engine" stroke="none"><rect x="35" y="24" width="10" height="4"/><rect x="32" y="28" width="16" height="18" rx="1"/></g>
+  <g data-wear="drivetrain"><path d="M34 46h12l-3 12h-6z"/><path d="M40 58v62M29 124h22" fill="none"/><circle cx="40" cy="124" r="4"/></g>
+</svg>
+<span id="t-worst"></span>
+</div>
+</div>
+<div class="t-temps">
+  <div id="t-oil"><span>Oil °C</span><b></b><i></i></div>
+  <div id="t-cool"><span>Coolant °C</span><b></b><i></i></div>
+  <div id="t-brake"><span>Brakes °C</span><b></b><i></i></div>
+  <div id="t-boost" hidden><span>Boost bar</span><b></b><i></i></div>
+</div>
+</section>
 <div id="credit"></div>
 <iframe id="carpage" title="Instrument cluster"></iframe>
 <script type="module">
@@ -79,27 +157,35 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import NORDSCHLEIFE from './js/nordschleife.js';
 
 // The drivable cars (?car=, picked in the garage at home). Each runs on its own car page - engine, gearbox, gauges -
-// with a model of the same car as its body. A model's parts are found by matching "material|mesh|parent" names:
+// with a model of the same car as its body (?v= on its URL once the file is edited, past browsers' cached copy). A model's parts are found by matching "material|mesh|parent" names:
 // paint (repainted Black Sapphire, or paintColor), glass (tinted), cabin (mirrored to right-hand drive), wheels and tyre (hung on
 // pivots that spin and steer), steering (searched for its rim, from `near` if it hides inside a bigger mesh; with
 // no `re`, the built wheel goes at `near`; `look`: how high over its centre the eye looks for the cluster; `inset`: how far short of what it sees there the cluster
-// goes, for dials deep in tubes), tail (its rear half glows when braking), head/tail/mirror lamps (where the
-// amber signals go), credit (title, page, licence if not by-nc-sa, author if not Ddiaz Design and their page)
+// goes, for dials deep in tubes; `size`: how wide it looks, 0.36 m at 1 m, smaller where the wheel hides more; `from`: the car whose model it came from, credited too), tail (its rear half glows when braking), head/tail/mirror lamps (where the
+// amber signals go), credit (title, page, licence if not by-nc-sa, author if not Ddiaz Design and their page), stiff (its
+// springs and anti-roll bars: 1 = an everyday saloon, 3.2° of body roll per g; 2 = half that, a third less pitch, quicker)
 const CARS = {
   x1: {
-    name: 'BMW X1 xDrive20d', page: 'bmw-x1-xdrive20d', model: '/models/bmw-x1-f48.glb', length: 4.447, wheelbase: 2.76, redline: 4850, // rpm, for the phone pad's shift lights
-    credit: ['2020 BMW X1 xDrive 18d', 'https://sketchfab.com/3d-models/2020-bmw-x1-xdrive-18d-4ca3a2247af44e51919074565ed93486'],
-    paint: /^CarPaint\|/, glass: /^(glass|glass_D|Panorama)\|/,
-    cabin: /^(front_seat|back_seat|Tonel|steering_wheel|Torpeda|doors|Potolok|Salon_black)\|/,
-    wheels: /^(Tire_texture|rim_black|Rim_Chrome|disk)\||Koleso_mat_back/, tyre: /^Tire_texture\|/,
-    steering: { re: /^steering_wheel\|/ },
-    tail: { re: /^Back_lights_texture\|/, fromMap: true, idle: 0.25, brake: 6 },
-    lamps: { head: /^Front_lights_emmisive\|/, tail: /^Back_lights_emisive\|/, mirror: /^Mirrors\|/ },
+    name: 'BMW X1 xDrive20d', page: 'bmw-x1-xdrive20d', model: '/models/bmw-x1-e84.glb?v=2', length: 4.477, wheelbase: 2.76, redline: 4850, // rpm, for the phone pad's shift lights
+    credit: ['BMW X1 2013', 'https://sketchfab.com/3d-models/bmw-x1-2013-302b32456b054dbdb5b72a08aca2bb80', 'by', 'DEMON_SCARY1235', 'https://sketchfab.com/szymonpasterczyk734'],
+    wheelsCredit: ['2020 BMW X1 xDrive 18d', 'https://sketchfab.com/3d-models/2020-bmw-x1-xdrive-18d-4ca3a2247af44e51919074565ed93486'], // its M Y-spoke wheels
+    // the E84 LCI: its parts named by role in prep (the wheels and the steering wheel cut out of merged meshes, the
+    // wheel scaled up to a real one's size), on black M Y-spoke wheels off the F48's model
+    paint: /^x1_paint\|/, glass: /^x1_glass\|/, cabin: /^cabin_/,
+    wheels: /^x1_(tyre|rim|disc|cap)/, tyre: /^x1_tyre/,
+    steering: { re: /^cabin_steering\|/, near: [-0.361, 1.038, 0.336] }, // (the rim's centre, by a circle fit)
+    tail: { re: /^x1_tail/, idle: 0.25, brake: 6, keep: v => v.y < 1.25 }, // (the clusters, not the third brake light up by the spoiler)
+    lamps: { head: /^x1_head/, tail: /^x1_tail/ },
     exhaustX: 0.45,
+    grip : 1.6,
+    chassis: { m: 1650, front: 0.53, rear: 0.6, h: 0.6 }, // kg, the front's share of the weight, the rear's of the drive (xDrive), CG height m
+    stiff: 0.6, // tall and softly sprung
   },
   m3: {
     name: 'BMW M3 CS Touring', page: 'bmw-m3-touring', model: '/models/bmw-m3-cs-touring.glb', length: 4.801, wheelbase: 2.857, redline: 7200,
     grip: 2.1, // g: track-biased tyres (everyday cars: 0.92)
+    chassis: { m: 1850, front: 0.52, rear: 0.75 }, // M xDrive, rear-biased (all of it in 2WD)
+    stiff: 2,
     credit: ['2025 BMW M3 CS Touring', 'https://sketchfab.com/3d-models/2025-bmw-m3-cs-touring-ebda8c29a8ef4ec789391e918d52ef55'],
     glass: /\|glass\|/, 
     glassPlain: true,
@@ -109,13 +195,14 @@ const CARS = {
     // speckle through each other, so the see-through layer's wheel is left out
     steering: { re: /InteriorA_Material1\||^red_Int\|/, near: [-0.375, 0.885, 0.35], drop: /^m3cs\w*InteriorA_Material1\|/ },
     // its lights are layered so that no layer's glow shows through: a soft red glow is laid over each tail light instead
-    tail: { overlay: true, keep: v => v.y > 0.75 && v.y < 1 && Math.abs(v.x) > 0.45 }, // the clusters at the rear corners
+    tail: { keep: v => v.y > 0.75 && v.y < 1 && Math.abs(v.x) > 0.45 }, // the clusters at the rear corners
     lamps: { head: /LightEmissiveA_Material1\|/, tail: /LightEmissiveA_Material1\|/ },
     exhaustX: 0.4, exhaustBoth: true, // tips both sides
   },
   m5: {
     name: 'BMW M5 CS', page: 'bmw-m5-cs', model: '/models/bmw-m5-competition.glb', length: 4.983, wheelbase: 2.982, redline: 7200, 
-    grip: 2.3,
+    grip: 2.3, stiff: 2.1,
+    chassis: { m: 1825, front: 0.53, rear: 0.75 },
     credit: ['2021 BMW M5 Competition', 'https://sketchfab.com/3d-models/2021-bmw-m5-competition-29a4c13761cb40e6a050871bd40a0963'],
     glass: /^bMAT_Glass1\|(?!bSM_FrontKit)/, glassPlain: true, cabin: /\|(bD_Body|bSM_Interior)_/, // (not the headlight lenses)
     wheels: /Wheel1A_3D|\|bSM_(Hub|Disk)_/, tyre: /Wheel1A_3D/, // the calipers (bSM_Brake_) stay put
@@ -127,25 +214,28 @@ const CARS = {
     exhaustX: 0.5, exhaustBoth: true, // tips both sides
   },
   m140: {
-    name: 'BMW M140i xDrive', page: 'bmw-140i', model: '/models/bmw-m140i.glb', length: 4.324, wheelbase: 2.69, redline: 7400, 
-    grip: 1.8,
+    name: 'BMW M140i xDrive', page: 'bmw-140i', model: '/models/bmw-m140i.glb?v=2', length: 4.324, wheelbase: 2.69, redline: 7400, 
+    grip: 2.2, stiff: 1.45,
+    chassis: { m: 1600, front: 0.54, rear: 0.6 },
     credit: ['2018 BMW M140i', 'https://sketchfab.com/3d-models/2018-bmw-m140i-24f09cc46773424fb2a3922427f1c37d', 'by'],
-    paint: /^iBody1\|/, glass: /^iGlass_Clear_Windshield1\|/, glassPlain: true, cabin: /^iInterior1\|/,
+    paint: /^iBody1\|/, glass: /^iGlass_Clear_Windshield1\|/, glassPlain: true, cabin: /^iInterior1\||\|cabin_steering$/,
     wheels: /^(iRim1|iTyres1|iBreak1)\|/, tyre: /^iTyres1\|/, // the (blue) calipers stay put
-    steering: { near: [-0.37, 0.86, 0.2] }, // its cabin has no steering wheel: the built one, here
-    tail: { overlay: true }, // its lights are already full red, so they can't glow brighter: a red glow goes over them
+    steering: { re: /\|cabin_steering$/, near: [-0.37, 0.86, 0.2], from: 'f30' }, // its cabin had none: the 320d's (the same M Sport wheel), fitted
+    tail: {}, // its lights are already full red, so they can't glow brighter: only the red glow over them shows braking
     lamps: { head: /^iWhite_Glow1\|/, tail: /^iRed_Glow1\|/, mirror: /^iMirror1\|/ },
     exhaustX: 0.5, exhaustBoth: true, // tips both sides
   },
   // a BeamNG car cut down to an M Sport 320d, its wheels, tyres and steering wheel fitted and its cabin's parts named cabin_
   f30: {
-    name: 'BMW 320d', page: 'bmw-320d', model: '/models/bmw-320d-f30.glb', length: 4.633, wheelbase: 2.81, redline: 5500,
+    name: 'BMW 320d', page: 'bmw-320d', model: '/models/bmw-320d-f30.glb?v=2', length: 4.633, wheelbase: 2.81, redline: 5500,
     credit: ['BMW 3 Series MK6 (F30)', 'https://sketchfab.com/3d-models/bmw-3-series-mk6-f30-2011-2018-087efd9833714af2a68561bde9181985', 'by', 'DEMON_SCARY1235', 'https://sketchfab.com/szymonpasterczyk734'],
-    grip: 1.6,
+    grip: 1.6, stiff: 1.15, // M Sport springs
+    chassis: { m: 1550, front: 0.49, rear: 1 },
+    drift: true, // on a wet or snowy road, the road's real friction (the others keep their share of their dry grip)
     paint: /^F30paint\|/, paintColor: 0x1f3866, glass: /^F30_glass\|/, glassPlain: true, cabin: /\|cabin_/, // blue, like the garage photo
     wheels: /\|wheel_/, tyre: /^F30_tyre\|/,
-    steering: { re: /\|cabin_steering$/, near: [-0.366, 0.777, 0.339], look: 0.2 }, // its dials sit high, over the rim
-    tail: { overlay: true }, // its brake lights are thin strips: a red glow goes over each tail light
+    steering: { re: /\|cabin_steering$/, near: [-0.366, 0.877, 0.339], look: 0.115, size: 0.28 }, // between the rim and the column's cover
+    tail: {}, // its brake lights are thin strips: the red glow over each tail light shows braking
     lamps: { head: /^F30_headlight\|.*\|_12[01]$/, tail: /^F30_optikazad\|/, mirror: /^F30_signal_[LR]\|.*\|_10[01]$/ }, // (not the fog lights)
     exhaustX: 0.44,
   },
@@ -154,7 +244,8 @@ const CARS = {
   m550: {
     name: 'BMW M550d xDrive', page: 'bmw-550d-mk2', model: '/models/bmw-m550d-g30.glb', length: 4.963, wheelbase: 2.975, redline: 6200,
     credit: ['BMW 5-Series Sedan (G30) LCI', 'https://sketchfab.com/3d-models/bmw-5-series-sedan-g30-lci-c2910a4e0d154f2ebdc41e6265eaaac3', 'by', 'Mona x Supercars', 'https://sketchfab.com/Car2022'],
-    grip: 2.2,
+    grip: 2.2, stiff: 1.75,
+    chassis: { m: 1950, front: 0.53, rear: 0.6 },
     paint: /\|paint_(body|parts)\|/, paintColor: 0x403c38, glass: /\|glass\|/, glassPlain: true, cabin: /\|cabin_/, // dark graphite, like the garage photo
     wheels: /\|wheel_/, tyre: /\|wheel_tyre_\d\|/,
     steering: { re: /\|cabin_wheel\|/, near: [-0.395, 0.92, 0.385] }, // (it shares its mesh with the centre console)
@@ -167,11 +258,12 @@ const CARS = {
   e60: {
     name: 'BMW M5 E60', page: 'bmw-m5-e60', model: '/models/bmw-m5-e60.glb', length: 4.855, wheelbase: 2.889, redline: 8250,
     credit: ['BMW M5 (E60)', 'https://sketchfab.com/3d-models/bmw-m5-e60-02b103c91e0947cb940a769851e69dd6', 'by', 'GT Cars: Hyperspeed', 'https://sketchfab.com/Car2022'],
-    grip: 2.0,
+    grip: 2.0, stiff: 1.7,
+    chassis: { m: 1830, front: 0.52, rear: 1 },
     paint: /\|paint_\d+\|/, paintColor: 0xf2f2ee, glass: /\|glass_1\|/, glassPlain: true, cabin: /\|cabin_/, // Alpine White
     wheels: /\|wheel_/, tyre: /\|wheel_tyre_1\|/,
     steering: { re: /\|cabin_/, near: [-0.377, 0.903, 0.45], look: 0.13 }, // spread over several meshes: found by its rim
-    tail: { overlay: true },
+    tail: {},
     lamps: { head: /\|head_lights_1\|/, tail: /\|tail_lights_1\|/ },
     exhaustX: 0.5, exhaustBoth: true, // tips both sides
   },
@@ -180,12 +272,29 @@ const CARS = {
     name: 'Porsche 911 GT3 RS', page: 'porsche-911-gt3-rs', model: '/models/porsche-911-gt3-rs.glb', length: 4.557, wheelbase: 2.453, redline: 9000,
     credit: ['2019 Porsche 911 (991.2) GT3 RS', 'https://sketchfab.com/3d-models/2019-porsche-911-9912-gt3-rs-97ea84db846e4945961dffb8b2d7af18'],
     grip: 2.8, // Cup tyres and downforce: the garage's grippiest
+    chassis: { m: 1420, front: 0.39, rear: 1, h: 0.45 }, // the engine behind the rear axle
+    stiff: 3.6, // race-car springs and bars: it barely leans
     paint: /^991_2phong2SG1\|/, paintColor: 0x8fd41e, glass: /^991_2phong18SG1\|/, glassPlain: true, cabin: /^991_2phong(9|11)SG1\|/, // lime
     wheels: /Wheel1A_3D|^991_2phong2[01]SG1\|/, tyre: /Wheel1A_3D/, // the calipers stay put
-    steering: { re: /^991_2phong9SG1\|/, near: [-0.365, 0.815, 0.245], look: 0.115, inset: 0.15 }, // over the rims of its five dial tubes
-    tail: { overlay: true, keep: v => v.y > 0.7 && v.y < 0.9 }, // the clusters (not the bumper reflectors or third brake light)
+    steering: { re: /^991_2phong9SG1\|/, near: [-0.338, 0.815, 0.245], look: 0.115, inset: 0.15 }, // over the rims of its five dial tubes
+    tail: { keep: v => v.y > 0.7 && v.y < 0.9 }, // the clusters (not the bumper reflectors or third brake light)
     lamps: { head: /^991_2phong8SG1\|/, tail: /^991_2phong12SG1\|/ },
     exhaustX: 0.06, exhaustBoth: true, // twin tips in the middle
+  },
+  // a BeamNG E90 kit cut down to one 335i: M Sport front and sills, LCI angel-eye lights, 18" double-spokes in black
+  // on made-up 225/40 R18 tyres, the sport seats moved in from the exploded set; levelled (it came 4.5° nose-down),
+  // spec-gloss swapped for plain materials and every part named by role
+  e90: {
+    name: 'BMW 335i', page: 'bmw-335i-e90', model: '/models/bmw-335i-e90.glb', length: 4.549, wheelbase: 2.76, redline: 7000,
+    credit: ['BMW 3 Series (E90) 2004-2012', 'https://sketchfab.com/3d-models/bmw-3-series-e90-2004-2012-1d3485a460a84fe6bde59bd8ee8f7334', 'by', 'DEMON_SCARY1235', 'https://sketchfab.com/szymonpasterczyk734'],
+    grip: 1.9, stiff: 1.3,
+    chassis: { m: 1600, front: 0.51, rear: 1 },
+    paint: /^e90_paint\|/, paintColor: 0xb4b8bc, glass: /^e90_glass\|/, glassPlain: true, cabin: /\|cabin_/, // Titanium Silver
+    wheels: /\|wheel_/, tyre: /^e90_tyre\|/,
+    steering: { re: /\|cabin_steering/, near: [-0.369, 0.862, 0.404], look: 0.115, inset: 0.08, size: 0.295 }, // in front of its dial tubes' rims, whole in the wheel's upper opening
+    tail: { re: /^e90_tail\|/, idle: 0.25, brake: 6 },
+    lamps: { head: /^e90_lens\|/, tail: /^e90_tail\|/ },
+    exhaustX: 0.48, exhaustBoth: true, // a tip each side
   },
 };
 CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', grip: 2.2, page: 'bmw-530e', redline: 6500, paintColor: 0x1a3363 }; // the M550d's body, in blue like the garage photo
@@ -194,17 +303,31 @@ CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', grip: 2.2, page: 'bmw-530e'
 const query = new URLSearchParams(location.search), TEST_DRIVE = query.has('test_drive');
 const CAR = CARS[query.get('car')] || Object.values(CARS).find(c => c.page === query.get('car')) || CARS.x1;
 
-// shortcut: kinematic bicycle model, no tyre slip or weight transfer.
+// Below 3 m/s (and in reverse) the car rolls on a kinematic bicycle model - no tyre slip, so it pivots like a real one
+// when parking; above, slide() below, with tyres that slip
 const WHEELBASE = CAR.wheelbase, MAX_STEER = 0.8;
-// m/s² sideways at full A/D: the car's tyre grip (CAR.grip, in g), the same at any speed as a real road car's - it
+// the car's tyre grip in g (CAR.grip): what full A/D asks of it, the same at any speed as a real road car's - it
 // doesn't fade at 130 km/h, so a fast corner still turns in
 const GRIP = (CAR.grip ?? 0.92) * 9.81;
+let wet = 1; // the road's share of that in this weather: 1 dry, less wet or in snow (the weather sets it, below)
+let roadMu = 1; // the road's real friction: 1 dry, 0.65 wet, 0.28 snow (set by the weather too)
+// the tyres' friction on this road (g): their grip times the weather's share - or the drift car's (the 320d's) on a wet
+// or snowy road, the road's real friction
+const roadGrip = () => CAR.drift && roadMu < 1 ? roadMu : GRIP / 9.81 * wet;
+// the chassis (CAR.chassis: kg, the front's share of the weight, the rear's of the drive, CG height m; a and b the CG to
+// each axle, Iz the yaw inertia kg m²) and tyres (a simplified Pacejka curve: B its stiffness, C its shape)
+const CH = { m: 1600, front: 0.5, rear: 1, h: 0.52, ...CAR.chassis };
+const CHASSIS = { ...CH, a: WHEELBASE * (1 - CH.front), b: WHEELBASE * CH.front, Iz: 0.85 * CH.m * WHEELBASE ** 2 * CH.front * (1 - CH.front), B: 23, C: 1.35, track: 1.55 };
+// what the loop hands the model each frame - accel: the car page's pull (m/s²), spin: its wheelspin (0-1.5), hb: the
+// handbrake, dsc: 1 on, 0.5 DTC / MDM / PSM Sport, 0 off, rear: the drive's rear share - and what it hands back
+const drift = { accel: 0, spin: 0, hb: false, dsc: 1, rear: CHASSIS.rear, cut: 0, held: 0, active: 0, on: false, beta: 0, ay: 0, slide: 0 };
 
 // car.speed (m/s, negative in reverse) comes from the car page's own powertrain; this only steers and moves the car.
 // steer: -1..1, already eased in from the keys (steerInput)
 function step(car, steer, dt) {
-  // speed-sensitive lock: full lock when parking, shrinking with v² so full A/D never pulls more than GRIP
-  const lock = Math.min(MAX_STEER, Math.atan(GRIP * WHEELBASE / Math.max(car.speed ** 2, 1)));
+  if (car.speed > 3) return slide(car, steer, dt);
+  // speed-sensitive lock: full lock when parking, shrinking with v² so full A/D never pulls more than the road can take
+  const lock = Math.min(MAX_STEER, Math.atan(roadGrip() * 9.81 * WHEELBASE / Math.max(car.speed ** 2, 1)));
   car.steer += (steer * lock - car.steer) * Math.min(1, dt * 12);
   // about the middle of the wheelbase (the car's origin): the rear wheels roll where they point instead of sliding
   // out, so the car pivots like a real one at parking speeds; the middle runs beta inside the heading
@@ -212,6 +335,8 @@ function step(car, steer, dt) {
   car.heading += car.speed * Math.cos(beta) * Math.tan(car.steer) / WHEELBASE * dt;
   car.x += Math.sin(car.heading + beta) * car.speed * dt;
   car.z += Math.cos(car.heading + beta) * car.speed * dt;
+  Object.assign(car, { v: car.speed * Math.tan(beta), r: car.speed * Math.cos(beta) * Math.tan(car.steer) / WHEELBASE }); // (for slide() to carry on from)
+  Object.assign(drift, { on: false, beta: 0, slide: 0, ay: 0 });
 }
 // keys are on or off, so the wheel winds on over ~0.25 s (a tap is a small correction, holding is full lock) and
 // unwinds twice as fast when let go
@@ -220,14 +345,92 @@ function steerInput(cur, want, dt) {
   return cur + Math.sign(want - cur) * Math.min(Math.abs(want - cur), rate * dt);
 }
 
-// steering self-check; failures show in the devtools console
+// Above 3 m/s, forwards, a dynamic bicycle model: v (sideways, + left) and r (yaw), with car.speed the forward speed
+// the car page sets. Each axle's tyres slip sideways - their grip peaks at ~6° of slip, then slides at 85% of it - the
+// load shifts back under power and forward under braking, and what a tyre has left for cornering is what its drive or
+// braking hasn't used (the friction circle; ABS keeps the brakes short of locking). Spinning rears (the car page's
+// wheelspin) lose side grip along their slip: much at a small angle, which kicks the tail out, little once it's well
+// out, so the throttle holds a drift; lifting lets them bite and straighten it. The handbrake locks them.
+// Gripping, A/D turn the wheels as far as the road can take at this speed. Sliding (the body more than ~6° off its
+// path), the wheels steer from where the front's going: with DSC off (or in DTC / MDM / PSM Sport) hands off holds the
+// angle, into the turn adds to it, against it eases it out without flicking past straight - a drifter's hands. With
+// DSC on they ease it out, and DSC brakes a wheel against oversteer and trims the drive (then the throttle)
+const tyreCurve = (slip, B) => Math.sin(CHASSIS.C * Math.atan(B * slip)); // side force / its peak
+function slide(car, steer, dt) {
+  const D = CHASSIS, L = WHEELBASE, g = 9.81, mu = roadGrip(), n = Math.ceil(dt / 0.004), h = dt / n;
+  const lockTo = x => Math.max(-MAX_STEER, Math.min(MAX_STEER, x));
+  car.v ??= 0; car.r ??= 0;
+  for (let k = 0; k < n; k++) {
+    const u = Math.max(car.speed, 0.5), beta = Math.atan2(car.v, u), trail = Math.atan2(car.v + D.a * car.r, u); // (trail: where the front's going)
+    // gripping: A/D ask for their share of what the road can take at this speed - the turn's angle plus the tyres'
+    // slip at that share - and, steering against a slide, room to as far as it's sliding
+    const lock = k => Math.atan(k * mu * g * L / u ** 2) + 0.25 * Math.tan(Math.asin(0.98 * k) / D.C) / D.B;
+    const gripping = lockTo(steer * beta > 0 ? steer * (lock(1) + Math.abs(beta)) : Math.sign(steer) * lock(Math.abs(steer)));
+    // sliding: the front's slip into the turn (into: the way it's turning), from how fast the angle A changes (Adot)
+    // against how fast it's asked to - added at up to 1.2 rad/s; let go, held while the rears spin (or the handbrake's
+    // on), otherwise eased out in proportion to A
+    drift.held += ((drift.hb || drift.spin > 0.05) - drift.held) * Math.min(1, h * 4);
+    const into = -Math.sign(beta) || 1, A = -into * beta, Adot = -into * (drift.ay / u - car.r), ask = drift.dsc < 1 ? steer * into : -1;
+    const want = ask > 0 ? ask * 1.2 : (ask - (drift.dsc < 1 ? 1 - drift.held : 1)) * Math.min(1.2, Math.max(0, A) * 3);
+    const sliding = lockTo(trail + into * Math.max(-0.3, Math.min(0.2, 0.06 + 0.5 * (want - Adot))));
+    const w = THREE.MathUtils.clamp((Math.abs(beta) - 0.05) / 0.1, 0, 1);
+    car.steer += (gripping + (sliding - gripping) * w - car.steer) * Math.min(1, h * 12);
+    const ax = drift.accel * (1 - 0.8 * drift.cut * drift.dsc), Fzf = D.m * (g * D.b - ax * D.h) / L, Fzr = D.m * (g * D.a + ax * D.h) / L;
+    // drive split by the drivetrain, braking 65/35 (each axle kept short of locking); asked for more than the rears
+    // can carry, the rest spins them
+    const rear = drift.rear, wantR = drift.hb ? -mu * Fzr : ax > 0 ? rear * D.m * ax : 0.35 * D.m * ax, wantF = ax > 0 ? (1 - rear) * D.m * ax : 0.65 * D.m * ax;
+    const cap = (F, Fz) => Math.max(-0.98 * mu * Fz, Math.min(0.98 * mu * Fz, F)), Fxr = cap(wantR, Fzr), Fxf = ax < 0 ? Math.max(wantF, -0.85 * mu * Fzf) : cap(wantF, Fzf);
+    const spinR = Math.max(drift.spin * rear, wantR > 0 ? (wantR - Fxr) / (mu * Fzr) * 2 : 0), spinF = drift.spin * (1 - rear);
+    const side = (Fx, Fz) => mu * Fz * Math.sqrt(Math.max(0, 1 - (Fx / (mu * Fz)) ** 2)); // the fronts' friction circle
+    // the rears' slip, sideways and along: what their drive or braking takes (0.1 at the limit), their spin, or locked
+    // by the handbrake - their force lies along it, so in a big slide the drive costs them little side grip
+    const af = car.steer - trail, ar = -Math.atan2(car.v - D.b * car.r, u), sa = Math.tan(ar);
+    const slip = Math.hypot(sa, drift.hb ? 1 : Math.abs(Fxr) / (mu * Fzr) * 0.1 + spinR * 0.25);
+    const Fyf = side(Fxf, Fzf) * (1 - Math.min(0.8, spinF * 0.55)) * tyreCurve(af, D.B * 0.8); // (the fronts a little softer: it understeers at the limit)
+    const Fyr = slip > 1e-6 ? mu * Fzr * tyreCurve(slip, D.B) * sa / slip : 0, cs = Math.cos(car.steer);
+    let Mz = D.a * Fyf * cs - D.b * Fyr;
+    drift.active = 0;
+    if (drift.dsc) { // braking one wheel holds the yaw near what the steering asks for, as far as the road allows - against
+      // oversteer (understeer's the driver's to fix); DTC / MDM let it run ~0.3 rad/s past that first
+      const most = mu * g / u, rRef = Math.max(-most, Math.min(most, u * Math.tan(car.steer) / L)), err = car.r - rRef, band = 0.03 + (1 - drift.dsc) * 0.3;
+      if (Math.abs(err) > band && err * car.r > 0) {
+        const top = D.track / 2 * mu * D.m * g / 4, m = Math.max(-top, Math.min(top, (err - Math.sign(err) * (band - 0.03)) * D.Iz * 8 * drift.dsc));
+        Mz -= m;
+        drift.active = Math.abs(m) / top;
+        car.speed -= Math.abs(m) / (D.track / 2) / D.m * h; // (that brake slows it)
+      }
+    }
+    drift.cut += ((drift.active > 0) - drift.cut) * Math.min(1, h * 4); // DSC's power cut, at the engine's pace
+    car.v += ((Fyf * cs + Fyr) / D.m - u * car.r) * h;
+    car.r += Mz / D.Iz * h;
+    car.speed = Math.max(0, car.speed + (car.v * car.r - Fyf * Math.sin(car.steer) / D.m) * h); // a slide scrubs speed
+    car.heading += car.r * h;
+    car.x += (Math.sin(car.heading) * car.speed + Math.cos(car.heading) * car.v) * h; // forward, and sideways (+ left)
+    car.z += (Math.cos(car.heading) * car.speed - Math.sin(car.heading) * car.v) * h;
+    Object.assign(drift, { on: true, beta, ay: (Fyf * cs + Fyr) / D.m, slide: THREE.MathUtils.clamp((Math.abs(ar) - 0.1) / 0.15, 0, 1) });
+  }
+}
+
+// steering self-checks; failures show in the devtools console. Each runs from a fresh state on a dry road, DSC on
 {
-  const t = { x: 0, z: 0, heading: 0, speed: 10, steer: 0 };
-  for (let i = 0; i < 30; i++) step(t, 1, 1 / 60);
+  const run = (o, steerOf, secs, set = {}, road = {}) => {
+    Object.assign(drift, { accel: 0, spin: 0, hb: false, dsc: 1, rear: CHASSIS.rear, cut: 0, held: 0 }, set);
+    [wet, roadMu] = [road.wet ?? 1, road.mu ?? 1];
+    const c = { x: 0, z: 0, heading: 0, steer: 0, ...o };
+    for (let i = 0; i < secs * 60; i++) step(c, steerOf(i / 60, c), 1 / 60);
+    const out = { ...c, beta: Math.atan2(c.v ?? 0, Math.max(c.speed, 0.5)), ay: drift.ay };
+    [wet, roadMu] = [1, 1];
+    Object.assign(drift, { accel: 0, spin: 0, hb: false, dsc: 1, rear: CHASSIS.rear, cut: 0, held: 0, active: 0, on: false, beta: 0, ay: 0, slide: 0 });
+    return out;
+  };
+  const t = run({ speed: 10 }, () => 1, 0.5);
   console.assert(t.heading > 0 && t.x > 0, 'A should turn left', t);
-  const f = { x: 0, z: 0, heading: 0, speed: 50, steer: 0 };
-  for (let i = 0; i < 60; i++) step(f, 1, 1 / 60);
-  console.assert(f.heading > 0.8 * GRIP / 50 && f.heading < GRIP / 50, 'full A at 180 km/h should pull GRIP, no more', f);
+  // full A at 180 km/h pulls the tyres' grip, no more - half on a road half as grippy; part of A, about its share
+  const f = run({ speed: 50 }, () => 1, 2), half = run({ speed: 50 }, () => 1, 2, {}, { wet: 0.5 }), part = run({ speed: 55 }, () => 0.3, 3);
+  console.assert(f.ay > 0.8 * GRIP && f.ay < 1.02 * GRIP, 'full A at 180 km/h should pull GRIP, no more', f);
+  console.assert(Math.abs(half.ay / f.ay - 0.5) < 0.08, 'on a road half as grippy, half the pull', half);
+  const kin = 55 ** 2 * Math.tan(0.3 * Math.atan(GRIP * WHEELBASE / 55 ** 2)) / WHEELBASE;
+  console.assert(part.ay > 0.75 * kin && part.ay < 1.25 * kin, 'a third of A at 200 km/h should pull about a third of GRIP', part, kin);
   // full lock at parking speed: the car turns about one fixed point level with its rear axle (as a real one does),
   // R = wheelbase / tan(lock) out to the left - the rear wheels roll round it instead of sliding
   const R = WHEELBASE / Math.tan(MAX_STEER), p = { x: 0, z: 0, heading: 0, speed: 2, steer: MAX_STEER };
@@ -238,6 +441,19 @@ function steerInput(cur, want, dt) {
   let s = 0;
   for (let i = 0; i < 6; i++) s = steerInput(s, 1, 1 / 60);
   console.assert(s > 0.35 && s < 0.45, 'a 0.1 s tap should give about 40% of the lock', s);
+  // on snow: full lock with no power understeers; DSC keeps power in a corner in line. The drift car, DSC off: pulling
+  // the handbrake into a corner, then hands off on the power, holds a drift; lifting off straightens it
+  const snow = { wet: 0.38, mu: 0.28 }, entry = t => t < 0.6;
+  const plough = run({ speed: 14 }, () => 1, 2, { dsc: 0 }, snow), held = run({ speed: 14 }, () => 0.6, 3, { accel: 1.2 }, snow); // (with DSC on, its page's traction control holds the spin)
+  console.assert(Math.abs(plough.beta) < 0.1, 'full lock on snow should understeer, not spin', plough);
+  console.assert(Math.abs(held.beta) < 0.1, 'DSC should keep power in a snowy corner in line', held);
+  if (CAR.drift) {
+    const go = (t, c) => (Object.assign(drift, { hb: t < 0.5, accel: entry(t) ? 0 : 1.2, spin: entry(t) ? 0 : 1.2 }), c.speed += drift.accel / 60, entry(t) ? 1 : 0); // (its page's pull)
+    const drifting = run({ speed: 11 }, go, 4, { dsc: 0 }, snow);
+    const lifted = run({ speed: 11 }, (t, c) => (go(t, c), t > 3 && Object.assign(drift, { accel: -0.3, spin: 0 }), entry(t) ? 1 : 0), 5, { dsc: 0 }, snow);
+    console.assert(drifting.beta < -0.15 && drifting.beta > -0.8, 'on the power, hands off, the drift should hold', drifting);
+    console.assert(Math.abs(lifted.beta) < 0.06, 'lifting off should straighten it', lifted);
+  }
 }
 
 // reversed depth: no flicker between road and paint far away, and unlike log depth no depth written per pixel (that
@@ -274,7 +490,8 @@ const env = (() => {
 scene.environment = env;
 scene.environmentIntensity = 1;
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x445533, 2));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x445533, 2); // (the weather sets both lights, below)
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 1.5);
 sun.position.set(50, 100, 30);
 scene.add(sun);
@@ -1282,22 +1499,25 @@ function terrainAt(x, z) {
 // what the car rests on: the road itself on a road, the land off it (near: the car's height, see onRoad)
 const surfaceAt = (x, z, near) => { const r = onRoad(x, z, near); return r.on ? r.y : terrainAt(x, z); };
 
+let terrain;
 { // the terrain mesh, ~15 m grid, coloured grass, then rock where steep or high, then snow (high only round the
   // mountain loop: the Nordschleife's hills, as high, stay green)
   const w = LAND.x1 - LAND.x0, h = LAND.z1 - LAND.z0;
   const tg = new THREE.PlaneGeometry(w, h, Math.round(w / 15), Math.round(h / 15)).rotateX(-Math.PI / 2)
     .translate((LAND.x0 + LAND.x1) / 2, 0, (LAND.z0 + LAND.z1) / 2);
-  const tp = tg.attributes.position, col = [], c = new THREE.Color();
+  const tp = tg.attributes.position, col = [], c = new THREE.Color(), kind = new Uint8Array(tp.count); // 0 grass, 1 rock, 2 snow
   for (let i = 0; i < tp.count; i++) tp.setY(i, terrainAt(tp.getX(i), tp.getZ(i)));
   tg.computeVertexNormals();
   for (let i = 0; i < tp.count; i++) {
     const x = tp.getX(i), z = tp.getZ(i), up = tg.attributes.normal.getY(i);
     const y = tp.getY(i) - 1000 * THREE.MathUtils.smoothstep(Math.hypot(Math.max(3700 - x, 0, x - 6200), Math.max(-1100 - z, 0, z - 1800)), 0, 400);
-    c.setHex(y > 240 ? 0xf2f4f6 : up < 0.72 || y > 200 ? 0x7d776e : 0x5a7a4a);
+    kind[i] = y > 240 ? 2 : up < 0.72 || y > 200 ? 1 : 0;
+    c.setHex([0x5a7a4a, 0x7d776e, 0xf2f4f6][kind[i]]);
     col.push(c.r, c.g, c.b);
   }
   tg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  scene.add(new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ vertexColors: true })));
+  scene.add(terrain = new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ vertexColors: true })));
+  terrain.userData.kind = kind; // (the season and snow recolour it)
 }
 
 // trees: along the autobahn, round the racetrack outside its walls, on gentle grass slopes round the mountains and the
@@ -1537,7 +1757,7 @@ function collide(car) {
 // a frame's move, in steps of under 0.4 m so nothing thin is driven clean through at speed
 function move(car, steer, dt) {
   const n = Math.ceil(Math.abs(car.speed) * dt / 0.4) || 1;
-  for (let k = 0; k < n; k++) { step(car, steer, dt / n); collide(car); }
+  for (let k = 0; k < n; k++) { step(car, steer, dt / n); collide(car); if (car.hit && car.v) car.v *= 0.3, car.r *= 0.3; }
 }
 // collision self-checks: head-on into the home garage's back wall the car stops short of it; glancing the autobahn's
 // median wall at 10° it runs on along the wall, clear of it, at cos 10° of its speed; into it at 45° it stops, wherever
@@ -1568,11 +1788,14 @@ for (const [r, lanes, name] of [[A, [-11.9, -8.1, -4.4, 4.4, 8.1, 11.9], 'autoba
 }
 
 // BMW X1 xDrive20d (E84) from primitives at real size: 4.45 m long, 1.80 wide, 1.55 tall.
-// Origin is mid-wheelbase on the ground; front is +Z, left is +X.
-const car = new THREE.Group();
+// Origin is mid-wheelbase on the ground; front is +Z, left is +X. The wheels and shadow hang on car, everything else on
+// body, which pitches and rolls on the springs (suspension(), in the loop)
+const car = new THREE.Group(), body = new THREE.Group();
+car.add(body);
 // Black Sapphire metallic, or the car's own colour; its own, dimmer reflections - at the scene's strength the studio
 // lights wash it to silver
 const bodyMat = new THREE.MeshPhysicalMaterial({ color: CAR.paintColor ?? 0x070809, metalness: 0.3, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.1, envMap: env, envMapIntensity: 0.07 });
+const envLit = [[bodyMat, 0.07]]; // materials with their own reflections, and how strong: the weather dims them at night
 const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x0c0f13, metalness: 0.1, roughness: 0.05 });
 const blackMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
 const gloss = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 });   // high-gloss black trim
@@ -1581,7 +1804,7 @@ const tailMat = new THREE.MeshLambertMaterial({ color: 0xa00d0d, emissive: 0x500
 const AMBER_OFF = 0x3d2600, AMBER_ON = 0xffa31a;
 const indMats = { 1: new THREE.MeshBasicMaterial({ color: AMBER_OFF }), [-1]: new THREE.MeshBasicMaterial({ color: AMBER_OFF }) }; // 1 = left
 const trims = []; // outside window trim: hidden from the driver's seat along with the body
-const add = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); car.add(m); return m; };
+const add = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); body.add(m); return m; };
 const box = (w, h, d, mat, x, y, z) => add(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
 // side profile drawn in (z, y), extruded across the width; bevel rounds the edges and grows the outline by `bevel`
 function profile(shape, width, mat, bevel = 0) {
@@ -1650,15 +1873,16 @@ box(1.15, 0.035, 0.22, bodyMat, 0, 1.458, -1.93);                               
 const hmbl = new THREE.MeshBasicMaterial({ color: 0x3a0606 });
 box(0.32, 0.025, 0.02, hmbl, 0, 1.43, -1.98);                                        // high-mounted brake light
 // a soft shadow pinned under the car
-const blob = rgba => {
+const blob = (rgba, core = 0) => { // core: how far out (0-1) it stays at full strength
   const c = document.createElement('canvas'), g = c.getContext('2d');
   c.width = c.height = 64;
   const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  r.addColorStop(0, rgba); r.addColorStop(1, 'rgba(0,0,0,0)');
+  r.addColorStop(0, rgba); r.addColorStop(core, rgba); r.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = r; g.fillRect(0, 0, 64, 64);
   return new THREE.CanvasTexture(c);
 };
 const shadow = add(new THREE.PlaneGeometry(2.3, 5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: blob('rgba(0,0,0,0.6)'), transparent: true, depthWrite: false }), 0, 0.025, 0);
+car.add(shadow); // (on the road, not the body)
 const plateMat = new THREE.MeshLambertMaterial({ color: 0xf2f2f2 });
 box(0.52, 0.11, 0.02, plateMat, 0, 0.47, 2.25);                                      // number plates
 box(0.52, 0.11, 0.02, plateMat, 0, 0.62, -2.255);
@@ -1697,13 +1921,13 @@ steeringWheel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.045,
 column.add(steeringWheel, new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.3, 12).rotateX(Math.PI / 2).translate(0, 0, 0.16), wheelMat));
 column.position.set(-0.37, 0.985, 0);
 column.rotation.x = 0.35;
-car.add(column);
+body.add(column);
 // where the cluster sits in the dash, facing the driver: 1100 px wide page -> 0.33 m (the model moves it to its own dash)
 const dashAnchor = new THREE.Object3D();
 dashAnchor.position.set(-0.37, 1.0, 0.3);
 dashAnchor.rotation.set(-0.23, Math.PI, 0, 'YXZ');
 dashAnchor.scale.setScalar(0.0003);
-car.add(dashAnchor);
+body.add(dashAnchor);
 
 // 225/45 R18 tyres on double-spoke rims; steer (y) is applied outside spin (x)
 const WHEEL_R = 0.33;
@@ -1734,7 +1958,7 @@ let usingModel = false;
 // glassPlain glass: darker and mirror-like from outside, so it reads as glass; from the seat a light tint that's
 // easy to see through (its inside face would reflect the sky over the road)
 const plainGlass = [], tintGlass = () => { for (const m of plainGlass) Object.assign(m, inCar ? { opacity: 0.3, specularIntensity: 0 } : { opacity: 0.6, specularIntensity: 1 }); };
-const modelLamps = { 1: [], [-1]: [] }, modelTail = [], modelTailGlow = [];
+const modelLamps = { 1: [], [-1]: [] }, modelTail = [], modelTailGlow = [], modelHeadGlow = [], modelHead = [];
 new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
   gltf.updateMatrixWorld(true);
   const parts = [], all = new THREE.Box3(), v = new THREE.Vector3(), c = new THREE.Vector3();
@@ -1754,7 +1978,7 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
     p.geo.computeBoundingBox();
     if (is(p, CAR.paint)) p.mat = bodyMat;            // Black Sapphire, or its paintColor
     if (p.mat.transmission) p.mat.transmission = 0;    // plain tinted glass: no second render pass every frame
-    if (p.mat.clearcoat) Object.assign(p.mat, { envMap: env, envMapIntensity: 0.2 }); // clear-coated paint/carbon: the studio lights would wash it white
+    if (p.mat.clearcoat) Object.assign(p.mat, { envMap: env, envMapIntensity: 0.2 }), envLit.push([p.mat, 0.2]); // clear-coated paint/carbon: the studio lights would wash it white
     if (is(p, CAR.glass)) { // tinted (its own copy: a lens may share the material)
       p.mat = p.mat.clone();
       p.mat.opacity = 0.45;
@@ -1795,17 +2019,31 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
     return b;
   };
 
-  // wheels: each part split by which corner its triangles are in, then hung on a pivot at that wheel's hub
+  // wheels: each part split by which corner its triangles are in, then hung on a pivot at that wheel's hub, spinning
+  // about the tyre's own axle - its least-spread direction - since some lean in at the top (camber: the M3's rears 2.4°),
+  // and spun about the car's x axis those wobble
   const cornerOf = at => (at.x > 0) + 2 * (at.z > 0);
-  const hubs = [0, 1, 2, 3].map(() => new THREE.Box3());
+  const hubs = [0, 1, 2, 3].map(() => new THREE.Box3()), sums = hubs.map(() => new Array(10).fill(0)); // n, x, y, z, xx, xy, xz, yy, yz, zz
   for (const p of ofRole(CAR.tyre)) for (let t = 0, ix = p.geo.index.array; t < ix.length; t += 3) {
-    const corner = cornerOf(centroid(p, t));
-    for (let i = 0; i < 3; i++) hubs[corner].expandByPoint(v.fromBufferAttribute(p.geo.attributes.position, ix[t + i]));
+    const corner = cornerOf(centroid(p, t)), m = sums[corner];
+    for (let i = 0; i < 3; i++) {
+      hubs[corner].expandByPoint(v.fromBufferAttribute(p.geo.attributes.position, ix[t + i]));
+      m[0]++; m[1] += v.x; m[2] += v.y; m[3] += v.z; m[4] += v.x * v.x; m[5] += v.x * v.y; m[6] += v.x * v.z; m[7] += v.y * v.y; m[8] += v.y * v.z; m[9] += v.z * v.z;
+    }
   }
-  const root = new THREE.Group(), pivots = hubs.map(b => {
+  const axleOf = ([n, x, y, z, xx, xy, xz, yy, yz, zz]) => { // the covariance's smallest eigenvector, by power iteration on (trace - it)
+    const c = [[xx - x * x / n, xy - x * y / n, xz - x * z / n], [xy - x * y / n, yy - y * y / n, yz - y * z / n], [xz - x * z / n, yz - y * z / n, zz - z * z / n]];
+    const tr = c[0][0] + c[1][1] + c[2][2], a = [1, 0, 0];
+    for (let k = 0; k < 60; k++) {
+      const b = c.map((row, i) => tr * a[i] - row[0] * a[0] - row[1] * a[1] - row[2] * a[2]), l = Math.hypot(...b);
+      for (let i = 0; i < 3; i++) a[i] = b[i] / l;
+    }
+    return new THREE.Vector3(...a).multiplyScalar(Math.sign(a[0]));
+  };
+  const root = new THREE.Group(), pivots = hubs.map((b, n) => {
     const pivot = new THREE.Group();
     pivot.position.copy(b.getCenter(new THREE.Vector3()));
-    pivot.rotation.order = 'YXZ'; // steer (y) outside spin (x), as for the built wheels
+    pivot.userData.axle = axleOf(sums[n]);
     root.add(pivot);
     return pivot;
   });
@@ -1821,11 +2059,26 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
         mesh.position.copy(pivots[n].position).negate();
         pivots[n].add(mesh);
       });
-    } else if (is(p, CAR.tail.re)) { // its rear half on a material of its own, so braking lights only the tail lights
-      const [rear, rest] = split(p, at => at.z < 0), glow = p.mat.clone();
-      if (CAR.tail.fromMap) { glow.emissiveMap = glow.map; glow.emissive.setHex(0xff2020); glow.emissiveIntensity = 1; }
-      modelTail.push([glow, glow.emissiveIntensity]);
-      root.add(subMesh(p, rest), subMesh(p, rear, glow));
+    } else if (is(p, CAR.tail.re) || is(p, CAR.lamps.head)) {
+      // the lamps on materials of their own: braking lights only the tail lights (a tail part's rear half), the
+      // headlights only the headlamps (a head part's front 60 cm)
+      const tailP = is(p, CAR.tail.re), headP = is(p, CAR.lamps.head), tris = [[], [], []]; // tail, head, the rest
+      for (let t = 0, ix = p.geo.index.array; t < ix.length; t += 3) {
+        const at = centroid(p, t);
+        tris[tailP && at.z < 0 ? 0 : headP && at.z > CAR.length / 2 - 0.6 ? 1 : 2].push(ix[t], ix[t + 1], ix[t + 2]);
+      }
+      if (tris[2].length) root.add(subMesh(p, tris[2]));
+      if (tris[0].length) {
+        const glow = p.mat.clone();
+        if (CAR.tail.fromMap) { glow.emissiveMap = glow.map; glow.emissive.setHex(0xff2020); glow.emissiveIntensity = 1; }
+        modelTail.push([glow, glow.emissiveIntensity]);
+        root.add(subMesh(p, tris[0], glow));
+      }
+      if (tris[1].length) {
+        const lit = p.mat.clone();
+        if (lit.emissive) modelHead.push([lit, lit.emissive.clone(), lit.emissiveIntensity]); // (its own glow, kept for when they're off)
+        root.add(subMesh(p, tris[1], lit));
+      }
     } else root.add(new THREE.Mesh(p.geo, p.mat));
   }
 
@@ -1907,19 +2160,29 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
       root.add(lamp);
       modelLamps[s].push(lamp);
     }
-    if (CAR.tail.overlay) { // the brake glow, over the tail light (off until braking)
-      const size = tail.getSize(new THREE.Vector3()), glow = new THREE.Mesh(new THREE.PlaneGeometry(size.x * 1.6, size.y * 2.6),
-        new THREE.MeshBasicMaterial({ map: blob('rgba(255,40,30,1)'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, opacity: 0 }));
+    { // the brake glow, over the tail light (off until braking)
+      const size = tail.getSize(new THREE.Vector3()), glow = new THREE.Mesh(new THREE.PlaneGeometry(size.x * 2, size.y * 3.2),
+        new THREE.MeshBasicMaterial({ map: blob('rgba(255,40,30,1)', 0.35), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, opacity: 0 }));
       glow.position.copy(tail.getCenter(new THREE.Vector3())).setZ(tail.min.z - 0.02);
       root.add(glow);
       modelTailGlow.push(glow.material);
     }
+    // the headlight's glow round its lamp (off until the lights are on)
+    const lens = head.getSize(new THREE.Vector3()), beamGlow = new THREE.Mesh(new THREE.PlaneGeometry(lens.x * 2, lens.y * 3.2),
+      new THREE.MeshBasicMaterial({ map: blob('rgba(255,246,228,1)', 0.3), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
+    beamGlow.position.copy(head.getCenter(new THREE.Vector3())).setZ(head.max.z + 0.02);
+    root.add(beamGlow);
+    modelHeadGlow.push(beamGlow.material);
   }
 
   // mid-wheelbase at the car's origin; the eye, the cluster and the exhaust follow the model
   const front = pivots.filter(p => p.position.z > 0), rear = pivots.filter(p => p.position.z <= 0);
   const midZ = (front[0].position.z + rear[0].position.z) / 2;
   root.position.z = -midZ;
+  headlights.forEach((l, n) => { // each beam from one of the model's own lamps
+    const at = sideBox(CAR.lamps.head, n ? -1 : 1, 1).getCenter(new THREE.Vector3());
+    l.position.set(at.x, at.y, at.z - midZ + 0.05);
+  });
   const wheelAt = pivot.clone().setZ(pivot.z - midZ);
   EYE.copy(wheelAt).add(new THREE.Vector3(0, 0.3, -0.55));
   // the car page's cluster covers the model's own: whatever the driver sees through the top of the steering wheel
@@ -1929,12 +2192,16 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
   const at = hit ? hit.point.addScaledVector(look, -(CAR.steering.inset ?? 0.01)) : wheelAt.clone().add(new THREE.Vector3(0, 0.11, 0.32));
   dashAnchor.position.copy(at);
   dashAnchor.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(EYE, at, new THREE.Vector3(0, 1, 0))); // faces the driver
-  dashAnchor.scale.setScalar(0.36 * at.distanceTo(EYE) / 1100); // about as wide, to the eye, as the model's own cluster
+  dashAnchor.scale.setScalar((CAR.steering.size ?? 0.36) * at.distanceTo(EYE) / 1100); // about as wide, to the eye, as the model's own cluster
   EXHAUST.set(CAR.exhaustX, 0.3, -CAR.length / 2 - midZ + 0.05);
 
-  for (const c of car.children) c.visible = c === dashAnchor || c === shadow; // retire the built car
+  for (const c of [...car.children, ...body.children]) c.visible = c === body || c === dashAnchor || c === shadow || headlights.includes(c); // retire the built car (not the headlights)
   wheels.length = 0;
   wheels.push(...pivots);
+  const shell = new THREE.Group(); // all but the wheels rides on the springs
+  shell.position.copy(root.position);
+  for (const c of [...root.children]) if (!pivots.includes(c)) shell.add(c);
+  body.add(shell);
   car.add(root);
   usingModel = true;
 }).catch(e => console.warn(`${CAR.name} model not loaded - keeping the built car:`, e));
@@ -1958,11 +2225,14 @@ function onKey(e) {
     return keys.delete(e.code);
   }
   keys.add(e.code);
-  if (e.code === 'Tab' || e.code === 'ArrowUp' || e.code === 'ArrowDown' || (e.code === 'Space' && own(e))) e.preventDefault(); // this page's keys, not focus or scrolling
+  if (e.code === 'Tab' || e.code === 'Slash' || e.code === 'ArrowUp' || e.code === 'ArrowDown' || (e.code === 'Space' && own(e))) e.preventDefault(); // this page's keys, not focus or scrolling
   if (e.repeat) return;
   if (e.code === 'Tab') setPanel(!panelOpen);
   if (e.code === 'KeyW') orbitYaw = 0, orbitPitch = PITCH;
   if (e.code === 'KeyC') setView(!inCar);
+  if (e.code === 'Backquote') toggleTeleport();
+  if (e.code === 'Backslash') toggleWeather();
+  if (e.code === 'Slash') setLapTimer(!lap.on);
   if (LIMIT_KEYS[e.code]) setLimit(...LIMIT_KEYS[e.code]);
   if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') signal.side = e.code === 'ArrowLeft' ? 1 : -1, signal.t = 0;
 }
@@ -2043,7 +2313,7 @@ function setView(seat) {
 // The car page drives: its own I/W/S/R keys run the engine, gearbox and brakes, and every frame it hands its speed
 // to CarDyno.tick. It's same-origin, so this page can reach into it.
 const frame = document.getElementById('carpage');
-const carPage = { speed: 0, reverse: false, smoke: 0, braking: 0, ignition: false, gear: '', rpm: 0, tc: false, spin: 0 };
+const carPage = { speed: 0, reverse: false, smoke: 0, braking: 0, ignition: false, gear: '', rpm: 0, tc: false, spin: 0, chassis: -1, susp: 'stock', dampers: 0, throttle: 0, coolant: null, boost: null };
 
 // throttle and brake limiters: ↑/↓ and O/P set how far W and S open (20-100% in 20% steps), linearly up to that.
 // The car page reads them (window.throttleLimit / brakeLimit); this browser remembers them between drives
@@ -2060,11 +2330,13 @@ function showLimits() {
 }
 showLimits();
 
-// phone pad (scripts/pad-relay.mjs, public/pad.html). From the phone: tilt steering (-1-1, + = left) and throttle /
-// brake sliders (0-1) at 30 Hz, taps of the car's keys and of its drive modes. To it: gear, speed and revs, this car's
-// key hints (the buttons it shows), its drive modes and the cluster's set-up pop-ups. The throttle opens the car page's accelerator directly; the brake
+// phone pad (scripts/pad-relay.mjs, public/pad.html). From the phone: tilt steering (-1-1, + = left), throttle /
+// brake sliders (0-1) and the handbrake (h, held) at 30 Hz, taps of the car's keys, its drive modes, its traction
+// switch and the headlights' brightness. To it: gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
+// on, 2 high beam) and their brightness, this car's key hints (the buttons it shows), its drive modes and the
+// cluster's set-up pop-ups. The throttle opens the car page's accelerator directly; the brake
 // holds S with the brake limiter set to the slider (in the loop below), so the pedal ramps as S does
-const pad = { s: 0, t: 0, b: 0, at: 0 };
+const pad = { s: 0, t: 0, b: 0, h: false, at: 0 };
 let padWs, padHints = {}, padModes = [], padTicks = 0;
 function padInput(m) {
   const w = frame.contentWindow, clamp = (v, lo) => Math.min(1, Math.max(lo, +v || 0));
@@ -2074,7 +2346,7 @@ function padInput(m) {
     accel.dispatchEvent(new w.Event('input'));
   }
   if (!b !== !pad.b) w.dispatchEvent(new w.KeyboardEvent(b ? 'keydown' : 'keyup', { key: 's', code: 'KeyS' }));
-  Object.assign(pad, { s, t, b, at: performance.now() });
+  Object.assign(pad, { s, t, b, h: !!m.h, at: performance.now() });
 }
 // a tap of one of the car's keys, straight into the car page - so its C (chassis) and O (M Sound) get past this page's
 // own C and O - or into this page for its own keys (signals, view)
@@ -2083,9 +2355,36 @@ function padTap({ key, code, shiftKey }, toDrive) {
   for (const type of ['keydown', 'keyup']) w.dispatchEvent(new w.KeyboardEvent(type, init));
 }
 const padSend = m => padWs?.readyState === WebSocket.OPEN && padWs.send(JSON.stringify(m));
+// the car page's stability control, whichever switch it has (a TC / DSC / PSM button, or the E90's and X1's DSC
+// segment): [1 on, 0.5 DTC / MDM / PSM Sport, 0 off; its name, for the phone pad]
+function traction(doc) {
+  const seg = doc?.querySelector('#dsc-seg .active'), btn = doc?.querySelector('#tc-btn, #dsc-btn, #psm-btn');
+  if (!seg && !btn) return [1, ''];
+  const text = seg ? { on: 'DSC', dtc: 'DTC', off: 'DSC OFF' }[seg.dataset.val] : btn.textContent.trim().replace(/\s+/g, ' ');
+  if (/off/i.test(text)) return [0, text];
+  if (btn?.querySelector('.leds i.on')) return [0, text + ' OFF']; // (the E60's shows it on its LED)
+  return [/dtc|mdm|sport/i.test(text) ? 0.5 : 1, text];
+}
+function cycleTraction() { // the phone's traction button: the car page's own switch, one step on
+  const doc = frame.contentDocument, seg = [...doc?.querySelectorAll('#dsc-seg button') ?? []];
+  if (seg.length) seg[(seg.findIndex(b => b.classList.contains('active')) + 1) % seg.length].click();
+  else doc?.querySelector('#tc-btn, #dsc-btn, #psm-btn')?.click();
+}
+// the rear's share of the drive now: the car's own split, or its xDrive switch's (4WD Sport / Sport more to the rear,
+// 2WD all of it, the X1's Traction 50:50) - the M5 and M3 show theirs on the cluster
+function rearShare(doc) {
+  const ind = doc?.getElementById('xdrive-ind'), mode = doc?.querySelector('#xdrive-seg .active')?.dataset.val
+    ?? (ind && ind.style.display !== 'none' ? (/2WD/.test(doc.getElementById('mode-sm')?.textContent) ? '2wd' : '4wdsport') : '');
+  return { '2wd': 1, '4wdsport': Math.min(1, CHASSIS.rear + 0.15), sport: Math.min(1, CHASSIS.rear + 0.15), traction: 0.5 }[mode] ?? CHASSIS.rear;
+}
+function nudgeBeam(by) { // the phone's Beam - / +: 10% a tap, mirrored on the car menu's slider
+  setBeam(Math.min(200, Math.max(20, beam.level + Math.sign(by) * 10)));
+  const el = frame.contentDocument?.querySelector('.beam-level input');
+  if (el) el.value = beam.level, el.nextElementSibling.textContent = `${beam.level}%`;
+}
 setInterval(() => {
-  const dm = frame.contentDocument?.querySelector('.mode-btn.active')?.dataset.mode;
-  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm } };
+  const doc = frame.contentDocument, dm = doc?.querySelector('.mode-btn.active')?.dataset.mode, lit = id => !!doc?.getElementById(id)?.classList.contains('active');
+  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level } };
   if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes }; // once a second, for a phone that joins late
   padSend(m);
 }, 66);
@@ -2101,6 +2400,8 @@ function showPadLink(url) { // the relay copies the phone's link to the clipboar
     const m = JSON.parse(e.data);
     if (m.tap) padTap(m.tap, m.drive);
     else if (m.mode) [...frame.contentDocument.querySelectorAll('.mode-btn')].find(b => b.dataset.mode === m.mode)?.click();
+    else if (m.traction) cycleTraction();
+    else if (m.beam) nudgeBeam(m.beam);
     else if ('t' in m) padInput(m);
     else if ('phone' in m) showPadLink(m.phone);
   };
@@ -2148,8 +2449,8 @@ function refuel(on) {
   w.document.getElementById('refuel-btn')?.dispatchEvent(new w.KeyboardEvent(on ? 'keydown' : 'keyup', { key: 'Enter' }));
 }
 
-// the garage: stop inside it and the car list opens; picking another car restarts the drive in it, here (at home, or
-// in a pit garage: ?at=pits at the racetrack, ?at=ring at the Nordschleife)
+// the garage: stop inside it (or in a car park bay) and the car list opens; picking another car restarts the drive in
+// it, here (at home, in the bay: ?at=bay<n>, or in a pit garage: ?at=pits at the racetrack, ?at=ring at the Nordschleife)
 const garageEl = document.getElementById('garage');
 for (const id of ['garage-cars', 'pit-cars']) document.getElementById(id).innerHTML = Object.values(CARS).map(c =>
   `<button data-car="${c.page}"${c === CAR ? ' class="on"' : ''}>${c.name}${c === CAR ? ' · driving now' : ''}</button>`).join('');
@@ -2158,13 +2459,18 @@ const swapCar = (page, at) => { // the car page saves on its way out
   if (at) query.set('at', at); else query.delete('at');
   location.search = query;
 };
-let garageClosed = false; // closed for this visit; reopens after driving out and back in
+const startBay = CP_BAYS[/^bay(\d+)$/.exec(query.get('at'))?.[1]];
+let garageClosed = !!startBay; // closed for this visit (and in the bay a swap started in); reopens after driving out and back in
 garageEl.addEventListener('click', e => {
   const b = e.target.closest('button');
-  if (b?.dataset.car && b.dataset.car !== CAR.page) swapCar(b.dataset.car);
+  if (b?.dataset.car && b.dataset.car !== CAR.page) swapCar(b.dataset.car, inBay());
   else if (b) { garageClosed = true; garageEl.hidden = true; }
 });
-const inGarage = () => Math.abs(state.x - HOME.x) < 2.4 && Math.abs(state.z - HOME.z) < 4;
+const inBay = () => { // its ?at=, parked (roughly) in a car park bay
+  const n = CP_BAYS.findIndex(b => Math.abs(state.x - b.x) < 2 && Math.abs(state.z - b.z) < 1 && Math.abs(state.y - b.y) < 1);
+  return n < 0 ? undefined : 'bay' + n;
+};
+const inGarage = () => (Math.abs(state.x - HOME.x) < 2.4 && Math.abs(state.z - HOME.z) < 4) || !!inBay();
 // the mechanic: stop in its bay and its menu opens the car menu on the car's own servicing, tuning or dyno tab.
 // Servicing and engine repairs only show in the car menu here - the mechanic is where the car gets fixed
 const shopEl = document.getElementById('shop');
@@ -2227,10 +2533,10 @@ function setPanel(open, tab) {
   w.focus();
 }
 panelClose.addEventListener('click', () => setPanel(false));
-// C (view), Tab (car menu), the arrows (signals, throttle limit), O/P (brake limit) and Space (handbrake) are this
+// C (view), Tab (car menu), ` (teleport), / (lap timer), \ (time & weather), the arrows (signals, throttle limit), O/P (brake limit) and Space (handbrake) are this
 // page's; the car page never sees them - the M3's uses C itself, and Space is its footbrake. Space still reaches it in
 // Dyno mode (where it runs a pull) and in the car menu
-const OWN = new Set(['KeyC', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyO', 'KeyP']);
+const OWN = new Set(['KeyC', 'Tab', 'Backquote', 'Backslash', 'Slash', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyO', 'KeyP']);
 const own = e => OWN.has(e.code) || (e.code === 'Space' && !panelOpen && !frame.contentWindow.CarDyno?.on);
 for (const type of ['keydown', 'keyup']) addEventListener(type, e => {
   onKey(e);
@@ -2256,12 +2562,23 @@ frame.addEventListener('load', () => {
     html.drive-panel body { background: rgba(9, 10, 12, .86) !important; min-height: 100vh; }
     html:not(.drive-shop) .cs-tab[data-tab="service"], html:not(.drive-shop) #repair-btn { display: none !important; }
     html:not(.drive-pump) #refuel-btn { visibility: hidden !important; }
+    .beam-level { display: inline-flex; align-items: center; gap: 6px; font: 12px system-ui, sans-serif; color: #aab0b8; white-space: nowrap; }
+    .beam-level input { width: 90px; } .beam-level b { min-width: 3.2em; color: #e9edf2; }
   </style>`);
+  // the headlights' brightness, beside the car's own Lights / High switch
+  w.document.getElementById('highbeam-btn')?.insertAdjacentHTML('afterend', `<label class="beam-level" title="Headlight brightness">Beam <input type="range" min="20" max="200" step="10" value="${beam.level}"><b>${beam.level}%</b></label>`);
+  const beamIn = w.document.querySelector('.beam-level input');
+  beamIn?.addEventListener('input', () => { setBeam(+beamIn.value); beamIn.nextElementSibling.textContent = `${beam.level}%`; });
+  beamIn?.addEventListener('change', () => beamIn.blur()); // so the arrow keys go back to the signals and the throttle limit
   const tick = w.CarDyno.tick;
   w.CarDyno.pop = backfire;
-  w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = w.CarTune.ch.smoke; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; carPage.tc = !!i.tc; carPage.spin = i.spin || 0; tick(i); };
+  let springs = true; // whether its car menu fits suspension (the E60's doesn't: CarTune.part throws for it)
+  try { w.CarTune.part('suspension'); } catch { springs = false; }
+  w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = w.CarTune.ch.smoke; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; carPage.tc = !!i.tc; carPage.spin = i.spin || 0; tick(i);
+    carPage.throttle = i.ignition ? i.throttle : 0; carPage.coolant = i.coolant; carPage.boost = i.boost;
+    carPage.chassis = i.chassis ?? -1; carPage.susp = springs ? w.CarTune.part('suspension') : 'stock'; carPage.dampers = w.CarService.parts.find(p => p.key === 'dampers')?.value || 0; };
   const serviceTick = w.CarService.tick; // the brake pedal (0-100) only reaches CarService
-  w.CarService.tick = i => { carPage.braking = i.braking; carPage.ignition = i.ignition; return serviceTick.call(w.CarService, i); };
+  w.CarService.tick = i => { carPage.braking = i.braking; carPage.ignition = i.ignition; return serviceTick.call(w.CarService, drift.on ? { ...i, slip: Math.max(i.slip || 0, drift.slide * roadMu * 1.5) } : i); };
   // the frame and its hole sized to this car's cluster (the CSS3D panel keeps its width), the chase panel kept on screen
   clusterH = Math.ceil(w.document.querySelector('.cluster').getBoundingClientRect().height);
   frame.style.height = clusterH + 'px';
@@ -2303,8 +2620,9 @@ frame.addEventListener('load', () => {
 // - odometer, fuel, wear, tune - and, as the latest page to open it, makes older tabs of it stop saving
 if (location.protocol === 'file:') document.getElementById('hud').textContent = 'Open this through the app (http://sim-app.test/drive.html) - the car runs from there.';
 else frame.src = `/car/${CAR.page}/raw${TEST_DRIVE ? '?test_drive=1' : ''}`;
-document.getElementById('credit').innerHTML = `${CAR.name.replace('BMW ', '')} model: <a href="${CAR.credit[1]}" target="_blank">${CAR.credit[0]}</a>
-  by <a href="${CAR.credit[4] || 'https://sketchfab.com/ddiaz-design'}" target="_blank">${CAR.credit[3] || 'Ddiaz Design'}</a>, <a href="http://creativecommons.org/licenses/${CAR.credit[2] || 'by-nc-sa'}/4.0/" target="_blank">CC ${(CAR.credit[2] || 'by-nc-sa').toUpperCase()} 4.0</a>
+const credit = ([title, page, licence = 'by-nc-sa', author = 'Ddiaz Design', authorPage = 'https://sketchfab.com/ddiaz-design']) => `<a href="${page}" target="_blank">${title}</a>
+  by <a href="${authorPage}" target="_blank">${author}</a>, <a href="http://creativecommons.org/licenses/${licence}/4.0/" target="_blank">CC ${licence.toUpperCase()} 4.0</a>`;
+document.getElementById('credit').innerHTML = `${CAR.name.replace('BMW ', '')} model: ${credit(CAR.credit)}${CAR.steering.from ? ` · steering wheel: ${credit(CARS[CAR.steering.from].credit)}` : ''}${CAR.wheelsCredit ? ` · wheels: ${credit(CAR.wheelsCredit)}` : ''}
   · Nordschleife: <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>`;
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
@@ -2315,44 +2633,323 @@ addEventListener('resize', () => {
 });
 
 // every drive starts at home, on the drive just out of the garage, facing down it to the valley road - or, after a
-// swap in a pit garage, on the pit lane outside it (16 m along its site's z), pointing to the exit
-const startPit = PITS.find(p => p.at === query.get('at')), startHeading = startPit ? Math.PI / 2 + startPit.rot : 0;
-const state = { x: startPit ? startPit.x + 16 * Math.sin(startPit.rot) : HOME.x, z: startPit ? startPit.z + 16 * Math.cos(startPit.rot) : HOME.z + 14, heading: startHeading, speed: 0, steer: 0 };
+// swap in a pit garage, on the pit lane outside it (16 m along its site's z), pointing to the exit; in the car park, in the
+// bay, facing out
+const HOME_SPOT = { x: HOME.x, y: 0, z: HOME.z + 14, heading: 0 };
+const pitSpot = p => ({ x: p.x + 16 * Math.sin(p.rot), y: p.y ?? 0, z: p.z + 16 * Math.cos(p.rot), heading: Math.PI / 2 + p.rot });
+const startPit = PITS.find(p => p.at === query.get('at'));
+const state = { ...(startPit ? pitSpot(startPit) : HOME_SPOT), speed: 0, steer: 0 };
+if (startBay) Object.assign(state, { x: startBay.x, y: startBay.y, z: startBay.z, heading: startBay.out });
 
-// mini map, north-up: +Z is up and +X is drawn on the left, so the map turns the same way the view does
-const mapEl = document.getElementById('map'), map = mapEl.getContext('2d');
-mapEl.width = mapEl.clientWidth * devicePixelRatio;
-mapEl.height = mapEl.clientHeight * devicePixelRatio;
-map.scale(devicePixelRatio, devicePixelRatio);
-const MAP_ROADS = [A, M, K1, K2, ...STREETS, T, TR, PL, CR, SL, VL, ON, NR, NPL, NA];
-// fuel, home, mechanics, the viewpoint, the start lines, the pit garages, the village
-const MARKERS = [...STATIONS.map(p => [p, '#2ecc71']), [HOME, '#4fa8ff'], ...SHOPS.map(p => [p, '#ff8c1a']), [V.P[Math.round(V.N / 2)], '#ffd23f'],
+// mini map, heading-up: the car's arrow always points up and the world turns round it (+X drawn on the left of +Z, as
+// the view sees it). On a circuit, in a town, at the airfield, the village or the mountain loop it fits that whole
+// place, the smallest first (a town inside the mountain's box wins) - for the three loops, within 200 m of the road too,
+// as the Nordschleife's box takes in the mountain's summit; anywhere else it follows the car, seeing further ahead the
+// faster it goes
+const mapEl = document.getElementById('map'), map = mapEl.getContext('2d'), MW = mapEl.clientWidth, MH = mapEl.clientHeight;
+mapEl.width = MW * devicePixelRatio;
+mapEl.height = MH * devicePixelRatio;
+const MAP_ROADS = [A, M, K1, K2, K3, RW, ...STREETS, T, TR, PL, CR, SL, VL, ON, NR, NPL, NA];
+// fuel, home and the car park, mechanics, the viewpoint, the start lines, the pit garages, the village
+const MARKERS = [...STATIONS.map(p => [p, '#2ecc71']), [HOME, '#4fa8ff'], [{ x: CP.x1, z: (CP.z0 + CP.z1) / 2 }, '#4fa8ff'], ...SHOPS.map(p => [p, '#ff8c1a']), [V.P[Math.round(V.N / 2)], '#ffd23f'],
   [T.P[ISF], '#ffffff'], [NR.P[RIG], '#ffffff'], ...PITS.map(p => [p, '#ff8c1a']), [VIL, '#c08a5a']];
-const all = MAP_ROADS.flatMap(r => r.P), xs = all.map(p => p.x), zs = all.map(p => p.z);
-const [minX, maxX, minZ, maxZ] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
-const mapS = Math.min((mapEl.clientWidth - 24) / (maxX - minX), (mapEl.clientHeight - 24) / (maxZ - minZ));
-const toMap = (x, z) => [mapEl.clientWidth / 2 - (x - (minX + maxX) / 2) * mapS, mapEl.clientHeight / 2 - (z - (minZ + maxZ) / 2) * mapS];
-const roadPath = new Path2D();
-for (const r of MAP_ROADS) {
-  roadPath.moveTo(...toMap(r.P[0].x, r.P[0].z));
-  for (let i = 20; i <= r.N; i += 20) roadPath.lineTo(...toMap(r.P[i].x, r.P[i].z));
-  roadPath.lineTo(...toMap(r.P[r.N].x, r.P[r.N].z)); // the last point (the loops close on themselves)
+const roadsPath = roads => { // in metres: a point every 18 m, and the last (the loops close on themselves)
+  const path = new Path2D();
+  for (const r of roads) {
+    path.moveTo(r.P[0].x, r.P[0].z);
+    for (let i = 6; i <= r.N; i += 6) path.lineTo(r.P[i].x, r.P[i].z);
+    path.lineTo(r.P[r.N].x, r.P[r.N].z);
+  }
+  return path;
+};
+const roadPath = roadsPath(MAP_ROADS);
+const corners = (x0, x1, z0, z1) => [{ x: x0, z: z0 }, { x: x1, z: z1 }];
+const PLACES = [['City', corners(CITY.x0, CITY.x1, CITY.z0, CITY.z1)], ['Midtown', corners(X2[0], X2.at(-1), Z2[0], Z2.at(-1))],
+  ['Southgate', corners(X3[0], X3.at(-1), Z3[0], Z3.at(-1))], ['Airfield', corners(90, 500, -2980, -420)],
+  ['Village', corners(VIL.x - VIL.r, VIL.x + VIL.r, VIL.z - VIL.r, VIL.z + VIL.r)],
+  ['Circuit', [...T.P, ...PL.P], [T, PL]], ['Nordschleife', [...NR.P, ...NPL.P], [NR, NPL]], ['Mountain', M.P, [M]]].map(([name, P, loop]) => {
+  const xs = P.map(p => p.x), zs = P.map(p => p.z), x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
+  // r: round its middle, so it fits whichever way the map has turned
+  return { name, x0, x1, z0, z1, x: (x0 + x1) / 2, z: (z0 + z1) / 2, r: Math.hypot(x1 - x0, z1 - z0) / 2 + 30, roads: loop, loop: loop && roadsPath(loop) };
+});
+// the middle (eased), px per metre, how far down the map it sits; the place it's in (looked up 4 times a second)
+const mapView = { x: state.x, z: state.z, s: 0.3, a: 0.66, at: null, look: 0 };
+
+// teleport: ` (or a click on the mini map) lists the racetracks and places; picking one puts the car there, stopped.
+// spotOn: on the nearest of these roads to (x, z), `side` m left of its centre line (traffic keeps left), facing
+// whichever way along it is nearer the heading `toward`
+const spotOn = (roads, x, z, toward, side = 0) => {
+  let r = roads[0], i = 0;
+  for (const q of roads) { const k = nearestSample(q, x, z); if (Math.hypot(q.P[k].x - x, q.P[k].z - z) < Math.hypot(r.P[i].x - x, r.P[i].z - z)) r = q, i = k; }
+  const L = r.L[i], h = Math.atan2(-L.z, L.x), back = Math.cos(h - toward) < 0, s = back ? -side : side; // L: its left, square to the way it runs
+  return { x: r.P[i].x + L.x * s, y: r.P[i].y, z: r.P[i].z + L.z * s, heading: back ? h + Math.PI : h };
+};
+const roof = CP_BAYS[(CP.levels - 1) * CP_BAYS.length / CP.levels];
+const TELEPORTS = [ // name, where, the spot
+  ['Racetrack', 'the start / finish line', spotOn([T], T.P[ISF].x, T.P[ISF].z, pitSpot(PITS[0]).heading)],
+  ['Racetrack pits', 'outside the team garage', pitSpot(PITS[0])],
+  ['Nordschleife', 'on the grid, behind the start line', spotOn([NR], NR.P[RIG - 3].x, NR.P[RIG - 3].z, pitSpot(PITS[1]).heading)],
+  ['Nordschleife pits', 'outside the team garage', pitSpot(PITS[1])],
+  ['Mountain', 'the viewpoint at the summit', spotOn([V], V.P[V.N >> 1].x, V.P[V.N >> 1].z, Math.PI)],
+  ['Autobahn', 'northbound, the long straight', spotOn([A], 2000, -3200, 0, 7)],
+  ['Airfield', "the runway's south end", spotOn([RW], 150, -2900, 0)],
+  ['Home', 'the drive outside the garage', HOME_SPOT],
+  ['City', 'downtown, on the avenue', spotOn(STREETS, 2700, -900, 0, 2.5)],
+  ['Car park', 'a bay on the roof', { x: roof.x, y: roof.y, z: roof.z, heading: roof.out }],
+  ['Midtown', 'its middle', spotOn(STREETS, 1000, -625, 0, 2.5)],
+  ['Southgate', 'its middle', spotOn(STREETS, 1000, -2775, 0, 2.5)],
+  ['Village', 'in among the houses', spotOn([CR, SL, VL], VIL.x, VIL.z, 0, 1.5)],
+  ['Mechanic', 'in the workshop by home', { ...SHOP, y: 0, heading: 0 }],
+];
+const teleportEl = document.getElementById('teleport');
+document.getElementById('teleport-places').innerHTML = TELEPORTS.map(([name, where], n) => `<button data-to="${n}">${name}<small>${where}</small></button>`).join('');
+const toggleTeleport = () => { teleportEl.hidden = !teleportEl.hidden || panelOpen; };
+mapEl.addEventListener('click', toggleTeleport);
+teleportEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.to) teleport(TELEPORTS[b.dataset.to][2]);
+  teleportEl.hidden = true;
+  frame.contentWindow.focus(); // its keys work natively again
+});
+function teleport(to) {
+  Object.assign(state, to, { speed: 0, steer: 0 });
+  carPage.speed = 0;
+  frame.contentWindow.crashSpeed = 0; // the car page carries on from a standstill
+  sprung.speed = sprung.accel = lastRoll = 0; // no lurch from the speed it had
+  camYaw = state.heading + orbitYaw; // the chase camera straight in behind it
+  for (const t of tracks) t.at = null; // no tyre mark across the map
+  Object.assign(mapView, { x: state.x, z: state.z, look: 0 });
+  lapReset();
 }
-function drawMap() {
-  map.clearRect(0, 0, mapEl.clientWidth, mapEl.clientHeight);
-  map.lineWidth = 4;
-  map.strokeStyle = '#9a9a9a';
+
+// Nordschleife lap timer (/ turns it on and off; this browser remembers that, and each car's best lap): it follows
+// the car along the track and times a lap from the start line round to it again, past a third and two thirds of the
+// way in that order. A lap through the pit lane counts; 30 m off the track (the pit garage), or a teleport, calls it
+// off. Timed on the drive's own clock, the moment over the line found between frames
+const lapEl = document.getElementById('laptime'), lapNow = document.getElementById('lap-now'), lapLast = document.getElementById('lap-last'), lapBest = document.getElementById('lap-best');
+const LINE = NR.P[RIG], LINE_T = new THREE.Vector2(tNR.x, tNR.z).normalize();
+const lap = { on: true, best: {}, clock: 0, i: -1, s: 0, start: null, thirds: 0, look: 0, shown: '' };
+try { lap.on = localStorage.getItem('drive-laptimer') !== 'off'; lap.best = JSON.parse(localStorage.getItem('drive-ring-best')) || {}; } catch {}
+const lapFmt = (t, dp = 3) => { const k = 10 ** dp, u = Math.floor(t * k), m = Math.floor(u / (60 * k)); return `${m}:${(u / k - m * 60).toFixed(dp).padStart(dp + 3, '0')}`; };
+console.assert(lapFmt(478.4129) === '7:58.412' && lapFmt(65.05, 1) === '1:05.0' && lapFmt(59.9999) === '0:59.999', 'lap times read m:ss.mmm');
+lapBest.textContent = lap.best[CAR.page] ? lapFmt(lap.best[CAR.page]) : '-';
+document.getElementById('lap-on').textContent = lap.on ? 'on' : 'off';
+function lapReset() { lap.i = -1; lap.start = null; }
+function setLapTimer(on) {
+  lap.on = on;
+  lapReset();
+  try { localStorage.setItem('drive-laptimer', on ? 'on' : 'off'); } catch {}
+  document.getElementById('lap-on').textContent = on ? 'on' : 'off';
+}
+function lapTimer(dt) {
+  lap.clock += dt;
+  lapEl.hidden = !lap.on || mapView.at?.name !== 'Nordschleife';
+  if (lapEl.hidden) return lapReset();
+  const N = NR.N, along = () => (state.x - LINE.x) * LINE_T.x + (state.z - LINE.z) * LINE_T.y; // + past the line
+  if (lap.i < 0) { // finding the car on the track, 4 times a second
+    if ((lap.look -= dt) > 0) return;
+    lap.look = 0.25;
+    const i = nearestSample(NR, state.x, state.z);
+    if (Math.hypot(NR.P[i].x - state.x, NR.P[i].z - state.z) > 30) return;
+    lap.i = i;
+    lap.s = along();
+  }
+  let i = lap.i, near = Infinity;
+  for (let k = lap.i - 20; k <= lap.i + 60; k++) { const j = (k + N) % N, e = (NR.P[j].x - state.x) ** 2 + (NR.P[j].z - state.z) ** 2; if (e < near) near = e, i = j; }
+  if (near > 30 * 30) return lapReset();
+  lap.i = i;
+  const d = (i - RIG + N) % N, s = along();
+  if (Math.abs(d - N / 3) < 30) lap.thirds |= 1;
+  if (Math.abs(d - 2 * N / 3) < 30) lap.thirds |= (lap.thirds & 1) * 2; // only after the first
+  if (lap.s < 0 && s >= 0 && (d < 60 || d > N - 60)) { // over the line
+    const at = lap.clock - dt * s / (s - lap.s);
+    if (lap.start !== null && lap.thirds === 3) lapDone(at - lap.start);
+    lap.start = at;
+    lap.thirds = 0;
+  }
+  lap.s = s;
+  const text = lap.start === null ? '-:--.-' : lapFmt(lap.clock - lap.start, 1);
+  if (text !== lap.shown) lapNow.textContent = lap.shown = text;
+}
+function lapDone(t) {
+  const best = !(lap.best[CAR.page] <= t);
+  lapLast.textContent = lapFmt(t);
+  lapLast.classList.toggle('best', best);
+  if (!best) return;
+  lap.best[CAR.page] = t;
+  lapBest.textContent = lapFmt(t);
+  try { localStorage.setItem('drive-ring-best', JSON.stringify(lap.best)); } catch {}
+}
+function drawMap(dt) {
+  if ((mapView.look -= dt) <= 0) {
+    mapView.look = 0.25;
+    mapView.at = PLACES.find(p => state.x > p.x0 - 60 && state.x < p.x1 + 60 && state.z > p.z0 - 60 && state.z < p.z1 + 60 &&
+      (!p.roads || p.roads.some(r => r.P.some(q => (q.x - state.x) ** 2 + (q.z - state.z) ** 2 < 200 ** 2))));
+  }
+  const at = mapView.at, k = 1 - Math.exp(-dt * 3), fit = Math.min(MW, MH) / 2 - 8, dpr = devicePixelRatio;
+  mapView.x += ((at ? at.x : state.x) - mapView.x) * k;
+  mapView.z += ((at ? at.z : state.z) - mapView.z) * k;
+  mapView.a += ((at ? 0.5 : 0.66) - mapView.a) * k;
+  mapView.s *= (fit / (at ? at.r : 300 + Math.abs(state.speed) * 6) / mapView.s) ** k; // zooms evenly, in or out
+  map.setTransform(dpr, 0, 0, dpr, 0, 0);
+  map.clearRect(0, 0, MW, MH);
+  map.translate(MW / 2, MH * mapView.a);
+  map.rotate(state.heading);
+  map.scale(-mapView.s, -mapView.s);
+  map.translate(-mapView.x, -mapView.z);
+  map.lineJoin = map.lineCap = 'round';
+  map.lineWidth = 4 / mapView.s;
+  map.strokeStyle = '#8a8a8a';
   map.stroke(roadPath);
+  if (at?.loop) { // the track or the loop itself, picked out
+    map.lineWidth = 2.5 / mapView.s;
+    map.strokeStyle = '#f2f2f2';
+    map.stroke(at.loop);
+  }
+  map.lineWidth = 1.5 / mapView.s;
+  map.strokeStyle = '#000';
   for (const [p, color] of MARKERS) {
     map.fillStyle = color;
-    map.beginPath(); map.arc(...toMap(p.x, p.z), 4.5, 0, Math.PI * 2); map.fill();
+    map.beginPath(); map.arc(p.x, p.z, 4.5 / mapView.s, 0, Math.PI * 2); map.fill(); map.stroke();
   }
-  map.save();
-  map.translate(...toMap(state.x, state.z));
-  map.rotate(-state.heading); // the arrow's tip, drawn pointing up, then faces the car's heading
+  // the arrow, pointing up as the car does, where the transform above puts the car
+  const u = (mapView.x - state.x) * mapView.s, v = (mapView.z - state.z) * mapView.s, c = Math.cos(state.heading), sn = Math.sin(state.heading);
+  map.setTransform(dpr, 0, 0, dpr, (MW / 2 + u * c - v * sn) * dpr, (MH * mapView.a + u * sn + v * c) * dpr);
   map.fillStyle = '#ff5a3c';
-  map.beginPath(); map.moveTo(0, -8); map.lineTo(5.5, 6); map.lineTo(-5.5, 6); map.closePath(); map.fill();
-  map.restore();
+  map.lineWidth = 1.5;
+  map.beginPath(); map.moveTo(0, -8); map.lineTo(5.5, 6); map.lineTo(-5.5, 6); map.closePath(); map.fill(); map.stroke();
+  map.setTransform(dpr, 0, 0, dpr, 0, 0);
+  map.font = '600 10px system-ui, sans-serif';
+  map.letterSpacing = '1.5px';
+  map.fillStyle = 'rgba(255, 255, 255, .85)';
+  map.textAlign = 'left';
+  map.textBaseline = 'alphabetic';
+  if (at) map.fillText(at.name.toUpperCase(), 10, 18);
+  // north (+Z), on the map's edge straight out from the arrow's spot
+  const nx = Math.sin(state.heading), ny = -Math.cos(state.heading), cx = MW / 2, cy = MH * mapView.a;
+  const t = Math.min(((nx > 0 ? MW - cx : cx) - 12) / Math.abs(nx), ((ny > 0 ? MH - cy : cy) - 12) / Math.abs(ny));
+  map.fillStyle = 'rgba(0, 0, 0, .6)';
+  map.beginPath(); map.arc(cx + nx * t, cy + ny * t, 8, 0, Math.PI * 2); map.fill();
+  map.fillStyle = '#fff';
+  map.textAlign = 'center';
+  map.textBaseline = 'middle';
+  map.letterSpacing = '0px';
+  map.fillText('N', cx + nx * t, cy + ny * t + 0.5);
+}
+// the worn-parts diagram, from the car page's servicing parts (0 as new .. 100 worn out): every Servicing group not
+// drawn on its own is under the bonnet. A part tuned out of the car (catless, DPF delete) doesn't count
+const WEAR_OF = { 'Wheels & tyres': 'tyres', Brakes: 'brakes', Chassis: 'springs', Drivetrain: 'drivetrain' };
+const wearEls = [...document.querySelectorAll('#wear [data-wear]')];
+const tEl = Object.fromEntries(['tc', 'slip', 'lat', 'lon', 'peak', 'thr', 'brk', 'worst', 'oil', 'cool', 'brake', 'boost'].map(k => [k, document.getElementById('t-' + k)]));
+const put = (el, text) => { if (el.textContent !== text) el.textContent = text; };
+function drawWear(parts = []) {
+  const worst = {};
+  let top;
+  for (const p of parts) {
+    if (/^(Removed|Not fitted)$/.test(p.read?.(p.value))) continue;
+    const k = WEAR_OF[p.group] || 'engine';
+    worst[k] = Math.max(worst[k] || 0, p.value);
+    if (!top || p.value > top.value) top = p;
+  }
+  for (const el of wearEls) {
+    const v = Math.round(Math.min(100, worst[el.dataset.wear] || 0));
+    if (el.wear === v) continue;
+    el.wear = v;
+    el.style.color = `hsl(0 ${v}% ${100 - v / 2}%)`; // white, through pink, to full red
+  }
+  put(tEl.worst, !top ? '' : top.value < 1 ? 'All parts as new' : `${top.label} ${Math.round(top.value)}%`);
+}
+// the g-g circle: the load the driver feels, from the body's own load transfer (sprung) - braking throws the dot up,
+// pulling away down, a left-hander out to the right. Rings every 0.5 g, the dashed one the tyres' grip; the trail is
+// the last 1.5 s, the peaks this drive's (not a wall's jolt). The rings, axes and labels are drawn once (ggBack)
+const GG = 200, G_MAX = Math.max(1.5, Math.ceil(GRIP / 9.81 * 2) / 2), GRIP_G = GRIP / 9.81, GG_R = GG / 2 - 6, GG_S = GG_R / G_MAX;
+const gg = document.getElementById('t-gg').getContext('2d'), ggBack = document.createElement('canvas').getContext('2d');
+gg.canvas.width = gg.canvas.height = ggBack.canvas.width = ggBack.canvas.height = GG * devicePixelRatio;
+{
+  const c = ggBack, R = GG_R, s = GG_S;
+  c.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, GG / 2 * devicePixelRatio, GG / 2 * devicePixelRatio); // from the middle
+  c.lineWidth = 1;
+  for (let r = 0.5; r <= G_MAX; r += 0.5) {
+    c.strokeStyle = r % 1 ? 'rgba(255, 255, 255, .07)' : 'rgba(255, 255, 255, .2)';
+    c.beginPath(); c.arc(0, 0, r * s, 0, Math.PI * 2); c.stroke();
+  }
+  c.strokeStyle = 'rgba(255, 255, 255, .1)';
+  c.beginPath(); c.moveTo(-R, 0); c.lineTo(R, 0); c.moveTo(0, -R); c.lineTo(0, R); c.stroke();
+  c.setLineDash([3, 4]);
+  c.strokeStyle = 'rgba(255, 176, 32, .6)';
+  c.beginPath(); c.arc(0, 0, GRIP_G * s, 0, Math.PI * 2); c.stroke();
+  c.font = '600 9px system-ui, sans-serif';
+  c.fillStyle = 'rgba(255, 255, 255, .4)';
+  c.textAlign = 'right'; // along the right-hand axis, inside each whole-g ring
+  c.textBaseline = 'bottom';
+  for (let r = 1; r <= G_MAX; r++) c.fillText(r + 'g', r * s - 3, -2);
+  c.textAlign = 'center';
+  c.textBaseline = 'top';
+  c.fillText('BRAKE', 0, -R + 2);
+  c.textBaseline = 'bottom';
+  c.fillText('ACCEL', 0, R - 2);
+}
+const ggDot = (x, y, r) => { gg.moveTo(x + r, y); gg.arc(x, y, r, 0, Math.PI * 2); };
+const tele = { trail: [], lat: 0, brk: 0, acc: 0, quiet: 0, boost: 0, slow: 0 };
+const heat = (t, cold, warm, hot) => t < cold ? '#5aa9ff' : t >= hot ? '#ff4d3d' : t >= warm ? '#ffb020' : '#e9edf2'; // cold, fine, warm, too hot
+function tile(el, text, frac, color) { // one temperature: its value, a bar along its range, coloured by how hot it is
+  el.hidden = text === undefined;
+  if (el.hidden || el.dataset.v === text + color) return;
+  el.dataset.v = text + color;
+  el.querySelector('b').textContent = text;
+  el.style.setProperty('--p', Math.round(Math.max(0, Math.min(1, frac || 0)) * 100) + '%');
+  el.style.setProperty('--c', color);
+}
+function pedal(el, f) {
+  const v = Math.max(0, Math.min(1, f || 0)).toFixed(2);
+  if (el.v !== v) el.style.transform = `scaleY(${el.v = v})`;
+}
+function drawTele(w, dt) {
+  const now = performance.now(), gx = sprung.side / 9.81, gy = sprung.accel / 9.81, g = Math.hypot(gx, gy), clip = Math.min(1, G_MAX / g);
+  if (state.hit) tele.quiet = 0.8; // a knock on a wall jolts the eased accel far past anything the tyres can do
+  if ((tele.quiet -= dt) <= 0 && !panelOpen && g < G_MAX) {
+    tele.lat = Math.max(tele.lat, Math.abs(gx));
+    tele.brk = Math.max(tele.brk, -gy);
+    tele.acc = Math.max(tele.acc, gy);
+  }
+  const s = GG_S, dpr = devicePixelRatio, dx = gx * clip * s, dy = gy * clip * s, trail = tele.trail;
+  if (!trail.length || now - trail.at(-1)[2] >= 33) trail.push([dx, dy, now]); // ~30 points a second, whatever the frame rate
+  while (now - trail[0][2] > 1500) trail.shift();
+  gg.setTransform(1, 0, 0, 1, 0, 0);
+  gg.clearRect(0, 0, gg.canvas.width, gg.canvas.height);
+  gg.drawImage(ggBack.canvas, 0, 0);
+  gg.setTransform(dpr, 0, 0, dpr, GG / 2 * dpr, GG / 2 * dpr);
+  gg.lineWidth = 2;
+  gg.strokeStyle = '#5aa9ff';
+  for (let i = 0; i < trail.length; i++) { // fading with age, the last stretch on to the dot
+    const [ax, ay, at] = trail[i], b = trail[i + 1];
+    gg.globalAlpha = 0.8 * (1 - (now - at) / 1500);
+    gg.beginPath(); gg.moveTo(ax, ay); gg.lineTo(b ? b[0] : dx, b ? b[1] : dy); gg.stroke();
+  }
+  gg.globalAlpha = 1;
+  gg.fillStyle = '#ffb020';
+  gg.beginPath(); ggDot(tele.lat * s, 0, 2.5); ggDot(-tele.lat * s, 0, 2.5); ggDot(0, -tele.brk * s, 2.5); ggDot(0, tele.acc * s, 2.5); gg.fill();
+  const use = g / (GRIP_G * wet); // how much of the tyres' grip it's using (on this road)
+  gg.fillStyle = use > 0.95 ? '#ff4d3d' : use > 0.8 ? '#ffb020' : '#fff';
+  gg.beginPath(); ggDot(dx, dy, 6); gg.fill();
+  pedal(tEl.thr, carPage.throttle);
+  pedal(tEl.brk, carPage.braking / 100);
+  tEl.tc.classList.toggle('on', carPage.tc);
+  tEl.slip.classList.toggle('on', carPage.spin > 0.25);
+  if ((tele.slow -= dt) > 0) return;
+  tele.slow = 0.1; // the numbers and the parts ten times a second: as readable, without relaying the panel out every frame
+  drawWear(w.CarService?.parts);
+  put(tEl.lat, Math.abs(gx).toFixed(2));
+  put(tEl.lon, (Math.round(gy * 100) / 100 || 0).toFixed(2));
+  put(tEl.peak, `Max  ${tele.lat.toFixed(2)} lat  ·  ${tele.brk.toFixed(2)} brake  ·  ${tele.acc.toFixed(2)} accel`);
+  const oil = w.CarDyno?.ch?.oil, cool = carPage.coolant, disc = w.CarService?.brakeTemp?.(), fade = w.CarService?.brakeFade?.() ?? 450;
+  const deg = t => t == null ? '–' : `${Math.round(t)}`;
+  tile(tEl.oil, deg(oil), (oil - 30) / 130, heat(oil, 80, 130, 145));
+  tile(tEl.cool, deg(cool), (cool - 30) / 100, heat(cool, 70, 108, 118));
+  tile(tEl.brake, deg(disc), disc / (fade + 200), heat(disc, 150, fade - 80, fade)); // cold race pads bite less; past fade they go off
+  tele.boost = Math.max(tele.boost, carPage.boost || 0); // shown once the car has made any (no tile on a car without a turbo)
+  tile(tEl.boost, tele.boost > 0.1 ? Math.max(0, carPage.boost).toFixed(2) : undefined, carPage.boost / tele.boost, '#e9edf2');
 }
 // the exhaust tips: EXHAUST's side, or both sides (CAR.exhaustBoth) - smoke and flame come out of each
 const SIDES = CAR.exhaustBoth ? [1, -1] : [1];
@@ -2372,7 +2969,7 @@ function smoke(dt, pct) {
   puffBack.set(0, 0, -1).applyEuler(car.rotation);
   for (puffDue += k * 40 * dt; puffDue >= 1; puffDue--) { // up to 40 puffs a second x 3.5 s fits the pool of 160
     const p = puffs[puffNext % puffs.length];
-    p.s.position.set(EXHAUST.x * SIDES[puffNext++ % SIDES.length], EXHAUST.y, EXHAUST.z).applyEuler(car.rotation).add(car.position);
+    p.s.position.set(EXHAUST.x * SIDES[puffNext++ % SIDES.length], EXHAUST.y, EXHAUST.z).applyMatrix4(body.matrixWorld);
     p.vel.set((Math.random() - 0.5) * 0.3, 0.4 + 0.4 * Math.random(), (Math.random() - 0.5) * 0.3).addScaledVector(puffBack, 1 + 2 * k - state.speed * 0.4); // blown out the back in a tight stream, then dragged along in the car's wake
     p.age = 0;
     p.alpha = 0.35 + 0.35 * k;
@@ -2423,7 +3020,7 @@ function flames(dt) {
       for (const [along, size, colour, glow] of FLAME) {
         const s = flameSprites[n++];
         s.material.color.setHex(colour);
-        s.position.set(side * EXHAUST.x + (Math.random() - 0.5) * 0.03, EXHAUST.y + along * len * 0.1, EXHAUST.z - along * len).applyEuler(car.rotation).add(car.position);
+        s.position.set(side * EXHAUST.x + (Math.random() - 0.5) * 0.03, EXHAUST.y + along * len * 0.1, EXHAUST.z - along * len).applyMatrix4(body.matrixWorld);
         s.scale.setScalar(size * (0.6 + 0.8 * p.size) * e * (0.8 + 0.4 * Math.random()));
         s.material.opacity = glow * e;
         s.visible = true;
@@ -2507,11 +3104,272 @@ function tyres(dt, roll, skid, onRollers) {
 }
 
 const pumpEl = document.getElementById('pump'), rollersEl = document.getElementById('rollers');
-let camYaw = startHeading, camPitch = PITCH, wheelSpin = 0, steerIn = 0;
+let camYaw = state.heading, camPitch = PITCH, wheelSpin = 0, steerIn = 0;
 const tilt = { pitch: 0, roll: 0 };
+// the body on its springs: it squats pulling away, dives under braking, leans out of a corner, and rocks as it settles.
+// Where it heads is the load transfer (g) times a gradient (°/g); a spring-damper takes it there. Firmer, so less lean and
+// quicker: CAR.stiff, the chassis setting (soft 0 to firm 2: M Chassis, EDC, the Porsche's drive mode), sport springs or
+// coilovers from the car menu; worn dampers let it bounce
+const sprung = { pitch: 0, roll: 0, vPitch: 0, vRoll: 0, accel: 0, speed: 0, side: 0 }, BODY_PIVOT = new THREE.Vector3(0, 0.35, 0), bodyOff = new THREE.Vector3();
+const SPRINGS = { stock: [1, 0], sport: [1.25, 0.05], coilovers: [1.5, 0.1] }; // stiffness, extra damping
+const X_AXIS = new THREE.Vector3(1, 0, 0), Y_AXIS = new THREE.Vector3(0, 1, 0), steerQ = new THREE.Quaternion(), eyeQ = new THREE.Quaternion();
+function suspension(dt) {
+  const firm = carPage.chassis >= 0 ? carPage.chassis : 1, [kPart, zPart] = SPRINGS[carPage.susp] || SPRINGS.stock;
+  const k = (CAR.stiff ?? 1) * kPart * (1 + 0.22 * firm);
+  const zeta = (0.3 + 0.12 * firm + zPart) * (1 - 0.5 * carPage.dampers / 100); // of critical damping
+  const w = 2 * Math.PI * 1.3 * Math.sqrt(k); // the body's bounce, ~1.3 Hz on a saloon
+  // the speed's change, eased: a hit or the handbrake lurches it too
+  sprung.accel += ((state.speed - sprung.speed) / dt - sprung.accel) * (1 - Math.exp(-dt * 12));
+  sprung.speed = state.speed;
+  const side = sprung.side = drift.on ? drift.ay : state.speed ** 2 * Math.tan(state.steer) * Math.cos(Math.atan(Math.tan(state.steer) / 2)) / WHEELBASE; // m/s² towards the left
+  const pitchTo = THREE.MathUtils.clamp(-2.2 / Math.sqrt(k) * sprung.accel / 9.81, -4, 4) * Math.PI / 180; // nose down + (the wheelbase is longer than the track)
+  const rollTo = THREE.MathUtils.clamp(3.2 / k * side / 9.81, -5, 5) * Math.PI / 180;         // left side up +
+  for (let n = Math.ceil(dt / 0.005), h = dt / n; n--;) { // short steps: the stiff springs would overshoot a long frame
+    sprung.vPitch += (w * w * (pitchTo - sprung.pitch) - 2 * zeta * w * sprung.vPitch) * h;
+    sprung.pitch += sprung.vPitch * h;
+    sprung.vRoll += (w * w * (rollTo - sprung.roll) - 2 * zeta * w * sprung.vRoll) * h;
+    sprung.roll += sprung.vRoll * h;
+  }
+  body.rotation.set(sprung.pitch, 0, sprung.roll); // about BODY_PIVOT, the wheel centres' height
+  body.position.copy(BODY_PIVOT).sub(bodyOff.copy(BODY_PIVOT).applyEuler(body.rotation));
+  body.updateWorldMatrix(true, false); // for the exhaust and the driver's eye this frame
+}
+// Time of day, the season and the weather. \ (or the clock in the help line) opens their menu; this browser remembers
+// them, and ?hour= ?season= ?sky= set them for a probe. A day passes in 24 minutes - or at the real pace with Live, which
+// also takes the season from the date and the sky from the Nürburgring's weather now (Open-Meteo, every 15 min). The
+// set of lights never changes (the headlights are only dark while they're off), so no shader is rebuilt mid-drive
+const SEASONS = { // sunrise and sunset at the Ring (h, on German clocks), the noon sun's height there (°, 50° N), the grass, the trees
+  spring: { name: 'Spring', de: 'Frühling', rise: 6.5, set: 19.5, noon: 40, grass: 0x6a9a4a, trees: [0x3f7a34, 0x4f8a3a, 0x2f5a2a] },
+  summer: { name: 'Summer', de: 'Sommer', rise: 5.3, set: 21.5, noon: 62, grass: 0x5a7a4a, trees: [0x2f5a2a, 0x2a5226, 0x355f2d] },
+  autumn: { name: 'Autumn', de: 'Herbst', rise: 7.3, set: 18.5, noon: 30, grass: 0x7a7548, trees: [0x2f5a2a, 0x2a4f27, 0x2f5a2a, 0xc0622a, 0xd8a03a, 0x9c3b22] }, // the firs stay green
+  winter: { name: 'Winter', de: 'Winter', rise: 8.3, set: 16.5, noon: 16, grass: 0x66705a, trees: [0x26402a, 0x2b4530] },
+};
+const SKIES = { // tint: the overcast it greys to (by k), sun: the sunlight let through, fog: near / far (m), grip: the road's (mu: for the drift model)
+  clear: { name: 'Clear', de: 'Sonnig', tint: 0x87a9c9, k: 0, sun: 1, fog: [150, 1600], grip: 1, mu: 1 },
+  cloudy: { name: 'Cloudy', de: 'Bewölkt', tint: 0x9aa3ab, k: 0.7, sun: 0.35, fog: [120, 1300], grip: 1, mu: 1 },
+  rain: { name: 'Rain', de: 'Regen', tint: 0x6f777f, k: 0.85, sun: 0.2, fog: [60, 600], grip: 0.72, mu: 0.65 },
+  fog: { name: 'Fog', de: 'Nebel', tint: 0xb8bdc2, k: 0.95, sun: 0.15, fog: [10, 180], grip: 0.95, mu: 1 },
+  snow: { name: 'Snow', de: 'Schnee', tint: 0xc8ccd2, k: 0.85, sun: 0.3, fog: [40, 450], grip: 0.38, mu: 0.28 },
+};
+const weather = { hour: 13, season: 'summer', sky: 'clear', live: false, run: true };
+try { Object.assign(weather, JSON.parse(localStorage.getItem('drive-weather'))); } catch {}
+for (const k of ['hour', 'season', 'sky']) if (query.has(k)) weather[k] = k === 'hour' ? +query.get(k) : query.get(k), weather.live = false;
+weather.hour = ((+weather.hour || 0) % 24 + 24) % 24;
+if (!SEASONS[weather.season]) weather.season = 'summer';
+if (!SKIES[weather.sky]) weather.sky = 'clear';
+const saveWeather = () => { try { localStorage.setItem('drive-weather', JSON.stringify(weather)); } catch {} };
+addEventListener('pagehide', saveWeather);
+const hhmm = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor(h % 1 * 60)).padStart(2, '0')}`;
+
+// the sun at hour h: its height (°) up from sunrise to noon's and down to sunset, then below the horizon - lowest at
+// midnight, as far down as noon's is short of 80° - and az, round from south (0) towards west (+)
+function sunAt(season, h) {
+  const s = SEASONS[season], day = s.set - s.rise, f = (h - s.rise) / day;
+  if (f >= 0 && f <= 1) return { el: s.noon * Math.sin(Math.PI * f), az: (f - 0.5) * Math.PI };
+  const g = ((h - s.set) % 24 + 24) % 24 / (24 - day);
+  return { el: -(80 - s.noon) * Math.sin(Math.PI * g), az: Math.PI / 2 + g * Math.PI };
+}
+console.assert(sunAt('summer', 13.4).el > 55 && sunAt('winter', 12.4).el < 20 && sunAt('summer', 2).el < -6 && sunAt('winter', 17).el < 0 &&
+  Math.abs(sunAt('spring', 6.5).az + Math.PI / 2) < 1e-9, 'the sun: high on a summer noon, low in winter, down at night, rising in the east');
+
+// the headlights: dipped or high beam as the car's own Lights / High switch is set (L, H), with the ignition on, at the
+// brightness set beside that switch in the car menu (each car its own; this browser remembers it)
+const headlights = [1, -1].map(s => { // one beam from each lamp (s: its side, + left)
+  const l = new THREE.SpotLight(0xfff1dc, 0, 150, 0.35, 0.5, 0); // no decay: the road's grazing angle already dims it with distance
+  l.position.set(s * 0.7, 0.75, 2.3); // (at the model's lamps once it's loaded)
+  car.add(l, l.target);
+  return l;
+});
+const BEAMS = { low: { power: 50, angle: 0.35, reach: 150, aim: [0, 30] }, high: { power: 100, angle: 0.5, reach: 320, aim: [0.6, 100] } }; // each lamp's; aim: the height and distance ahead it points at
+const beam = { level: 100 }; // %, 20-200
+try { beam.level = Math.min(200, Math.max(20, +JSON.parse(localStorage.getItem('drive-beam'))?.[CAR.page] || 100)); } catch {}
+function setBeam(level) {
+  beam.level = level;
+  try { localStorage.setItem('drive-beam', JSON.stringify({ ...JSON.parse(localStorage.getItem('drive-beam')), [CAR.page]: level })); } catch {}
+}
+function headlightsTick() {
+  const doc = frame.contentWindow.document, on = carPage.ignition && !!doc?.getElementById('lights-btn')?.classList.contains('active');
+  const b = on && doc.getElementById('highbeam-btn')?.classList.contains('active') ? BEAMS.high : BEAMS.low;
+  for (const l of headlights) {
+    l.intensity = on ? b.power * beam.level / 100 : 0;
+    l.angle = b.angle;
+    l.distance = b.reach;
+    l.target.position.set(l.position.x, ...b.aim); // straight ahead
+  }
+  const glow = on ? (b === BEAMS.high ? 1 : 0.75) * beam.level / 100 : 0;
+  for (const g of modelHeadGlow) g.opacity = Math.min(1, glow);
+  for (const [m, off, k] of modelHead) { // the lamps themselves lit warm white, or back to their own glow
+    if (on) m.emissive.setHex(0xfff2dc); else m.emissive.copy(off);
+    m.emissiveIntensity = on ? 3 * glow : k;
+  }
+}
+
+// the street lamps at night: each head lit, and a pool of its light on the road below it
+const lampHeads = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.3, 1.2).rotateX(Math.PI / 2).translate(0, 7.9, 0.6),
+  new THREE.MeshBasicMaterial({ color: 0xffe0a0 }), streetLamps.count);
+const lampPools = new THREE.InstancedMesh(new THREE.PlaneGeometry(16, 16).rotateX(-Math.PI / 2).translate(0, 0.15, 2.5),
+  new THREE.MeshBasicMaterial({ map: blob('rgba(255,205,140,0.6)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), streetLamps.count);
+for (let k = 0, at = new THREE.Matrix4(); k < streetLamps.count; k++) streetLamps.getMatrixAt(k, at), lampHeads.setMatrixAt(k, at), lampPools.setMatrixAt(k, at);
+scene.add(lampHeads, lampPools);
+
+// rain (streaks) and snow (flakes): DROPS of them in a BOX x TALL m box that wraps round the camera, each fixed in the
+// world as it falls, so they stream past a moving car
+const DROPS = 6000, BOX = 60, TALL = 30, FALL = { rain: 9, snow: 1.1 }, dropAt = Float32Array.from({ length: DROPS * 3 }, (_, i) => Math.random() * (i % 3 === 1 ? TALL : BOX));
+const rain = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(DROPS * 6), 3)),
+  new THREE.LineBasicMaterial({ color: 0xaab4c0, transparent: true, opacity: 0.5 }));
+const snow = new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(DROPS * 3), 3)),
+  new THREE.PointsMaterial({ map: blob('rgba(255,255,255,1)'), size: 0.12, transparent: true, depthWrite: false }));
+for (const o of [rain, snow]) o.frustumCulled = false, o.visible = false, scene.add(o);
+let fallT = 0;
+function precipitation(dt) {
+  const p = weather.sky === 'rain' ? rain : weather.sky === 'snow' ? snow : null;
+  rain.visible = p === rain;
+  snow.visible = p === snow;
+  if (!p) return;
+  const c = camera.position, a = p.geometry.attributes.position.array, drop = FALL[weather.sky] * (fallT += dt), wrap = (v, m) => (v % m + m) % m;
+  for (let i = 0, j = 0; i < DROPS; i++) {
+    const x = c.x + wrap(dropAt[i * 3] + (p === snow ? Math.sin(fallT * 0.8 + i) * 0.6 : 0) - c.x, BOX) - BOX / 2;
+    const y = c.y + wrap(dropAt[i * 3 + 1] - drop - c.y, TALL) - TALL / 2, z = c.z + wrap(dropAt[i * 3 + 2] - c.z, BOX) - BOX / 2;
+    a[j++] = x; a[j++] = y; a[j++] = z;
+    if (p === rain) a[j++] = x, a[j++] = y + 0.5, a[j++] = z; // a 0.5 m streak
+  }
+  p.geometry.attributes.position.needsUpdate = true;
+}
+
+// the season and snow on the land: the grass (the terrain's, the plain's, the verges', the island's), the trees, and
+// the roads - darker wet, greyed by slush in snow - each from its dry summer colour
+const treeMeshes = [];
+scene.traverse(o => { if (o.isInstancedMesh && o.geometry.type === 'ConeGeometry') treeMeshes.push(o); });
+for (const t of treeMeshes) t.material.color.setHex(0xffffff), t.setColorAt(0, t.material.color); // the colour per tree (and in the shader from the start)
+const greens = [], asphalt = [];
+(function sort(o) {
+  if (o === car) return;
+  const m = o.material, hsl = {};
+  if (m?.isMeshLambertMaterial && !m.vertexColors && !m.map && !m.userData.dry) {
+    m.color.getHSL(hsl, THREE.SRGBColorSpace);
+    const green = hsl.h > 0.2 && hsl.h < 0.42 && hsl.s > 0.12 && hsl.s < 0.45, grey = hsl.s < 0.12 && hsl.l > 0.15 && hsl.l < 0.31;
+    if (green || grey) (green ? greens : asphalt).push(m), m.userData.dry = m.color.clone();
+  }
+  o.children.forEach(sort);
+})(scene);
+const hash = k => { const x = Math.sin(k * 12.9898) * 43758.5453; return x - Math.floor(x); }; // the same tree takes the same colour
+let groundKey = '';
+function groundCover() {
+  const key = weather.season + weather.sky;
+  if (key === groundKey) return;
+  groundKey = key;
+  const s = SEASONS[weather.season], snowy = weather.sky === 'snow', grass = new THREE.Color(s.grass), summer = new THREE.Color(SEASONS.summer.grass);
+  const cover = new THREE.Color(0xeef1f4), slush = new THREE.Color(0x9a9ea2), shift = new THREE.Color(grass.r / summer.r, grass.g / summer.g, grass.b / summer.b);
+  for (const m of greens) m.color.copy(m.userData.dry).multiply(shift).lerp(cover, snowy ? 0.9 : 0);
+  for (const m of asphalt) m.color.copy(m.userData.dry).multiplyScalar(weather.sky === 'rain' ? 0.7 : 1).lerp(slush, snowy ? 0.35 : 0);
+  const kind = terrain.userData.kind, col = terrain.geometry.attributes.color;
+  const shade = [snowy ? cover : grass, new THREE.Color(0x7d776e).lerp(cover, snowy ? 0.4 : 0), new THREE.Color(0xf2f4f6)]; // grass, rock, the peaks' snow
+  for (let i = 0; i < kind.length; i++) col.setXYZ(i, shade[kind[i]].r, shade[kind[i]].g, shade[kind[i]].b);
+  col.needsUpdate = true;
+  const pal = (snowy ? [0xb8c4c0, 0xa9b8b2, 0x6f8478] : s.trees).map(h => new THREE.Color(h));
+  for (const t of treeMeshes) {
+    for (let k = 0; k < t.count; k++) t.setColorAt(k, pal[Math.floor(hash(k) * pal.length)]);
+    t.instanceColor.needsUpdate = true;
+  }
+}
+groundCover();
+
+// Live: the Ring's clock and season (checked each minute) and its weather (every 15 minutes)
+const SEASON_OF = ['winter', 'winter', 'spring', 'spring', 'spring', 'summer', 'summer', 'summer', 'autumn', 'autumn', 'autumn', 'winter'];
+const wmoSky = c => c <= 1 ? 'clear' : c <= 3 ? 'cloudy' : c === 45 || c === 48 ? 'fog' : (c >= 71 && c <= 77) || c === 85 || c === 86 ? 'snow' : 'rain';
+console.assert(wmoSky(0) === 'clear' && wmoSky(3) === 'cloudy' && wmoSky(48) === 'fog' && wmoSky(61) === 'rain' && wmoSky(73) === 'snow' &&
+  wmoSky(86) === 'snow' && wmoSky(95) === 'rain' && wmoSky(81) === 'rain', 'WMO weather codes map to the skies');
+let liveTick = 0, liveAt = -Infinity, liveNote = '';
+function liveSync() {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', month: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' })
+    .formatToParts(new Date()).map(x => [x.type, +x.value]));
+  weather.hour = p.hour + p.minute / 60;
+  weather.season = SEASON_OF[p.month - 1];
+  if (performance.now() - liveAt < 15 * 60e3) return;
+  liveAt = performance.now();
+  fetch('https://api.open-meteo.com/v1/forecast?latitude=50.335&longitude=6.947&current=weather_code').then(r => r.json()).then(j => {
+    const c = j.current?.weather_code;
+    if (!Number.isFinite(c)) throw new Error('no weather_code');
+    if (weather.live) weather.sky = wmoSky(c);
+    liveNote = '';
+  }).catch(() => { liveNote = 'Live weather unavailable - the sky stays as it is'; }).finally(() => weatherEl.hidden || drawWeatherMenu());
+}
+
+// each frame: the clock, then the sun, sky, fog, lights and the falling rain or snow from it
+const NIGHT = new THREE.Color(0x0b1020), DAY = new THREE.Color(0x87a9c9), DUSK = new THREE.Color(0xd9825b), WARM = new THREE.Color(0xffb070),
+  MOON = new THREE.Color(0x7080b0), WHITE = new THREE.Color(0xffffff), overcast = new THREE.Color(), wxNow = document.getElementById('wx-now');
+let wxShown = '';
+function skyTick(dt) {
+  if (weather.live) { if ((liveTick -= dt) <= 0) liveTick = 60, liveSync(); else weather.hour = (weather.hour + dt / 3600) % 24; }
+  else if (weather.run) weather.hour = (weather.hour + dt / 60) % 24; // an hour a minute
+  const sk = SKIES[weather.sky], { el, az } = sunAt(weather.season, weather.hour), up = el * Math.PI / 180;
+  const d = THREE.MathUtils.smoothstep(el, -6, 12), glow = (1 - Math.min(1, Math.abs(el) / 8)) * (1 - sk.k); // daylight 0-1; the dawn / dusk glow
+  sun.position.set(Math.cos(up) * Math.sin(az), Math.sin(up), -Math.cos(up) * Math.cos(az)).multiplyScalar(100); // (real south is -z, west +x)
+  sun.intensity = 1.5 * sk.sun * THREE.MathUtils.smoothstep(el, 0, 10);
+  sun.color.copy(WHITE).lerp(WARM, 1 - THREE.MathUtils.smoothstep(el, 2, 20));
+  hemi.intensity = 2 * Math.max(0.1, d) * (1 - 0.2 * sk.k);
+  hemi.color.copy(MOON).lerp(WHITE, d);
+  scene.background.copy(NIGHT).lerp(DAY, d).lerp(DUSK, glow * 0.45).lerp(overcast.setHex(sk.tint).multiplyScalar(0.12 + 0.88 * d), sk.k);
+  scene.fog.color.copy(scene.background);
+  [scene.fog.near, scene.fog.far] = sk.fog;
+  scene.environmentIntensity = 0.05 + 0.95 * d * (1 - 0.5 * sk.k); // no daylight in the paint at night
+  for (const [m, k] of envLit) m.envMapIntensity = k * scene.environmentIntensity;
+  const lit = 1 - THREE.MathUtils.smoothstep(el, -4, 4); // the street lamps come on round sunset
+  lampHeads.visible = lampPools.visible = lit > 0.01;
+  lampPools.material.opacity = lit;
+  rain.material.opacity = 0.25 + 0.3 * d;
+  wet = sk.grip;
+  roadMu = sk.mu;
+  groundCover();
+  precipitation(dt);
+  const shown = `${hhmm(weather.hour)} · ${SEASONS[weather.season].name} · ${sk.name}`;
+  if (shown !== wxShown) wxNow.textContent = wxShown = shown;
+}
+
+// the menu: the time (each season's dawn and dusk are its own), the clock running or not, the season, the sky, Live
+const weatherEl = document.getElementById('weather'), weatherOpts = document.getElementById('weather-opts'), wxNote = document.getElementById('wx-note');
+const TIMES = [['Dawn', s => s.rise + 0.25], ['Day', () => 13], ['Dusk', s => s.set - 0.25], ['Night', () => 23]];
+function drawWeatherMenu() {
+  const s = SEASONS[weather.season], b = (set, v, on, name, small) => `<button data-set="${set}" data-v="${v}"${on ? ' class="on"' : ''}>${name}<small>${small}</small></button>`;
+  weatherOpts.innerHTML = `<div class="wx-row">${TIMES.map(([name, at], n) => b('hour', n, false, name, hhmm(at(s)))).join('')}${b('run', '', weather.run && !weather.live, 'Clock', weather.live ? 'real time' : weather.run ? 'running' : 'paused')}</div>` +
+    `<div class="wx-row">${Object.entries(SEASONS).map(([k, v]) => b('season', k, k === weather.season, v.name, v.de)).join('')}</div>` +
+    `<div class="wx-row">${Object.entries(SKIES).map(([k, v]) => b('sky', k, k === weather.sky, v.name, v.de)).join('')}</div>` +
+    b('live', '', weather.live, 'Live', "the Nürburgring now: Germany's clock, the season, the weather");
+  wxNote.textContent = liveNote || (weather.live ? 'Following the Nürburgring' : 'A day passes in 24 minutes');
+}
+function toggleWeather() {
+  weatherEl.hidden = !weatherEl.hidden || panelOpen;
+  if (!weatherEl.hidden) drawWeatherMenu();
+}
+wxNow.addEventListener('click', toggleWeather);
+weatherEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if ('leave' in b.dataset) { weatherEl.hidden = true; frame.contentWindow.focus(); return; } // its keys work natively again
+  const { set, v } = b.dataset;
+  if (set === 'live') weather.live = !weather.live, liveTick = 0, liveAt = -Infinity;
+  else {
+    weather.live = false;
+    if (set === 'run') weather.run = !weather.run;
+    else weather[set] = set === 'hour' ? TIMES[v][1](SEASONS[weather.season]) : v;
+  }
+  saveWeather();
+  drawWeatherMenu();
+});
+
+// one frame drawn while loading with nothing culled or hidden, so every shader and every object's GPU pipeline is built
+// now: on the Mac (ANGLE on Metal) that happens at an object's first draw, and a town first coming into view stalled
+// that frame 100-130 ms (compileAsync alone doesn't help: it only links). The lights never change, so they hold
+{
+  const off = [];
+  scene.traverse(o => { if (o.frustumCulled || !o.visible) { off.push([o, o.frustumCulled, o.visible]); o.frustumCulled = false; o.visible = true; } });
+  renderer.render(scene, camera);
+  for (const [o, culled, visible] of off) Object.assign(o, { frustumCulled: culled, visible });
+}
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
+  turnFerris(dt);
   // on the rollers - in Dyno mode, or with the car menu open on its dyno or performance tab - the wheels turn at the
   // car page's speed but the car stays put, so a pull or a timed run doesn't drive it off unseen
   const roll = carPage.speed / 3.6 * (carPage.reverse ? -1 : 1), w = frame.contentWindow;
@@ -2523,11 +3381,13 @@ renderer.setAnimationLoop(() => {
   steerIn = steerInput(steerIn, (keys.has('KeyA') - keys.has('KeyD')) || pad.s, dt);
   pull += ((dt > 0 ? (Math.abs(roll) - Math.min(Math.abs(lastRoll), handedBack)) / dt : 0) - pull) * (1 - Math.exp(-dt * 8));
   lastRoll = roll;
-  const handbrake = keys.has('Space') && !rollers && !panelOpen;
+  const handbrake = (keys.has('Space') || pad.h) && !rollers && !panelOpen;
   const v = state.speed;
   state.hit = 0;
-  // the handbrake locks the rear wheels: they skid, slowing the car at ~0.35 g, and hold it standing
-  if (handbrake) state.speed = Math.sign(state.speed) * Math.max(0, Math.abs(state.speed) - 0.35 * GRIP * dt);
+  // the handbrake locks the rear wheels: they skid, slowing the car at 0.4 of the road's grip, and hold it standing
+  Object.assign(drift, { accel: pull, spin: carPage.spin, hb: handbrake, dsc: traction(w.document)[0], rear: rearShare(w.document) });
+  const hbDecel = 0.4 * roadGrip() * 9.81;
+  if (handbrake) state.speed = Math.sign(state.speed) * Math.max(0, Math.abs(state.speed) - hbDecel * dt);
   move(state, steerIn, dt);
   handedBack = state.speed !== v ? Math.abs(state.speed) : Infinity;
   if (state.hit && state.speed !== v) w.crashSpeed = handedBack * 3.6; // a hit: the car page carries on from here (km/h)
@@ -2545,10 +3405,14 @@ renderer.setAnimationLoop(() => {
   car.position.set(state.x, state.y = (hF + hB + hL + hR) / 4, state.z);
   car.rotation.set(-tilt.pitch, state.heading, tilt.roll, 'YXZ');
   frame.contentWindow.roadGrade = Math.sin(tilt.pitch); // + = uphill: slower on the climb, gathering speed downhill
+  // wet or snowy: less traction and braking too (the dyno's rollers stay dry); the drift car's at the road's real
+  // friction (its dry figures are ~1.4x a real road's)
+  frame.contentWindow.surfaceGrip = rollers ? 1 : CAR.drift && roadMu < 1 ? 0.7 * roadMu : wet;
+  if (dt > 0) suspension(dt);
   wheelSpin += roll * dt / WHEEL_R;
-  for (const w of wheels) {
-    w.rotation.x = wheelSpin;
-    if (w.position.z > 0) w.rotation.y = state.steer;
+  for (const w of wheels) { // spun about its axle, then steered about the upright
+    w.quaternion.setFromAxisAngle(w.userData.axle || X_AXIS, wheelSpin);
+    if (w.position.z > 0) w.quaternion.premultiply(steerQ.setFromAxisAngle(Y_AXIS, state.steer));
   }
   steeringWheel.rotation.z = -state.steer * 15; // left (positive steer) turns it anticlockwise as the driver sees it
   if (signal.side && (signal.t += dt) >= 3 * FLASH) signal.side = 0;
@@ -2558,14 +3422,15 @@ renderer.setAnimationLoop(() => {
   hmbl.color.setHex(braking ? 0xff2a2a : 0x3a0606);
   for (const [mt, full] of modelTail) mt.emissiveIntensity = full * (braking ? CAR.tail.brake : CAR.tail.idle);
   for (const g of modelTailGlow) g.opacity = braking ? 1 : 0;
+  headlightsTick();
   smoke(dt, carPage.smoke);
   flames(dt);
-  tyres(dt, roll, handbrake && Math.abs(roll) > 1, rollers);
+  tyres(dt, roll, (handbrake && Math.abs(roll) > 1) || drift.slide > 0.3, rollers); // (sliding marks too)
   const pump = atPump();
   refuel(pump && !carPage.ignition);
   pumpEl.hidden = !pump;
   pumpEl.textContent = fueling ? 'Refuelling - start the engine (I) to stop' : `${inPit() ? 'In the pit box' : 'At the pump'}: switch the engine off (I) to refuel`;
-  frame.contentWindow.throttleLimit = limits.throttle;
+  frame.contentWindow.throttleLimit = limits.throttle * (1 - 0.8 * drift.cut * drift.dsc); // (DSC's cut)
   frame.contentWindow.brakeLimit = limits.brake * (pad.b || 1); // the phone's brake slider: how far its held S opens
   const parked = inGarage(), pitted = inPit(), atShop = inShop() || !!pitted, html = frame.contentWindow.document.documentElement; // (toggle's force must be a boolean: undefined flips the class every frame)
   if (!parked) garageClosed = false;
@@ -2581,19 +3446,21 @@ renderer.setAnimationLoop(() => {
   wasInShop = atShop;
 
   if (inCar) { // from the driver's seat, looking where the car points (so up and down hills too); swipes turn the head
-    camera.position.copy(EYE).applyEuler(car.rotation).add(car.position);
-    camera.up.set(0, 1, 0).applyQuaternion(car.quaternion);
+    camera.position.copy(EYE).applyMatrix4(body.matrixWorld);
+    body.getWorldQuaternion(eyeQ);
+    camera.up.set(0, 1, 0).applyQuaternion(eyeQ);
     const p = orbitPitch - PITCH - 0.1;
-    const look = new THREE.Vector3(Math.sin(orbitYaw) * Math.cos(p), Math.sin(p), Math.cos(orbitYaw) * Math.cos(p)).applyQuaternion(car.quaternion);
+    const look = new THREE.Vector3(Math.sin(orbitYaw) * Math.cos(p), Math.sin(p), Math.cos(orbitYaw) * Math.cos(p)).applyQuaternion(eyeQ);
     camera.lookAt(camera.position.clone().add(look));
   } else {
     // ease the angles, not the position, so swinging round circles the car instead of cutting through it
-    const k = 1 - Math.exp(-dt * 4), yawTarget = state.heading + orbitYaw;
+    const k = 1 - Math.exp(-dt * 4), yawTarget = state.heading + orbitYaw + drift.beta * 0.7; // (in a slide, round towards where it's going)
     camYaw += Math.atan2(Math.sin(yawTarget - camYaw), Math.cos(yawTarget - camYaw)) * k; // shortest way round
     camPitch += (orbitPitch - camPitch) * k;
     const flat = Math.cos(camPitch) * CAM_DIST, cx = state.x - Math.sin(camYaw) * flat, cz = state.z - Math.cos(camYaw) * flat;
     camera.up.set(0, 1, 0);
-    camera.position.set(cx, Math.max(car.position.y + 1 + Math.sin(camPitch) * CAM_DIST, terrainAt(cx, cz) + 0.5), cz); // never under a hillside
+    const over = inCarPark(state.x, state.z) && onRoad(cx, cz, car.position.y + CP.h); // the deck or ramp over the car
+    camera.position.set(cx, Math.min(Math.max(car.position.y + 1 + Math.sin(camPitch) * CAM_DIST, terrainAt(cx, cz) + 0.5), over?.on ? over.y - 0.6 : Infinity), cz); // never under a hillside, or up through a deck
     camera.lookAt(state.x, car.position.y + 1, state.z);
     camera.rotateX(-Math.atan(hudAnchor.position.y + clusterH * 0.00081 / 2 + CHASE_GAP)); // tipped down over a taller panel
   }
@@ -2614,7 +3481,10 @@ renderer.setAnimationLoop(() => {
   cssPose.decompose(cluster.position, cluster.quaternion, cluster.scale);
   cssCam.projectionMatrix.copy(camera.projectionMatrix);
 
-  drawMap();
+  skyTick(dt);
+  lapTimer(dt);
+  drawMap(dt);
+  drawTele(frame.contentWindow, dt);
   renderer.render(scene, camera);
   cssRenderer.render(cssScene, panelOpen ? panelCam : cssCam);
 });
