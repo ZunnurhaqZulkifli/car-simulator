@@ -59,7 +59,7 @@
   #teleport-places { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; }
   #weather { width: min(520px, calc(100vw - 72px)); }
   #weather .wx-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); column-gap: 8px; margin-bottom: 10px; }
-  #wx-now { cursor: pointer; }
+  #wx-now, #drift-on { cursor: pointer; }
   kbd { padding: 0 5px; border: 1px solid #555; border-radius: 4px; font: 12px ui-monospace, monospace; }
   #credit { position: fixed; z-index: 2; right: 12px; bottom: 8px; font-size: 11px; color: rgba(255, 255, 255, .75); text-shadow: 0 1px 2px #000; }
   #credit a { color: inherit; }
@@ -73,7 +73,7 @@
 <body>
 <div id="hud">I start · W gas · S brake · Space handbrake · A/D steer · R reverse · ←/→ signal · L lights, H high beam · C in-car view · two-finger swipe to look around · Tab car menu · Esc close
   <div><kbd>F</kbd> cruise control, <kbd>,</kbd><kbd>.</kbd> set speed -5 / +5 km/h · <kbd>↑</kbd><kbd>↓</kbd> throttle limit <b id="lim-throttle">100%</b> · <kbd>O</kbd><kbd>P</kbd> brake limit <b id="lim-brake">100%</b></div>
-  <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <kbd>`</kbd> or click the map: teleport · <kbd>/</kbd> Nordschleife lap timer <b id="lap-on">on</b> · <kbd>\</kbd> time &amp; weather <b id="wx-now"></b> · <a href="/" style="color:inherit">main menu</a></div>
+  <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <kbd>`</kbd> or click the map: teleport · <kbd>/</kbd> Nordschleife lap timer <b id="lap-on">on</b> · <kbd>;</kbd> drift mode <b id="drift-on">off</b> · <kbd>\</kbd> time &amp; weather <b id="wx-now"></b> · <a href="/" style="color:inherit">main menu</a></div>
   <div id="pump" hidden></div>
   <div id="rollers" hidden>On the dyno rollers - Dyno mode is on (<kbd>Tab</kbd> car menu, Dyno) - switch it off to drive</div>
   <div id="padlink" hidden></div>
@@ -303,17 +303,21 @@ CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', grip: 2.2, page: 'bmw-530e'
 const query = new URLSearchParams(location.search), TEST_DRIVE = query.has('test_drive');
 const CAR = CARS[query.get('car')] || Object.values(CARS).find(c => c.page === query.get('car')) || CARS.x1;
 
-// Below 3 m/s (and in reverse) the car rolls on a kinematic bicycle model - no tyre slip, so it pivots like a real one
-// when parking; above, slide() below, with tyres that slip
+// The car rolls on a kinematic bicycle model - no tyre slip, so it pivots like a real one when parking, and turns as
+// hard as its grip allows. In drift mode, above 3 m/s going forward, slide() below takes over: tyres that slip
 const WHEELBASE = CAR.wheelbase, MAX_STEER = 0.8;
+// drift mode (; or the HUD's switch, or the phone pad): on, the slipping tyres, DSC and the 320d's real friction on a
+// wet road; off, the grip model. Off unless switched on - this browser remembers it
+let driftMode = false;
+try { driftMode = localStorage.getItem('drive-drift') === '1'; } catch {}
 // the car's tyre grip in g (CAR.grip): what full A/D asks of it, the same at any speed as a real road car's - it
 // doesn't fade at 130 km/h, so a fast corner still turns in
 const GRIP = (CAR.grip ?? 0.92) * 9.81;
 let wet = 1; // the road's share of that in this weather: 1 dry, less wet or in snow (the weather sets it, below)
 let roadMu = 1; // the road's real friction: 1 dry, 0.65 wet, 0.28 snow (set by the weather too)
-// the tyres' friction on this road (g): their grip times the weather's share - or the drift car's (the 320d's) on a wet
-// or snowy road, the road's real friction
-const roadGrip = () => CAR.drift && roadMu < 1 ? roadMu : GRIP / 9.81 * wet;
+// the tyres' friction on this road (g): their grip times the weather's share - or, in drift mode, the drift car's (the
+// 320d's) on a wet or snowy road, the road's real friction
+const roadGrip = () => driftMode && CAR.drift && roadMu < 1 ? roadMu : GRIP / 9.81 * wet;
 // the chassis (CAR.chassis: kg, the front's share of the weight, the rear's of the drive, CG height m; a and b the CG to
 // each axle, Iz the yaw inertia kg m²) and tyres (a simplified Pacejka curve: B its stiffness, C its shape)
 const CH = { m: 1600, front: 0.5, rear: 1, h: 0.52, ...CAR.chassis };
@@ -325,7 +329,7 @@ const drift = { accel: 0, spin: 0, hb: false, dsc: 1, rear: CHASSIS.rear, cut: 0
 // car.speed (m/s, negative in reverse) comes from the car page's own powertrain; this only steers and moves the car.
 // steer: -1..1, already eased in from the keys (steerInput)
 function step(car, steer, dt) {
-  if (car.speed > 3) return slide(car, steer, dt);
+  if (driftMode && car.speed > 3) return slide(car, steer, dt);
   // speed-sensitive lock: full lock when parking, shrinking with v² so full A/D never pulls more than the road can take
   const lock = Math.min(MAX_STEER, Math.atan(roadGrip() * 9.81 * WHEELBASE / Math.max(car.speed ** 2, 1)));
   car.steer += (steer * lock - car.steer) * Math.min(1, dt * 12);
@@ -336,7 +340,7 @@ function step(car, steer, dt) {
   car.x += Math.sin(car.heading + beta) * car.speed * dt;
   car.z += Math.cos(car.heading + beta) * car.speed * dt;
   Object.assign(car, { v: car.speed * Math.tan(beta), r: car.speed * Math.cos(beta) * Math.tan(car.steer) / WHEELBASE }); // (for slide() to carry on from)
-  Object.assign(drift, { on: false, beta: 0, slide: 0, ay: 0 });
+  Object.assign(drift, { on: false, beta: 0, slide: 0, ay: 0, cut: 0, active: 0 }); // (no DSC cut left over)
 }
 // keys are on or off, so the wheel winds on over ~0.25 s (a tap is a small correction, holding is full lock) and
 // unwinds twice as fast when let go
@@ -413,8 +417,14 @@ function slide(car, steer, dt) {
   }
 }
 
-// steering self-checks; failures show in the devtools console. Each runs from a fresh state on a dry road, DSC on
+// steering self-checks; failures show in the devtools console. Each runs from a fresh state on a dry road, DSC on, in
+// drift mode - bar the first, the grip model's
 {
+  const off = { x: 0, z: 0, heading: 0, speed: 50, steer: 0 }, was = driftMode;
+  driftMode = false;
+  for (let i = 0; i < 60; i++) step(off, 1, 1 / 60);
+  console.assert(off.heading > 0.8 * GRIP / 50 && off.heading < GRIP / 50 && !drift.on, 'drift mode off: full A at 180 km/h should pull GRIP, no slide', off);
+  driftMode = true;
   const run = (o, steerOf, secs, set = {}, road = {}) => {
     Object.assign(drift, { accel: 0, spin: 0, hb: false, dsc: 1, rear: CHASSIS.rear, cut: 0, held: 0 }, set);
     [wet, roadMu] = [road.wet ?? 1, road.mu ?? 1];
@@ -460,6 +470,7 @@ function slide(car, steer, dt) {
     console.assert(drifting.beta < -0.15 && drifting.beta > -0.8, 'on the power, hands off, the drift should hold', drifting);
     console.assert(Math.abs(lifted.beta) < 0.06, 'lifting off should straighten it', lifted);
   }
+  driftMode = was;
 }
 
 // reversed depth: no flicker between road and paint far away, and unlike log depth no depth written per pixel (that
@@ -2245,6 +2256,7 @@ function onKey(e) {
   if (e.code === 'Backquote') toggleTeleport();
   if (e.code === 'Backslash') toggleWeather();
   if (e.code === 'Slash') setLapTimer(!lap.on);
+  if (e.code === 'Semicolon') setDriftMode(!driftMode);
   if (LIMIT_KEYS[e.code]) setLimit(...LIMIT_KEYS[e.code]);
   if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') signal.side = e.code === 'ArrowLeft' ? 1 : -1, signal.t = 0;
 }
@@ -2344,7 +2356,8 @@ showLimits();
 
 // phone pad (scripts/pad-relay.mjs, public/pad.html). From the phone: tilt steering (-1-1, + = left), throttle /
 // brake sliders (0-1) and the handbrake (h, held) at 30 Hz, taps of the car's keys, its drive modes, its traction
-// switch, the headlights' brightness, look-around drags (lx / ly, as trackpad deltas), a view reset, and Tab / Esc. To it: gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
+// switch, the headlights' brightness, look-around drags (lx / ly, as trackpad deltas), a view reset, Tab / Esc and
+// drift mode. To it: gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
 // on, 2 high beam) and their brightness, this car's key hints (the buttons it shows), its drive modes and the
 // cluster's set-up pop-ups. The throttle opens the car page's accelerator directly; the brake
 // holds S with the brake limiter set to the slider (in the loop below), so the pedal ramps as S does
@@ -2397,7 +2410,7 @@ function nudgeBeam(by) { // the phone's Beam - / +: 10% a tap, mirrored on the c
 }
 setInterval(() => {
   const doc = frame.contentDocument, dm = doc?.querySelector('.mode-btn.active')?.dataset.mode, lit = id => !!doc?.getElementById(id)?.classList.contains('active');
-  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen } };
+  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen, drift: driftMode } };
   if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes }; // once a second, for a phone that joins late
   padSend(m);
 }, 66);
@@ -2416,6 +2429,7 @@ function showPadLink(url) { // the relay copies the phone's link to the clipboar
     else if (m.traction) cycleTraction();
     else if (m.beam) nudgeBeam(m.beam);
     else if (m.look) resetLook(); // { look: 'reset' }
+    else if (m.drift) setDriftMode(!driftMode);
     else if ('t' in m) padInput(m);
     else if ('phone' in m) showPadLink(m.phone);
   };
@@ -2559,7 +2573,7 @@ function topOpen() {
 // C (view), Tab (car menu), ` (teleport), / (lap timer), \ (time & weather), the arrows (signals, throttle limit), O/P (brake limit) and Space (handbrake) are this
 // page's; the car page never sees them - the M3's uses C itself, and Space is its footbrake. Space still reaches it in
 // Dyno mode (where it runs a pull) and in the car menu
-const OWN = new Set(['KeyC', 'Tab', 'Backquote', 'Backslash', 'Slash', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyO', 'KeyP']);
+const OWN = new Set(['KeyC', 'Tab', 'Backquote', 'Backslash', 'Slash', 'Semicolon', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyO', 'KeyP']);
 // Esc is this page's while it has something open to close; otherwise the car page's (it folds its dyno panel)
 const own = e => OWN.has(e.code) || (e.code === 'Space' && !panelOpen && !frame.contentWindow.CarDyno?.on) || (e.code === 'Escape' && !!topOpen());
 for (const type of ['keydown', 'keyup']) addEventListener(type, e => {
@@ -2761,6 +2775,14 @@ console.assert(lapFmt(478.4129) === '7:58.412' && lapFmt(65.05, 1) === '1:05.0' 
 lapBest.textContent = lap.best[CAR.page] ? lapFmt(lap.best[CAR.page]) : '-';
 document.getElementById('lap-on').textContent = lap.on ? 'on' : 'off';
 function lapReset() { lap.i = -1; lap.start = null; }
+function setDriftMode(on) {
+  driftMode = on;
+  try { localStorage.setItem('drive-drift', on ? '1' : '0'); } catch {}
+  driftOnEl.textContent = on ? 'on' : 'off';
+}
+const driftOnEl = document.getElementById('drift-on');
+driftOnEl.textContent = driftMode ? 'on' : 'off';
+driftOnEl.addEventListener('click', () => setDriftMode(!driftMode));
 function setLapTimer(on) {
   lap.on = on;
   lapReset();
@@ -3411,7 +3433,7 @@ renderer.setAnimationLoop(() => {
   state.hit = 0;
   // the handbrake locks the rear wheels: they skid, slowing the car at 0.4 of the road's grip, and hold it standing
   Object.assign(drift, { accel: pull, spin: carPage.spin, hb: handbrake, dsc: traction(w.document)[0], rear: rearShare(w.document) });
-  const hbDecel = 0.4 * roadGrip() * 9.81;
+  const hbDecel = (driftMode ? 0.4 : 0.35) * roadGrip() * 9.81;
   if (handbrake) state.speed = Math.sign(state.speed) * Math.max(0, Math.abs(state.speed) - hbDecel * dt);
   move(state, steerIn, dt);
   handedBack = state.speed !== v ? Math.abs(state.speed) : Infinity;
@@ -3432,7 +3454,7 @@ renderer.setAnimationLoop(() => {
   frame.contentWindow.roadGrade = Math.sin(tilt.pitch); // + = uphill: slower on the climb, gathering speed downhill
   // wet or snowy: less traction and braking too (the dyno's rollers stay dry); the drift car's at the road's real
   // friction (its dry figures are ~1.4x a real road's)
-  frame.contentWindow.surfaceGrip = rollers ? 1 : CAR.drift && roadMu < 1 ? 0.7 * roadMu : wet;
+  frame.contentWindow.surfaceGrip = rollers ? 1 : driftMode && CAR.drift && roadMu < 1 ? 0.7 * roadMu : wet;
   if (dt > 0) suspension(dt);
   wheelSpin += roll * dt / WHEEL_R;
   for (const w of wheels) { // spun about its axle, then steered about the upright

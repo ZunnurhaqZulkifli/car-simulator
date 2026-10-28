@@ -293,6 +293,7 @@ function build() {
           : { label: 'D', key: 'k', gear: 'D', cls: 'sel', aria: 'Drive' },
     h.m && !SPORT_M.test(h.m) && { label: 'M', key: 'm', gear: 'M', cls: 'sel', aria: 'Manual' },
     { label: 'DSC', id: 'tc', msg: { traction: 1 }, aria: 'Traction control: next setting' }, // labelled with the car's own setting (showTele)
+    { label: 'Drift', id: 'drift', msg: { drift: 1 }, aria: 'Drift mode on / off' }, // lit while on (showTele)
     { label: '▶', drive: { key: 'ArrowRight', code: 'ArrowRight' }, aria: 'Indicate right' },
   ].filter(Boolean);
   $('tab-drive').style.setProperty('--n', top.length);
@@ -322,7 +323,7 @@ function build() {
 
 const SEGS = 15;
 $('revs').append(...Array.from({ length: SEGS }, () => document.createElement('b')));
-function showTele({ g, v, r, on, dm, tc, hl, beam, menu }) {
+function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift }) {
   const redline = car?.redline || 7000;
   $('gear').textContent = g || '–';
   $('speed').textContent = v;
@@ -331,6 +332,7 @@ function showTele({ g, v, r, on, dm, tc, hl, beam, menu }) {
   $('revs').classList.toggle('flash', r >= redline * 0.97);
   $('ign').classList.toggle('on', on);
   $('menu').classList.toggle('on', !!menu);
+  $('drift')?.classList.toggle('on', !!drift);
   gearMode = /^D?S/.test(g || '') ? 'S' : (g || '')[0]; // R, N, D, S (S or DS), M - or P
   for (const b of document.querySelectorAll('[data-gear]')) b.classList.toggle('on', b.dataset.gear === gearMode || (b.dataset.gear === 'D' && gearMode === 'S'));
   $('ds')?.classList.toggle('sport', gearMode === 'S');
