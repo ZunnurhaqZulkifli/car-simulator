@@ -1479,12 +1479,20 @@
   function updateClock(){ const n = new Date(); lcd.clock.textContent = String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); }
   updateClock(); setInterval(updateClock, 15000);
 
-  // speedo needle: a critically-damped tracking filter - sits right on the speed while it climbs, rounds off sudden changes
-  function needleTrack(k){
+  // needles (the 320d's, as the 335i): a critically-damped tracking filter - sits right on the value while it climbs and
+  // only rounds off sudden changes. springDown: on the way down it's a plain spring, so the quick rev drop of an upshift eases out
+  // (per call, so the tach can follow the diesel limiter's bounce both ways - one-sided, it rides above the cut)
+  function needleTrack(k, springDown = false){
     let x = 0, v = 0, prev = 0; const c = 2*Math.sqrt(k);
-    return (target, dt) => { if(dt <= 0) return x; const tv = (target - prev)/dt; prev = target; v += (k*(target - x) + c*(tv - v))*dt; x += v*dt; return Math.max(0, x); };
+    return (target, dt, spring = springDown) => {
+      if(dt <= 0) return x;
+      let tv = (target - prev)/dt; prev = target;
+      if(spring && tv < 0) tv = 0;
+      v += (k*(target - x) + c*(tv - v))*dt; x += v*dt;
+      return Math.max(0, x);
+    };
   }
-  const speedNeedleTrack = needleTrack(25);
+  const speedNeedleTrack = needleTrack(25), tachNeedleTrack = needleTrack(85, true);
   let lastT = performance.now(), xdFrame = 0;
 
   function frame(now){
@@ -1638,12 +1646,15 @@
     // it catches: a short, gruff flare and back down to idle
     if(running && engineOnTime < 0.7 && speed < 3) targetRpmK = Math.max(targetRpmK, idleK + 0.38*(1 - engineOnTime/0.7));
     if(wheelspinK > 0) targetRpmK = Math.min(REV_LIMIT_K, targetRpmK + wheelspinK);
-    // rates (1/s): locked to the wheels in gear, a quick build and a compression-braked fall free-revving,
-    // a short wind-down once switched off
     const coupled = running && gearIdx >= 0 && speed > 3;
-    const rate = !running ? (cranking ? 12 : 3.2) : coupled ? (upshiftDropT > 0 ? 14 : shiftCooldown > 0 ? 6 : 14) : (targetRpmK > rpmK ? 7.5 : 2.2);
-    if(limCut && !coupled) rpmK -= 2.0*dt; // unfuelled, compression brakes it ~2,000 rpm/s
-    else rpmK += (Math.max(0, targetRpmK) - rpmK)*(1 - Math.exp(-dt*rate));
+    if(!running) rpmK += (targetRpmK - rpmK)*(1 - Math.exp(-dt*(cranking ? 12 : 3.2))); // cranking, or winding down once switched off
+    else if(limCut && !coupled) rpmK -= 2.0*dt; // unfuelled, compression brakes it ~2,000 rpm/s
+    else {
+      // the 320d's rates (as the 335i), per frame: quick to rise, slow to fall back; a brief hold right after a shift,
+      // then a quick (~0.07 s) drop into the new gear on an upshift
+      const fallRate = (upshiftDropT > 0 && shiftCooldown < 0.16) ? 1 - Math.exp(-dt/0.07) : (shiftCooldown > 0 && shiftCooldown < 0.16) ? 0.045 : 0.013;
+      rpmK += (Math.max(0, targetRpmK) - rpmK)*(targetRpmK > rpmK ? 0.135 : fallRate);
+    }
     if(!ignition && rpmK < 0.02) rpmK = 0;
     rpmK = Math.max(0, Math.min(REV_LIMIT_K, rpmK));
     // ---- diesel rev limiter: injection off at the cut, back on ~150 rpm lower (and not before 70 ms), so the revs
@@ -1662,7 +1673,7 @@
     // ---- needles ----
     const displaySpeed = Math.min(speedNeedleTrack(speed, dt), SPD_MAX*1.06);
     rot(speedNeedle, spdAng(displaySpeed));
-    rot(tachNeedle, tachAng(Math.min(rpmK, TACH_MAX*1.04)));
+    rot(tachNeedle, tachAng(Math.min(tachNeedleTrack(rpmK, dt, limHold >= 0.3), TACH_MAX*1.04)));
     $('led-speed-txt').textContent = Math.round(speed);
     $('led-rpm-txt').textContent = Math.round(rpmK*1000);
 
