@@ -2094,7 +2094,8 @@
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
     CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: running, rpm, throttle: pedalRaw, hp: liveHp, tq: liveTq, gear: gearIdx, gearLabel: gearStr,
-      speed, coolant: coolantC, boost: boostBar, egt: egrC, oil: oilC });
+      speed, coolant: coolantC, boost: boostBar, egt: egrC, oil: oilC,
+      chassis: ['comfort','sport','sportplus'].indexOf(setup.chassis) }); // the dampers, soft (0) to firm (2): the driving page's body roll and pitch
 
     // ---- warning lights ----
     if(ignition && engineOnTime < bulbCheckUntil) mainLights.forEach(w=>w.className='wl on-red');

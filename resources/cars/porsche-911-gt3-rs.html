@@ -1542,7 +1542,8 @@
     tqReadout.textContent = Math.round(dispTq) + ' Nm';
 
     CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: running, rpm, throttle: pedalRaw, hp: liveHp, tq: liveTq, gear: gearIdx,
-      gearLabel: isDrive() ? transmissionMode + gearStr : transmissionMode, speed, coolant: coolantC, boost: boostBar, egt: egrC, oil: oilC });
+      gearLabel: isDrive() ? transmissionMode + gearStr : transmissionMode, speed, coolant: coolantC, boost: boostBar, egt: egrC, oil: oilC,
+      chassis: ['normal','sport','track'].indexOf(mode) }); // PASM follows the drive mode, soft (0) to firm (2): the driving page's body roll and pitch
 
     // ---- tell-tales: bulb check at terminal 15, then what the car reports ----
     const bulb = ignition && engineOnTime < 2.2;
