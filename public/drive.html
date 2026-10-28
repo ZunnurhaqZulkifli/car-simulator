@@ -2364,8 +2364,9 @@ showLimits();
 // phone pad (scripts/pad-relay.mjs, public/pad.html). From the phone: tilt steering (-1-1, + = left), throttle /
 // brake sliders (0-1) and the handbrake (h, held) at 30 Hz, taps of the car's keys, its drive modes, its traction
 // switch, the headlights' brightness, look-around drags (lx / ly, as trackpad deltas), a view reset, Tab / Esc,
-// drift mode, a teleport, a request for the map overview (answered with it), a sound layer's level and mute. To it:
-// where the car is (pos), whether it's muted, its sound mixer's layers (once a second), gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
+// drift mode, a teleport, a request for the map overview (answered with it), a sound layer's level, mute and a time &
+// weather choice. To it: where the car is (pos), whether it's muted, its sound mixer's layers and the time & weather
+// menu (once a second), gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
 // on, 2 high beam) and their brightness, this car's key hints (the buttons it shows), its drive modes and the
 // cluster's set-up pop-ups. The throttle opens the car page's accelerator directly; the brake
 // holds S with the brake limiter set to the slider (in the loop below), so the pedal ramps as S does
@@ -2432,7 +2433,7 @@ function nudgeBeam(by) { // the phone's Beam - / +: 10% a tap, mirrored on the c
 setInterval(() => {
   const doc = frame.contentDocument, dm = doc?.querySelector('.mode-btn.active')?.dataset.mode, lit = id => !!doc?.getElementById(id)?.classList.contains('active');
   const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen, drift: driftMode, pos: [Math.round(state.x), Math.round(state.z), +state.heading.toFixed(2)], muted: !!doc?.querySelector('.mute-fab.muted'), slot: tuneSlot() } };
-  if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes, maps: tuneMaps() }, m.mix = mixRows(doc); // once a second, for a phone that joins late
+  if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes, maps: tuneMaps() }, m.mix = mixRows(doc), m.wx = wxMenu(); // once a second, for a phone that joins late
   padSend(m);
 }, 66);
 function showPadLink(url) { // the relay copies the phone's link to the clipboard each time this page opens
@@ -2453,6 +2454,7 @@ function showPadLink(url) { // the relay copies the phone's link to the clipboar
     else if (m.drift) setDriftMode(!driftMode);
     else if (m.mapReq) padSend({ map: overview ??= mapOverview() });
     else if (m.mix) setMix(String(m.mix[0]), m.mix[1]);
+    else if (Array.isArray(m.weather)) pickWeather(String(m.weather[0]), m.weather[1]), padSend({ wx: wxMenu() }); // (straight back, so the pad lights it)
     else if (m.mute) frame.contentDocument?.querySelector('.mute-fab')?.click();
     else if (m.teleport != null) { const to = Number.isInteger(m.teleport) && TELEPORTS[m.teleport]; if (to) teleport(to[2]), teleportEl.hidden = true; }
     else if ('t' in m) padInput(m);
@@ -3430,13 +3432,31 @@ function skyTick(dt) {
 // the menu: the time (each season's dawn and dusk are its own), the clock running or not, the season, the sky, Live
 const weatherEl = document.getElementById('weather'), weatherOpts = document.getElementById('weather-opts'), wxNote = document.getElementById('wx-note');
 const TIMES = [['Dawn', s => s.rise + 0.25], ['Day', () => 13], ['Dusk', s => s.set - 0.25], ['Night', () => 23]];
+// the menu's choices, row by row - [set, v, on, name, small] - for it and the phone pad's Weather tab
+function wxMenu() {
+  const s = SEASONS[weather.season];
+  return { now: wxNow.textContent, note: liveNote || (weather.live ? 'Following the Nürburgring' : 'A day passes in 24 minutes'), rows: [
+    [...TIMES.map(([name, at], n) => ['hour', n, false, name, hhmm(at(s))]), ['run', '', weather.run && !weather.live, 'Clock', weather.live ? 'real time' : weather.run ? 'running' : 'paused']],
+    Object.entries(SEASONS).map(([k, v]) => ['season', k, k === weather.season, v.name, v.de]),
+    Object.entries(SKIES).map(([k, v]) => ['sky', k, k === weather.sky, v.name, v.de]),
+    [['live', '', weather.live, 'Live', "the Nürburgring now: Germany's clock, the season, the weather"]]] };
+}
 function drawWeatherMenu() {
-  const s = SEASONS[weather.season], b = (set, v, on, name, small) => `<button data-set="${set}" data-v="${v}"${on ? ' class="on"' : ''}>${name}<small>${small}</small></button>`;
-  weatherOpts.innerHTML = `<div class="wx-row">${TIMES.map(([name, at], n) => b('hour', n, false, name, hhmm(at(s)))).join('')}${b('run', '', weather.run && !weather.live, 'Clock', weather.live ? 'real time' : weather.run ? 'running' : 'paused')}</div>` +
-    `<div class="wx-row">${Object.entries(SEASONS).map(([k, v]) => b('season', k, k === weather.season, v.name, v.de)).join('')}</div>` +
-    `<div class="wx-row">${Object.entries(SKIES).map(([k, v]) => b('sky', k, k === weather.sky, v.name, v.de)).join('')}</div>` +
-    b('live', '', weather.live, 'Live', "the Nürburgring now: Germany's clock, the season, the weather");
-  wxNote.textContent = liveNote || (weather.live ? 'Following the Nürburgring' : 'A day passes in 24 minutes');
+  const { rows, note } = wxMenu(), b = ([set, v, on, name, small]) => `<button data-set="${set}" data-v="${v}"${on ? ' class="on"' : ''}>${name}<small>${small}</small></button>`;
+  weatherOpts.innerHTML = rows.slice(0, 3).map(r => `<div class="wx-row">${r.map(b).join('')}</div>`).join('') + rows[3].map(b).join('');
+  wxNote.textContent = note;
+}
+// one choice, from the menu or the pad (checked: the pad's comes over the network)
+function pickWeather(set, v) {
+  if (!(set === 'live' || set === 'run' || (set === 'hour' && Number.isInteger(+v) && TIMES[+v]) || (set === 'season' && Object.hasOwn(SEASONS, v)) || (set === 'sky' && Object.hasOwn(SKIES, v)))) return;
+  if (set === 'live') weather.live = !weather.live, liveTick = 0, liveAt = -Infinity;
+  else {
+    weather.live = false;
+    if (set === 'run') weather.run = !weather.run;
+    else weather[set] = set === 'hour' ? TIMES[+v][1](SEASONS[weather.season]) : v;
+  }
+  saveWeather();
+  drawWeatherMenu();
 }
 function toggleWeather() {
   weatherEl.hidden = !weatherEl.hidden || panelOpen;
@@ -3447,15 +3467,7 @@ weatherEl.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b) return;
   if ('leave' in b.dataset) { weatherEl.hidden = true; frame.contentWindow.focus(); return; } // its keys work natively again
-  const { set, v } = b.dataset;
-  if (set === 'live') weather.live = !weather.live, liveTick = 0, liveAt = -Infinity;
-  else {
-    weather.live = false;
-    if (set === 'run') weather.run = !weather.run;
-    else weather[set] = set === 'hour' ? TIMES[v][1](SEASONS[weather.season]) : v;
-  }
-  saveWeather();
-  drawWeatherMenu();
+  pickWeather(b.dataset.set, b.dataset.v);
 });
 
 // one frame drawn while loading with nothing culled or hidden, so every shader and every object's GPU pipeline is built

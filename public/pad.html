@@ -121,6 +121,12 @@
   #extras header { height: 36px; }
   #extras nav { flex: 1; }
   #extras-close { color: var(--m-light); }
+  /* time & weather: the drive page's menu, row by row - times and the clock, seasons, skies, Live */
+  #tab-weather:not([hidden]) { display: flex; flex-direction: column; gap: 6px; }
+  #tab-weather .wx-now { flex: none; margin: 0; color: var(--dim); font-size: 13px; }
+  #tab-weather .wx-row { flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+  #tab-weather .key { font-size: 14px; line-height: 1.15; padding: 0 4px; overflow: hidden; }
+  #tab-weather .key small { display: block; font-size: 11px; font-weight: 500; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* the sound mixer: every layer's slider at once */
   #tab-sound { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); grid-auto-rows: minmax(24px, 1fr); gap: 6px; }
   .mix { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px; min-height: 0; overflow: hidden;
@@ -204,6 +210,7 @@
     <button id="extras-close" aria-label="Back to the driving controls">‹ Drive</button>
     <nav role="tablist">
       <button role="tab" data-tab="map" aria-selected="true">Map</button>
+      <button role="tab" data-tab="weather" aria-selected="false">Weather</button>
       <button role="tab" data-tab="sound" aria-selected="false">Sound</button>
       <button role="tab" data-tab="mouse" aria-selected="false">Mouse</button>
     </nav>
@@ -217,6 +224,7 @@
     </div>
     <div id="places" role="list" aria-label="Teleport"><p class="empty">Open the drive page on the Mac</p></div>
   </div>
+  <div class="tab" id="tab-weather" role="tabpanel" hidden><p class="empty">Open the drive page on the Mac</p></div>
   <div class="tab" id="tab-sound" role="tabpanel" hidden><p class="empty">Open the drive page on the Mac</p></div>
   <div class="tab" id="tab-mouse" role="tabpanel" hidden>
     <div id="mpad" role="application" aria-label="Touchpad for the Mac's pointer: drag to move, tap to click, two fingers to scroll, two-finger tap to right-click">
@@ -534,6 +542,23 @@ function showMix(rows) {
     if (el && Date.now() - (mixSetAt[id] || 0) > 1500) drawMix(el, v);
   }
 }
+// the Weather tab: the drive page's time & weather menu (once a second, and straight after a choice from here)
+let wxJson = '';
+function showWx(wx) {
+  const json = JSON.stringify(wx);
+  if (json === wxJson) return;
+  wxJson = json;
+  const now = Object.assign(document.createElement('p'), { className: 'wx-now', textContent: `${wx.now} · ${wx.note}` });
+  $('tab-weather').replaceChildren(now, ...wx.rows.map(r => {
+    const row = Object.assign(document.createElement('div'), { className: 'wx-row' });
+    row.append(...r.map(([set, v, on, name, small]) => {
+      const b = key({ label: name, msg: { weather: [set, v] }, cls: on ? 'on' : '' });
+      b.append(Object.assign(document.createElement('small'), { textContent: small }));
+      return b;
+    }));
+    return row;
+  }));
+}
 function drawMix(el, v) {
   el.style.setProperty('--v', v + '%');
   el.querySelector('b').textContent = v + '%';
@@ -613,6 +638,7 @@ $('go').onclick = async () => {
     if (m.map) gotWorld(m.map);
     if (m.mix) showMix(m.mix);
     if (m.mouseState) showMouse(m.mouseState);
+    if (m.wx) showWx(m.wx);
     // the set-up pop-ups for engine, chassis... have no title on the cluster: name the button just pressed instead
     if (m.toast) toast(m.toast.title || (Date.now() - pressed.at < 1000 ? pressed.label : ''), m.toast.text);
   };
