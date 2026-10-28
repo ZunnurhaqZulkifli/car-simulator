@@ -2356,8 +2356,8 @@ showLimits();
 
 // phone pad (scripts/pad-relay.mjs, public/pad.html). From the phone: tilt steering (-1-1, + = left), throttle /
 // brake sliders (0-1) and the handbrake (h, held) at 30 Hz, taps of the car's keys, its drive modes, its traction
-// switch, the headlights' brightness, look-around drags (lx / ly, as trackpad deltas), a view reset, Tab / Esc and
-// drift mode. To it: gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
+// switch, the headlights' brightness, look-around drags (lx / ly, as trackpad deltas), a view reset, Tab / Esc,
+// drift mode, a teleport and a request for the map overview (answered with it). To it: where the car is (pos), gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
 // on, 2 high beam) and their brightness, this car's key hints (the buttons it shows), its drive modes and the
 // cluster's set-up pop-ups. The throttle opens the car page's accelerator directly; the brake
 // holds S with the brake limiter set to the slider (in the loop below), so the pedal ramps as S does
@@ -2410,7 +2410,7 @@ function nudgeBeam(by) { // the phone's Beam - / +: 10% a tap, mirrored on the c
 }
 setInterval(() => {
   const doc = frame.contentDocument, dm = doc?.querySelector('.mode-btn.active')?.dataset.mode, lit = id => !!doc?.getElementById(id)?.classList.contains('active');
-  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen, drift: driftMode } };
+  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen, drift: driftMode, pos: [Math.round(state.x), Math.round(state.z), +state.heading.toFixed(2)] } };
   if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes }; // once a second, for a phone that joins late
   padSend(m);
 }, 66);
@@ -2430,6 +2430,8 @@ function showPadLink(url) { // the relay copies the phone's link to the clipboar
     else if (m.beam) nudgeBeam(m.beam);
     else if (m.look) resetLook(); // { look: 'reset' }
     else if (m.drift) setDriftMode(!driftMode);
+    else if (m.mapReq) padSend({ map: overview ??= mapOverview() });
+    else if (m.teleport != null) { const to = Number.isInteger(m.teleport) && TELEPORTS[m.teleport]; if (to) teleport(to[2]), teleportEl.hidden = true; }
     else if ('t' in m) padInput(m);
     else if ('phone' in m) showPadLink(m.phone);
   };
@@ -2689,9 +2691,10 @@ const mapEl = document.getElementById('map'), map = mapEl.getContext('2d'), MW =
 mapEl.width = MW * devicePixelRatio;
 mapEl.height = MH * devicePixelRatio;
 const MAP_ROADS = [A, M, K1, K2, K3, RW, ...STREETS, T, TR, PL, CR, SL, VL, ON, NR, NPL, NA];
-// fuel, home and the car park, mechanics, the viewpoint, the start lines, the pit garages, the village
-const MARKERS = [...STATIONS.map(p => [p, '#2ecc71']), [HOME, '#4fa8ff'], [{ x: CP.x1, z: (CP.z0 + CP.z1) / 2 }, '#4fa8ff'], ...SHOPS.map(p => [p, '#ff8c1a']), [V.P[Math.round(V.N / 2)], '#ffd23f'],
-  [T.P[ISF], '#ffffff'], [NR.P[RIG], '#ffffff'], ...PITS.map(p => [p, '#ff8c1a']), [VIL, '#c08a5a']];
+// its marked spots, by kind (the names are the phone pad map's legend)
+const MARKER_KINDS = [['Fuel', '#2ecc71', STATIONS], ['Home & car park', '#4fa8ff', [HOME, { x: CP.x1, z: (CP.z0 + CP.z1) / 2 }]],
+  ['Mechanic & pits', '#ff8c1a', [...SHOPS, ...PITS]], ['Viewpoint', '#ffd23f', [V.P[Math.round(V.N / 2)]]], ['Start lines', '#ffffff', [T.P[ISF], NR.P[RIG]]], ['Village', '#c08a5a', [VIL]]];
+const MARKERS = MARKER_KINDS.flatMap(([, color, spots]) => spots.map(p => [p, color]));
 const roadsPath = roads => { // in metres: a point every 18 m, and the last (the loops close on themselves)
   const path = new Path2D();
   for (const r of roads) {
@@ -2751,6 +2754,28 @@ teleportEl.addEventListener('click', e => {
   teleportEl.hidden = true;
   frame.contentWindow.focus(); // its keys work natively again
 });
+// the whole map, north up, for the phone pad's Map tab: a picture of the roads and markers, its middle and scale (px
+// per metre; +x is west, so both axes flip, as on the mini map), the places' names, the teleport list and the legend
+function mapOverview() {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const r of MAP_ROADS) for (const p of r.P) x0 = Math.min(x0, p.x), x1 = Math.max(x1, p.x), z0 = Math.min(z0, p.z), z1 = Math.max(z1, p.z);
+  const s = 480 / Math.max(x1 - x0, z1 - z0), w = Math.ceil((x1 - x0) * s) + 16, h = Math.ceil((z1 - z0) * s) + 16, x = (x0 + x1) / 2, z = (z0 + z1) / 2;
+  const c = Object.assign(document.createElement('canvas'), { width: w, height: h }), g = c.getContext('2d');
+  g.translate(w / 2, h / 2);
+  g.scale(-s, -s);
+  g.translate(-x, -z);
+  g.lineJoin = g.lineCap = 'round';
+  g.lineWidth = 3 / s;
+  g.strokeStyle = '#8a8a8a';
+  g.stroke(roadPath);
+  for (const [p, color] of MARKERS) {
+    g.fillStyle = color;
+    g.beginPath(); g.arc(p.x, p.z, 4 / s, 0, Math.PI * 2); g.fill();
+  }
+  return { img: c.toDataURL(), x, z, s, w, h, places: PLACES.map(p => [p.name, Math.round(p.x), Math.round(p.z)]), to: TELEPORTS.map(([name, where]) => [name, where]),
+    legend: MARKER_KINDS.map(([name, color]) => [name, color]) };
+}
+let overview; // (drawn once, the first time the pad asks)
 function teleport(to) {
   Object.assign(state, to, { speed: 0, steer: 0 });
   carPage.speed = 0;

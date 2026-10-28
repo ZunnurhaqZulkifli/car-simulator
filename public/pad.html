@@ -101,6 +101,16 @@
           background: radial-gradient(circle, rgba(255, 255, 255, .07) 1px, transparent 1.5px) 0 0 / 18px 18px, var(--panel); }
   #look > * { pointer-events: none; } /* offsets stay the pad's own, turned round or not */
   #look.down { border-color: var(--m-light); }
+  /* the map: the whole of it, north up, with the car on it; the places to teleport to beside it (scrolls) */
+  #tab-map { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .mapcol { display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+  #mapc { flex: 1; width: 100%; min-height: 0; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+  #legend { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; line-height: 14px; color: var(--dim); }
+  #legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  #legend i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px #000; }
+  #legend i.you { border-radius: 0; background: none; box-shadow: none; width: 0; height: 0; border: 4.5px solid transparent; border-bottom: 9px solid var(--c); border-top: 0; }
+  #places { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 44px; gap: 6px; align-content: start; overflow-y: auto; touch-action: pan-y; min-height: 0; }
+  #places .key { font-size: 13px; line-height: 1.1; padding: 0 6px; overflow: hidden; }
   .key { min-height: 0; font-weight: 600; line-height: 1.1; }
   .key.sel { font: 400 24px var(--num); }
   .key.on { border-color: var(--m-light); box-shadow: inset 0 0 0 1px var(--m-light); }
@@ -149,6 +159,7 @@
     <button role="tab" data-tab="setup" aria-selected="false">Setup</button>
     <button role="tab" data-tab="car" aria-selected="false">Car</button>
     <button role="tab" data-tab="view" aria-selected="false">View</button>
+    <button role="tab" data-tab="map" aria-selected="false">Map</button>
   </nav>
   <div class="tab" id="tab-drive" role="tabpanel"><p class="empty">Open the drive page on the Mac to get this car's controls</p></div>
   <div class="tab" id="tab-setup" role="tabpanel" hidden></div>
@@ -157,6 +168,13 @@
     <div id="look" role="application" aria-label="Look around: drag to turn the camera"><span>Drag to look around</span></div>
     <button class="key" id="cam" aria-label="Switch between the chase and in-car view">Chase / in-car</button>
     <button class="key" id="cam-reset">Reset view</button>
+  </div>
+  <div class="tab" id="tab-map" role="tabpanel" hidden>
+    <div class="mapcol">
+      <canvas id="mapc" aria-label="Map of the whole world, north up, with the car on it"></canvas>
+      <div id="legend" aria-label="Map legend"></div>
+    </div>
+    <div id="places" role="list" aria-label="Teleport"><p class="empty">Open the drive page on the Mac</p></div>
   </div>
 </main>
 <section class="side">
@@ -173,6 +191,7 @@ const FULL_LOCK = 40, DEAD = 2; // degrees the phone turns for full lock, and a 
 const pad = { s: 0, t: 0, b: 0, h: 0 }; // s: -1-1, + = left (as A on the drive page); t, b: 0-1; h: the handbrake, held
 const $ = id => document.getElementById(id);
 let ws, car = null, carJson = '', lastTele = 0, pressed = { label: '', at: 0 }, gearMode = '';
+let world = null, worldImg = null, worldAsked = 0, pos = null; // the map overview (from the drive page) and where the car is
 const send = m => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(m));
 
 // how far the phone is turned clockwise, like a wheel, from level in landscape (held either way round): world "up"
@@ -207,7 +226,7 @@ function drawSteer() {
 // as a pinch or a double-tap. The pad runs on pointer events, so the touches' own defaults can all go - bar the
 // intro's button, which wants its click
 for (const t of ['gesturestart', 'gesturechange', 'gestureend', 'touchmove', 'dblclick'])
-  document.addEventListener(t, e => e.preventDefault(), { passive: false });
+  document.addEventListener(t, e => (t === 'touchmove' && e.target.closest('#places')) || e.preventDefault(), { passive: false }); // (the teleport list scrolls)
 document.addEventListener('touchend', e => e.target.closest('#intro') || e.preventDefault(), { passive: false });
 
 // pedals: touch anywhere on one to set it, and it springs back when you let go
@@ -323,7 +342,7 @@ function build() {
 
 const SEGS = 15;
 $('revs').append(...Array.from({ length: SEGS }, () => document.createElement('b')));
-function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift }) {
+function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift, pos: p }) {
   const redline = car?.redline || 7000;
   $('gear').textContent = g || '–';
   $('speed').textContent = v;
@@ -333,6 +352,8 @@ function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift }) {
   $('ign').classList.toggle('on', on);
   $('menu').classList.toggle('on', !!menu);
   $('drift')?.classList.toggle('on', !!drift);
+  pos = p;
+  if (!$('tab-map').hidden) drawWorld();
   gearMode = /^D?S/.test(g || '') ? 'S' : (g || '')[0]; // R, N, D, S (S or DS), M - or P
   for (const b of document.querySelectorAll('[data-gear]')) b.classList.toggle('on', b.dataset.gear === gearMode || (b.dataset.gear === 'D' && gearMode === 'S'));
   $('ds')?.classList.toggle('sport', gearMode === 'S');
@@ -362,7 +383,60 @@ for (const t of document.querySelectorAll('[role=tab]')) t.onpointerdown = () =>
     o.setAttribute('aria-selected', o === t);
     $('tab-' + o.dataset.tab).hidden = o !== t;
   }
+  if (t.dataset.tab === 'map') askWorld(), drawWorld();
 };
+
+// the Map tab: the drive page sends its overview once asked (again every 3 s while none has come)
+function askWorld() {
+  if (world || Date.now() - worldAsked < 3000) return;
+  worldAsked = Date.now();
+  send({ mapReq: 1 });
+}
+function gotWorld(m) {
+  world = m;
+  worldImg = Object.assign(new Image(), { onload: drawWorld, src: m.img });
+  // on letting go, not on the press: a finger that starts scrolling the list is cancelled instead (pan-y)
+  $('places').replaceChildren(...m.to.map(([name, where], n) => {
+    const b = Object.assign(document.createElement('button'), { className: 'key', textContent: name, title: where });
+    b.setAttribute('aria-label', `Teleport: ${name}, ${where}`);
+    b.onpointerdown = () => b.classList.add('down');
+    b.onpointercancel = b.onpointerleave = () => b.classList.remove('down');
+    b.onpointerup = () => { if (!b.classList.contains('down')) return; b.classList.remove('down'); send({ teleport: n }); toast('Teleport', name); };
+    return b;
+  }));
+  const dot = (name, color, cls = '') => { const el = document.createElement('span'); el.innerHTML = `<i class="${cls}" style="--c:${color}"></i>`; el.append(name); return el; };
+  $('legend').replaceChildren(dot('You', '#ff5a3c', 'you'), ...(m.legend || []).map(([name, color]) => dot(name, color)));
+}
+function drawWorld() {
+  const c = $('mapc'), W = c.clientWidth, H = c.clientHeight, dpr = devicePixelRatio; // (its own size, turned round or not)
+  if (!W || !H) return askWorld();
+  if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) c.width = Math.round(W * dpr), c.height = Math.round(H * dpr);
+  const g = c.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  if (!world || !worldImg?.complete) return askWorld();
+  const k = Math.min((W - 12) / world.w, (H - 12) / world.h), ox = (W - world.w * k) / 2, oy = (H - world.h * k) / 2;
+  const at = (x, z) => [ox + (world.w / 2 - (x - world.x) * world.s) * k, oy + (world.h / 2 - (z - world.z) * world.s) * k];
+  g.drawImage(worldImg, ox, oy, world.w * k, world.h * k);
+  g.font = '600 9px Barlow, system-ui, sans-serif';
+  g.textAlign = 'center';
+  g.fillStyle = 'rgba(238, 241, 245, .6)';
+  const taken = []; // the towns sit close together: a name that would cover one already there is left off (the list has them all)
+  for (const [name, x, z] of world.places) {
+    const [px, py] = at(x, z), half = g.measureText(name.toUpperCase()).width / 2 + 3, box = [px - half, py - 10, px + half, py + 3];
+    if (taken.some(b => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
+    taken.push(box);
+    g.fillText(name.toUpperCase(), px, py);
+  }
+  if (!pos) return;
+  g.translate(...at(pos[0], pos[1]));
+  g.rotate(-pos[2]); // (heading grows turning left: anticlockwise, north up)
+  g.fillStyle = '#ff5a3c';
+  g.strokeStyle = '#000';
+  g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(0, -8); g.lineTo(5.5, 6); g.lineTo(-5.5, 6); g.closePath(); g.fill(); g.stroke();
+}
+addEventListener('resize', () => $('tab-map').hidden || drawWorld());
 
 const wake = () => navigator.wakeLock?.request('screen').catch(() => {}); // the screen sleeping mid-drive would drop the pad
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && wake());
@@ -382,6 +456,7 @@ $('go').onclick = async () => {
     const m = JSON.parse(e.data);
     if (m.car && JSON.stringify(m.car) !== carJson) { carJson = JSON.stringify(m.car); car = m.car; build(); }
     if (m.tele) { lastTele = Date.now(); showTele(m.tele); }
+    if (m.map) gotWorld(m.map);
     // the set-up pop-ups for engine, chassis... have no title on the cluster: name the button just pressed instead
     if (m.toast) toast(m.toast.title || (Date.now() - pressed.at < 1000 ? pressed.label : ''), m.toast.text);
   };
