@@ -71,7 +71,7 @@
 } }</script>
 </head>
 <body>
-<div id="hud">I start · W gas · S brake · Space handbrake · A/D steer · R reverse · ←/→ signal · L lights, H high beam · C in-car view · two-finger swipe to look around
+<div id="hud">I start · W gas · S brake · Space handbrake · A/D steer · R reverse · ←/→ signal · L lights, H high beam · C in-car view · two-finger swipe to look around · Tab car menu · Esc close
   <div><kbd>F</kbd> cruise control, <kbd>,</kbd><kbd>.</kbd> set speed -5 / +5 km/h · <kbd>↑</kbd><kbd>↓</kbd> throttle limit <b id="lim-throttle">100%</b> · <kbd>O</kbd><kbd>P</kbd> brake limit <b id="lim-brake">100%</b></div>
   <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <kbd>`</kbd> or click the map: teleport · <kbd>/</kbd> Nordschleife lap timer <b id="lap-on">on</b> · <kbd>\</kbd> time &amp; weather <b id="wx-now"></b> · <a href="/" style="color:inherit">main menu</a></div>
   <div id="pump" hidden></div>
@@ -2239,6 +2239,7 @@ function onKey(e) {
   if (e.code === 'Tab' || e.code === 'Slash' || e.code === 'ArrowUp' || e.code === 'ArrowDown' || (e.code === 'Space' && own(e))) e.preventDefault(); // this page's keys, not focus or scrolling
   if (e.repeat) return;
   if (e.code === 'Tab') setPanel(!panelOpen);
+  if (e.code === 'Escape') topOpen()?.();
   if (e.code === 'KeyW') resetLook();
   if (e.code === 'KeyC') setView(!inCar);
   if (e.code === 'Backquote') toggleTeleport();
@@ -2343,7 +2344,7 @@ showLimits();
 
 // phone pad (scripts/pad-relay.mjs, public/pad.html). From the phone: tilt steering (-1-1, + = left), throttle /
 // brake sliders (0-1) and the handbrake (h, held) at 30 Hz, taps of the car's keys, its drive modes, its traction
-// switch, the headlights' brightness, look-around drags (lx / ly, as trackpad deltas) and a view reset. To it: gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
+// switch, the headlights' brightness, look-around drags (lx / ly, as trackpad deltas), a view reset, and Tab / Esc. To it: gear, speed and revs, the traction setting, the lights (hl: 0 off, 1
 // on, 2 high beam) and their brightness, this car's key hints (the buttons it shows), its drive modes and the
 // cluster's set-up pop-ups. The throttle opens the car page's accelerator directly; the brake
 // holds S with the brake limiter set to the slider (in the loop below), so the pedal ramps as S does
@@ -2396,7 +2397,7 @@ function nudgeBeam(by) { // the phone's Beam - / +: 10% a tap, mirrored on the c
 }
 setInterval(() => {
   const doc = frame.contentDocument, dm = doc?.querySelector('.mode-btn.active')?.dataset.mode, lit = id => !!doc?.getElementById(id)?.classList.contains('active');
-  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level } };
+  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen } };
   if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes }; // once a second, for a phone that joins late
   padSend(m);
 }, 66);
@@ -2546,14 +2547,25 @@ function setPanel(open, tab) {
   w.focus();
 }
 panelClose.addEventListener('click', () => setPanel(false));
+// what Esc closes, the top one first: the car menu, the teleport or weather menu, the garage, mechanic or pit menu
+function topOpen() {
+  if (panelOpen) return () => setPanel(false);
+  if (!teleportEl.hidden) return () => teleportEl.hidden = true;
+  if (!weatherEl.hidden) return () => weatherEl.hidden = true;
+  if (!garageEl.hidden) return () => { garageClosed = true; garageEl.hidden = true; };
+  if (!shopEl.hidden) return () => { shopClosed = true; shopEl.hidden = true; };
+  if (!pitEl.hidden) return () => { pitClosed = true; pitEl.hidden = true; };
+}
 // C (view), Tab (car menu), ` (teleport), / (lap timer), \ (time & weather), the arrows (signals, throttle limit), O/P (brake limit) and Space (handbrake) are this
 // page's; the car page never sees them - the M3's uses C itself, and Space is its footbrake. Space still reaches it in
 // Dyno mode (where it runs a pull) and in the car menu
 const OWN = new Set(['KeyC', 'Tab', 'Backquote', 'Backslash', 'Slash', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyO', 'KeyP']);
-const own = e => OWN.has(e.code) || (e.code === 'Space' && !panelOpen && !frame.contentWindow.CarDyno?.on);
+// Esc is this page's while it has something open to close; otherwise the car page's (it folds its dyno panel)
+const own = e => OWN.has(e.code) || (e.code === 'Space' && !panelOpen && !frame.contentWindow.CarDyno?.on) || (e.code === 'Escape' && !!topOpen());
 for (const type of ['keydown', 'keyup']) addEventListener(type, e => {
+  const mine = own(e); // (before onKey: Esc closes what made it this page's)
   onKey(e);
-  if (own(e)) return;
+  if (mine) return;
   const w = frame.contentWindow; // keys pressed while this page has focus still reach the car page
   w.dispatchEvent(new w.KeyboardEvent(type, { key: e.key, code: e.code, repeat: e.repeat }));
 });

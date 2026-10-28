@@ -51,7 +51,8 @@
   #dot.wait { background: #e8a33a; }
   #dot.live { background: var(--m-light); }
   #car { flex: 1; min-width: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #ign { height: 30px; padding: 0 14px; border-radius: 15px; font-weight: 600; }
+  header button { height: 30px; padding: 0 14px; border-radius: 15px; font-weight: 600; flex: none; }
+  #menu.on { border-color: var(--m-light); box-shadow: inset 0 0 0 1px var(--m-light); }
   #ign.on { border-color: var(--m-red); box-shadow: 0 0 12px rgba(225, 38, 45, .45), inset 0 0 0 1px var(--m-red); }
 
   /* the cluster: the one loud thing */
@@ -132,6 +133,8 @@
 <main>
   <header>
     <span id="dot"></span><span id="car">Connecting to the Mac</span>
+    <button id="menu" aria-label="Car menu (Tab)">Tab</button>
+    <button id="esc" aria-label="Close (Esc)">Esc</button>
     <button id="ign">Start / stop</button>
   </header>
   <div class="cluster">
@@ -267,6 +270,8 @@ function key(o) {
 hook($('down'), { key: 'q' });
 hook($('up'), { key: 'e' });
 hook($('ign'), { key: 'i' });
+hook($('menu'), { drive: { key: 'Tab', code: 'Tab' } }); // the drive page's car menu
+hook($('esc'), { drive: { key: 'Escape', code: 'Escape' } }); // closes what's open there, else reaches the car page
 hook($('cam'), { drive: { key: 'c', code: 'KeyC' } });
 hook($('cam-reset'), { msg: { look: 'reset' } });
 
@@ -317,7 +322,7 @@ function build() {
 
 const SEGS = 15;
 $('revs').append(...Array.from({ length: SEGS }, () => document.createElement('b')));
-function showTele({ g, v, r, on, dm, tc, hl, beam }) {
+function showTele({ g, v, r, on, dm, tc, hl, beam, menu }) {
   const redline = car?.redline || 7000;
   $('gear').textContent = g || '–';
   $('speed').textContent = v;
@@ -325,6 +330,7 @@ function showTele({ g, v, r, on, dm, tc, hl, beam }) {
   [...$('revs').children].forEach((s, i) => s.classList.toggle('lit', i < lit));
   $('revs').classList.toggle('flash', r >= redline * 0.97);
   $('ign').classList.toggle('on', on);
+  $('menu').classList.toggle('on', !!menu);
   gearMode = /^D?S/.test(g || '') ? 'S' : (g || '')[0]; // R, N, D, S (S or DS), M - or P
   for (const b of document.querySelectorAll('[data-gear]')) b.classList.toggle('on', b.dataset.gear === gearMode || (b.dataset.gear === 'D' && gearMode === 'S'));
   $('ds')?.classList.toggle('sport', gearMode === 'S');
