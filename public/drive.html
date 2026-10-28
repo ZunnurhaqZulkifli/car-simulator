@@ -3205,7 +3205,7 @@ const headlights = [1, -1].map(s => { // one beam from each lamp (s: its side, +
   car.add(l, l.target);
   return l;
 });
-const BEAMS = { low: { power: 50, angle: 0.35, reach: 150, aim: [0, 30] }, high: { power: 100, angle: 0.5, reach: 320, aim: [0.6, 100] } }; // each lamp's; aim: the height and distance ahead it points at
+const BEAMS = { low: { power: 50, angle: 0.21, reach: 150, aim: [0, 30] }, high: { power: 100, angle: 0.3, reach: 320, aim: [0.6, 100] } }; // each lamp's; aim: the height and distance ahead it points at
 const beam = { level: 100 }; // %, 20-200
 try { beam.level = Math.min(200, Math.max(20, +JSON.parse(localStorage.getItem('drive-beam'))?.[CAR.page] || 100)); } catch {}
 function setBeam(level) {
