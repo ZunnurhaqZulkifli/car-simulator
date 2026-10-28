@@ -101,7 +101,7 @@
     draw();
   }
 
-  let frameN = 0;
+  let frameN = 0, shown = false;
   function tick(i) {
     const v = i.speed ?? 0;
     if (i.dt > 0) gS = ease(gS, (v - lastV) / 3.6 / i.dt / G, 0.1, i.dt);
@@ -244,7 +244,10 @@
     if (!els) return;
     const r = run || selected, s = { off: 'off', wait: 'idle', ready: 'armed', rec: 'rec' }[state];
     if (els.tab) els.tab.dataset.s = s; // the tab blinks while armed / recording, so it shows from the other tabs
-    if (!els.sec.offsetParent) return; // tab not shown / panel shut
+    // tab not shown / panel shut - looked up every 8th frame: offsetParent forces a style and layout of the whole page,
+    // which the drive page's cluster dirties every frame
+    if (n % 8 === 0) shown = !!els.sec.offsetParent;
+    if (!shown) return;
     els.pill.dataset.s = els.timer.dataset.s = s;
     els.pill.textContent = { off: '', wait: 'Stop to arm', ready: 'Ready · launch', rec: 'Recording' }[state];
     els.toggle.setAttribute('aria-checked', String(on));
