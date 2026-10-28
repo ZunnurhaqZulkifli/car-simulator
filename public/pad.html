@@ -30,8 +30,8 @@
 
   /* the sides: a paddle over each pedal, as the wheel's paddles sit over your thumbs */
   .side { display: grid; grid-template-rows: clamp(58px, 21vh, 84px) minmax(0, 1fr); gap: 10px; min-height: 0; }
-  /* the handbrake: the Drive tab's whole bottom row, held like the lever */
-  #hb { grid-column: 1 / -1; font-weight: 600; letter-spacing: .02em; background: linear-gradient(#262a2f, #1d2024); }
+  /* the handbrake: the Drive tab's whole bottom row in drift mode, held like the lever */
+  #hb { font-weight: 600; letter-spacing: .02em; background: linear-gradient(#262a2f, #1d2024); }
   #hb.down { background: #2a1517; border-color: var(--m-red); box-shadow: inset 0 0 0 1px var(--m-red); }
   .paddle { font: 400 40px/1 var(--num); border-radius: 22px 22px 12px 12px; background: linear-gradient(#30353c, #22262b);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
@@ -85,7 +85,11 @@
   nav button[aria-selected=true] { background: var(--raised); color: var(--text); box-shadow: inset 0 -2px 0 var(--m-light); }
   .tab { flex: 1; min-height: 0; display: grid; gap: 8px; grid-auto-rows: minmax(0, 1fr); }
   .tab[hidden] { display: none; }
-  #tab-drive { grid-template-columns: repeat(var(--n, 6), 1fr); } /* the signals at the ends, by the thumbs; the gears between */
+  /* rows: the signals at the ends, by the thumbs, the gears between; the driving row; the handbrake (drift mode) */
+  #tab-drive:not([hidden]) { display: flex; flex-direction: column; }
+  #tab-drive .row { flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+  #tab-drive .row[hidden] { display: none; }
+  #tab-drive .row .key:not(.sel):not(.m) { font-size: 13px; line-height: 1.05; overflow: hidden; overflow-wrap: break-word; padding: 0 4px; } /* a tune's own name can be long */
   #tab-setup { grid-template-columns: repeat(4, 1fr); }
   #tab-car { grid-template-columns: repeat(6, 1fr); grid-auto-rows: minmax(0, 64px); }
   #tab-car > :nth-child(-n+2) { grid-column: span 3; } /* Lights, High beam; under them Beam - / level / + */
@@ -202,7 +206,7 @@
 const FULL_LOCK = 40, DEAD = 2; // degrees the phone turns for full lock, and a still zone round straight ahead
 const pad = { s: 0, t: 0, b: 0, h: 0 }; // s: -1-1, + = left (as A on the drive page); t, b: 0-1; h: the handbrake, held
 const $ = id => document.getElementById(id);
-let ws, car = null, carJson = '', lastTele = 0, pressed = { label: '', at: 0 }, gearMode = '';
+let ws, car = null, carJson = '', lastTele = 0, pressed = { label: '', at: 0 }, gearMode = '', driftOn = false;
 let world = null, worldImg = null, worldAsked = 0, pos = null; // the map overview (from the drive page) and where the car is
 const send = m => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(m));
 
@@ -295,6 +299,7 @@ function key(o) {
   if (o.aria) b.setAttribute('aria-label', o.aria);
   if (o.gear) b.dataset.gear = o.gear;
   if (o.mode) b.dataset.mode = o.mode;
+  if (o.map) b.dataset.map = o.map, b.title = o.label;
   if (o.id) b.id = o.id;
   return hook(b, o);
 }
@@ -310,7 +315,7 @@ hook($('cam-reset'), { msg: { look: 'reset' } });
 const KNOWN = new Set(['i', 'w', 's', 'space', 'shift', 'q', 'e', 'm', 'k', 'g', 'n', 'r', '1', '2', '3', 'f', ',', '.', 'l', 'h', 't']); // (T: the traction button)
 // the gear keys: D's sport program - S or DS on G, or the E60's D / S on M - and a manual gate on M (the rest of
 // G - the M cars' Drivelogic, the GT3's drive mode - goes to Setup)
-const SPORT_G = /s gearbox|^ds$|^s$/i, SPORT_M = /d \/ s/i;
+const SPORT_G = /s gearbox|^ds$|^s$/i, SPORT_M = /d \/ s/i, FEEL = /^(engine|chassis|drivelogic|power|edc|drive mode|edrive mode)$/i;
 const nice = s => s.replace(/ gate$/, '').replace(/^./, c => c.toUpperCase());
 function build() {
   const h = car.hints, isM = /M1/.test(h['1'] || ''), fill = (id, list) => $(id).replaceChildren(...list.filter(Boolean).map(key));
@@ -325,19 +330,28 @@ function build() {
     h.m && !SPORT_M.test(h.m) && { label: 'M', key: 'm', gear: 'M', cls: 'sel', aria: 'Manual' },
     { label: '▶', drive: { key: 'ArrowRight', code: 'ArrowRight' }, aria: 'Indicate right' },
   ].filter(Boolean);
-  $('tab-drive').style.setProperty('--n', top.length);
-  fill('tab-drive', [...top, { label: 'Handbrake', id: 'hb', hold: 'h' }]);
-  const store = /store/.test(h['1'] || '');
+  // the driving row: its drive modes, its maps (named by the stage on them) or M1 / M2 / MDrive, and what sets how it
+  // drives on a track - the M cars' engine, chassis and Drivelogic, the E60's POWER and EDC, the GT3's drive mode
+  const store = /store/.test(h['1'] || ''), feel = Object.keys(h).filter(k => k !== sport && FEEL.test(nice(h[k])));
+  const drive = [
+    ...(car.modes || []).map(([mode, label]) => ({ label, mode })), // Comfort / Sport / Eco Pro
+    ...(isM ? [{ label: 'M1', key: '1', cls: 'm', store }, { label: 'M2', key: '2', cls: 'm', store }]
+            : ['1', '2', '3'].filter(k => h[k] && !(/map/i.test(h[k]) && car.maps?.some(Boolean) && !car.maps[k - 1])).map(k => /map/i.test(h[k]) ? { label: car.maps?.[k - 1] || `Map ${k}`, key: k, map: k } : { label: nice(h[k]), key: k })),
+    ...feel.map(k => ({ label: nice(h[k]), key: k })),
+  ]; // (a car on tune slots shows only the two maps it has - the X1's hints list a third)
+  const row = (id = '') => Object.assign(document.createElement('div'), { className: 'row', id });
+  const rows = [row(), drive.length && row(), row('hb-row')].filter(Boolean);
+  rows[0].append(...top.map(key));
+  if (drive.length) rows[1].append(...drive.map(key));
+  rows.at(-1).append(key({ label: 'Handbrake', id: 'hb', hold: 'h' }));
+  rows.at(-1).hidden = !driftOn; // the handbrake: only in drift mode
+  $('tab-drive').replaceChildren(...rows);
   fill('tab-setup', [
     { label: 'DSC', id: 'tc', msg: { traction: 1 }, aria: 'Traction control: next setting' }, // labelled with the car's own setting (showTele)
     h.f && { label: 'Cruise', key: 'f' },
     h[','] && { label: '−5', key: ',', aria: 'Cruise 5 km/h slower' },
     h['.'] && { label: '+5', key: '.', aria: 'Cruise 5 km/h faster' },
-    h.g && sport !== 'g' && { label: nice(h.g), key: 'g' }, // Drivelogic, drive mode
-    ...(car.modes || []).map(([mode, label]) => ({ label, mode })), // Comfort / Sport / Eco Pro
-    ...(isM ? [{ label: 'M1', key: '1', cls: 'm', store }, { label: 'M2', key: '2', cls: 'm', store }]
-            : ['1', '2', '3'].map(k => h[k] && { label: `Map ${k}`, key: k })),
-    ...Object.entries(h).filter(([k]) => !KNOWN.has(k)).map(([k, label]) => ({ label: nice(label), key: k })),
+    ...Object.entries(h).filter(([k]) => !KNOWN.has(k) && !feel.includes(k)).map(([k, label]) => ({ label: nice(label), key: k })),
     { label: 'Drift mode', id: 'drift', msg: { drift: 1 }, aria: 'Drift mode on / off' }, // last, out of the way; lit while on (showTele)
   ]);
   fill('tab-car', [
@@ -354,7 +368,7 @@ function build() {
 
 const SEGS = 15;
 $('revs').append(...Array.from({ length: SEGS }, () => document.createElement('b')));
-function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift, pos: p, muted: mu }) {
+function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift, pos: p, muted: mu, slot }) {
   const redline = car?.redline || 7000;
   $('gear').textContent = g || '–';
   $('speed').textContent = v;
@@ -364,6 +378,13 @@ function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift, pos: p, muted: m
   $('ign').classList.toggle('on', on);
   $('menu').classList.toggle('on', !!menu);
   $('drift')?.classList.toggle('on', !!drift);
+  driftOn = !!drift;
+  if ($('hb-row') && $('hb-row').hidden === driftOn) { // drift mode switched: the handbrake row shows or goes (let go)
+    $('hb-row').hidden = !driftOn;
+    pad.h = 0;
+    $('hb').classList.remove('down');
+  }
+  for (const b of document.querySelectorAll('[data-map]')) b.classList.toggle('on', +b.dataset.map === slot);
   pos = p;
   if (!$('tab-map').hidden) drawWorld();
   muted = !!mu;

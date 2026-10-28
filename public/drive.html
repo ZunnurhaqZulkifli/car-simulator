@@ -2420,6 +2420,10 @@ function setMix(id, pct) {
   el.value = Math.min(100, Math.max(0, Math.round(+pct)));
   el.dispatchEvent(new w.Event('input'));
 }
+// the car's two map slots by the stage on them ("Stock", "Stage 1"), and the one it's on - for the pad's map buttons
+// (null on a car with no tune: the E60)
+const tuneMaps = () => [1, 2].map(n => { try { return frame.contentWindow.CarTune.label(n).split(' · ')[0]; } catch { return null; } });
+const tuneSlot = () => { try { return frame.contentWindow.CarTune.slot(); } catch { return 0; } };
 function nudgeBeam(by) { // the phone's Beam - / +: 10% a tap, mirrored on the car menu's slider
   setBeam(Math.min(200, Math.max(20, beam.level + Math.sign(by) * 10)));
   const el = frame.contentDocument?.querySelector('.beam-level input');
@@ -2427,8 +2431,8 @@ function nudgeBeam(by) { // the phone's Beam - / +: 10% a tap, mirrored on the c
 }
 setInterval(() => {
   const doc = frame.contentDocument, dm = doc?.querySelector('.mode-btn.active')?.dataset.mode, lit = id => !!doc?.getElementById(id)?.classList.contains('active');
-  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen, drift: driftMode, pos: [Math.round(state.x), Math.round(state.z), +state.heading.toFixed(2)], muted: !!doc?.querySelector('.mute-fab.muted') } };
-  if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes }, m.mix = mixRows(doc); // once a second, for a phone that joins late
+  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen, drift: driftMode, pos: [Math.round(state.x), Math.round(state.z), +state.heading.toFixed(2)], muted: !!doc?.querySelector('.mute-fab.muted'), slot: tuneSlot() } };
+  if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes, maps: tuneMaps() }, m.mix = mixRows(doc); // once a second, for a phone that joins late
   padSend(m);
 }, 66);
 function showPadLink(url) { // the relay copies the phone's link to the clipboard each time this page opens

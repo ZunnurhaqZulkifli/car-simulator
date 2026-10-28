@@ -1724,6 +1724,7 @@
   api.boostAt = (rpmK) => boostTarget(cal(), rpmK * 1000);
   api.tick = (i) => { const r = tick(i); sample(i.dt); return r; }; // the datalog samples ride on the car's tick
   api.label = (n) => { const p = predicted(n || slot); return `${tune.slots[n || slot].name} · ${fmt(p.hp)} hp · ${fmt(p.tq)} Nm`; };
+  api.slot = () => slot; // which map (1 or 2) drives the engine now
   api.saveData = saveData;
   api.attachAudio = attachAudio;
   api.ch = ch;
