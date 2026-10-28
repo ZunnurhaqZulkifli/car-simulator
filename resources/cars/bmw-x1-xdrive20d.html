@@ -1241,7 +1241,7 @@
 
   // m/s^2 of whole-car drive each axle can take while accelerating at a
   function axleGrip(a){
-    const muG = SURFACE[surface]*0.95*9.81*TUNE_GRIP, dw = Math.min(Math.max(0, a), muG)/9.81*CG_H_OVER_L;
+    const muG = SURFACE[surface]*0.95*9.81*TUNE_GRIP*(window.surfaceGrip || 1), dw = Math.min(Math.max(0, a), muG)/9.81*CG_H_OVER_L;
     return [muG*(FRONT_STATIC - dw), muG*(1 - FRONT_STATIC + dw)];
   }
   // a = forward drive accel (m/s^2) the engine is asking for, before drag; returns what the tyres deliver

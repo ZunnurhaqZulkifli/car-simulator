@@ -1121,13 +1121,14 @@
   // with speed, identical from ~200 km/h), off lets it all spin
   function applyTraction(a){
     if(launchState === 'armed') return 0;
-    if(a <= GRIP) return a;
-    if(launchState === 'go'){ tcSlipK = 0.3; return GRIP*1.02; }
+    const grip = GRIP*(window.surfaceGrip || 1); // a wet or snowy road (drive.html's weather)
+    if(a <= grip) return a;
+    if(launchState === 'go'){ tcSlipK = 0.3; return grip*1.02; }
     const sportK = psm === 'sport' ? clamp01(1 - speed/200) : 0;
-    if(psm === 'on' || (psm === 'sport' && sportK < 0.05)){ tcIntervening = true; tcSlipK = Math.min(0.3, (a-GRIP)/GRIP); return GRIP*0.96; }
-    if(psm === 'sport'){ wheelspinK = Math.min(0.7*sportK, (a-GRIP)/GRIP*0.9); if(a > GRIP*(1 + 0.3*sportK)) tcIntervening = true; return GRIP*0.98; }
-    wheelspinK = Math.min(1.8, (a-GRIP)/GRIP*2.6);
-    return GRIP*0.92;
+    if(psm === 'on' || (psm === 'sport' && sportK < 0.05)){ tcIntervening = true; tcSlipK = Math.min(0.3, (a-grip)/grip); return grip*0.96; }
+    if(psm === 'sport'){ wheelspinK = Math.min(0.7*sportK, (a-grip)/grip*0.9); if(a > grip*(1 + 0.3*sportK)) tcIntervening = true; return grip*0.98; }
+    wheelspinK = Math.min(1.8, (a-grip)/grip*2.6);
+    return grip*0.92;
   }
 
   // ---- overrun: a lift from load at high revs puts a little fuel into a hot exhaust - a few pops in Normal,

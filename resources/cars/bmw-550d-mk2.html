@@ -1844,11 +1844,12 @@
   // a = forward drive accel (m/s^2) before drag
   function applyTraction(a, thr){
     if(launchState === 'engage') return 0; // drive still engaging - revs held, no pull yet
-    if(a <= TC_GRIP) return a;
-    if(launchState === 'go'){ tcSlipK = 0.3; return TC_GRIP*1.03; } // launch control: held at optimal slip
-    if(tcOn){ tcIntervening = true; tcSlipK = Math.min(0.3, (a - TC_GRIP)/TC_GRIP); return TC_GRIP*0.97; } // DSC trims the drive back to what the tyres can take
-    wheelspinK = Math.min(1.5, (a - TC_GRIP)/TC_GRIP * 3); // DSC off: the excess spins the tyres (revs flare)
-    return TC_GRIP*0.93; // and spinning tyres grip less than rolling ones
+    const grip = TC_GRIP*(window.surfaceGrip || 1); // a wet or snowy road (drive.html's weather)
+    if(a <= grip) return a;
+    if(launchState === 'go'){ tcSlipK = 0.3; return grip*1.03; } // launch control: held at optimal slip
+    if(tcOn){ tcIntervening = true; tcSlipK = Math.min(0.3, (a - grip)/grip); return grip*0.97; } // DSC trims the drive back to what the tyres can take
+    wheelspinK = Math.min(1.5, (a - grip)/grip * 3); // DSC off: the excess spins the tyres (revs flare)
+    return grip*0.93; // and spinning tyres grip less than rolling ones
   }
 
   let odometer = savedState.odometer ?? 10005.0, trip=0.0, tripFuelUsedL=0.0, fuelFrac = savedState.fuelLevel ?? 1.0;

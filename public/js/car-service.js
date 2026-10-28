@@ -850,15 +850,17 @@
       if (screechGain) screechGain.gain.setTargetAtTime(screech * screechVol * 3.0, actx.currentTime, 0.06);
     },
     // braking power: the hardware's bite, cold race pads, fade past the pads' temperature, boiling fluid (a long
-    // pedal), and wear - 100% worn pads lose 40%, bald tyres 25%, worn discs 20%, worn dampers 15%
+    // pedal), and wear - 100% worn pads lose 40%, bald tyres 25%, worn discs 20%, worn dampers 15% - and a wet or snowy
+    // road (drive.html sets surfaceGrip from its weather)
     brakeMul: () => {
       const cold = brakeT < 150 ? hw.coldBite + (1 - hw.coldBite) * brakeT / 150 : 1;
       const fade = 1 - Math.max(0, Math.min(1, (brakeT - hw.fade) / 300)) * 0.5;
       const boil = brakeT * 0.35 > fluidBoil() ? 0.55 : 1;
       return hw.bite * hw.stab * cold * fade * boil * (1 - byKey.brake.value / 100 * 0.4) * (1 - byKey.tyre.value / 100 * 0.25) *
-        (1 - byKey.discs.value / 100 * 0.2) * (1 - byKey.dampers.value / 100 * 0.15);
+        (1 - byKey.discs.value / 100 * 0.2) * (1 - byKey.dampers.value / 100 * 0.15) * (window.surfaceGrip || 1);
     },
     brakeTemp: () => brakeT,
+    brakeFade: () => hw.fade, // the disc temperature the fitted pads start to fade at (the drive page's telemetry)
     // car-tune.js's brake / suspension upgrades (anything left out goes back to factory)
     setHardware: (spec) => { Object.assign(hw, HW, spec); render(byKey.fluid); },
     // fully degraded oil triples engine wear

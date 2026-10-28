@@ -1524,12 +1524,13 @@
   // a = forward drive accel (m/s^2) before drag
   function applyTraction(a, thr){
     if(launchState === 'engage') return 0; // drive still engaging - revs held, no pull yet
-    if(a <= TC_GRIP){ tyreSlip = Math.max(0, (a/TC_GRIP - 0.85)/0.15)*0.25; return a; } // a squeal as they near the limit
-    const over = (a - TC_GRIP)/TC_GRIP;
-    if(launchState === 'go'){ tyreSlip = 0.35; return TC_GRIP*1.03; } // launch control: held at optimal slip
-    if(tcOn){ tcIntervening = true; tyreSlip = 0.25 + Math.min(0.25, over*0.5); return TC_GRIP*0.97; } // DSC lets a chirp through before it trims the drive
+    const grip = TC_GRIP*(window.surfaceGrip || 1); // a wet or snowy road (drive.html's weather)
+    if(a <= grip){ tyreSlip = Math.max(0, (a/grip - 0.85)/0.15)*0.25; return a; } // a squeal as they near the limit
+    const over = (a - grip)/grip;
+    if(launchState === 'go'){ tyreSlip = 0.35; return grip*1.03; } // launch control: held at optimal slip
+    if(tcOn){ tcIntervening = true; tyreSlip = 0.25 + Math.min(0.25, over*0.5); return grip*0.97; } // DSC lets a chirp through before it trims the drive
     wheelspinK = Math.min(1.5, over*3); tyreSlip = 0.35 + wheelspinK; // DSC off: the excess spins the tyres (revs flare)
-    return TC_GRIP*0.93; // and spinning tyres grip less than rolling ones
+    return grip*0.93; // and spinning tyres grip less than rolling ones
   }
 
   let odometer = savedState.odometer ?? 10005.0, trip=0.0, tripFuelUsedL=0.0, fuelFrac = savedState.fuelLevel ?? 1.0;

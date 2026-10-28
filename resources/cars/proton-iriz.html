@@ -1146,11 +1146,12 @@
   // a = forward drive accel (m/s^2) before drag
   function applyTraction(a, thr){
     if(launchState === 'engage') return 0; // drive still engaging - revs held, no pull yet
-    if(a <= TC_GRIP) return a;
-    if(launchState === 'go'){ return TC_GRIP*1.03; } // launch control: held at optimal slip
-    if(tcOn){ tcIntervening = true; return TC_GRIP*0.97; } // traction control trims the drive back to what the tyres can take
-    wheelspinK = Math.min(1.5, (a - TC_GRIP)/TC_GRIP * 3); // TC off: the excess spins the tyres (revs flare)
-    return TC_GRIP*0.93; // and spinning tyres grip less than rolling ones
+    const grip = TC_GRIP*(window.surfaceGrip || 1); // a wet or snowy road (drive.html's weather)
+    if(a <= grip) return a;
+    if(launchState === 'go'){ return grip*1.03; } // launch control: held at optimal slip
+    if(tcOn){ tcIntervening = true; return grip*0.97; } // traction control trims the drive back to what the tyres can take
+    wheelspinK = Math.min(1.5, (a - grip)/grip * 3); // TC off: the excess spins the tyres (revs flare)
+    return grip*0.93; // and spinning tyres grip less than rolling ones
   }
 
   // ---- drive mode: Sport sharpens the pedal map and rev response, opens up the exhaust, turns the TFT red ----

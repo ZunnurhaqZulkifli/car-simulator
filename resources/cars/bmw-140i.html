@@ -1628,7 +1628,7 @@
   // a = forward drive accel (m/s^2) before drag
   function applyTraction(a, thr){
     if(launchState === 'engage') return 0; // drive still engaging - revs held, no pull yet
-    const grip = GRIP[xdrive];
+    const grip = GRIP[xdrive]*(window.surfaceGrip || 1); // a wet or snowy road (drive.html's weather)
     if(a <= grip) return a;
     if(launchState === 'go'){ return grip*1.03; } // launch control: held at optimal slip
     if(dsc === 'on'){ tcIntervening = true; return grip*0.97; } // DSC trims the drive back to what the tyres can take

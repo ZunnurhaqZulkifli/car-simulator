@@ -1608,7 +1608,7 @@
   // drive accel (m/s^2) the tyres can actually use; DSC cuts the excess, MDM allows a controlled slide, off lets it all spin
   function applyTraction(a){
     if(launchState === 'engage') return 0;
-    const grip = GRIP[setup.xdrive];
+    const grip = GRIP[setup.xdrive]*(window.surfaceGrip || 1); // a wet or snowy road (drive.html's weather)
     if(a <= grip) return a;
     if(launchState === 'go'){ tcSlipK = 0.3; return grip*1.03; } // launch: optimal slip
     if(dsc === 'on'){ tcIntervening = true; tcSlipK = Math.min(0.3, (a-grip)/grip); return grip*0.97; }
