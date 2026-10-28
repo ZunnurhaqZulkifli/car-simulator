@@ -51,7 +51,7 @@
   #dot.wait { background: #e8a33a; }
   #dot.live { background: var(--m-light); }
   #car { flex: 1; min-width: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  header button { height: 30px; padding: 0 14px; border-radius: 15px; font-weight: 600; flex: none; }
+  header > button { height: 30px; padding: 0 14px; border-radius: 15px; font-weight: 600; flex: none; }
   #menu.on { border-color: var(--m-light); box-shadow: inset 0 0 0 1px var(--m-light); }
   #ign.on { border-color: var(--m-red); box-shadow: 0 0 12px rgba(225, 38, 45, .45), inset 0 0 0 1px var(--m-red); }
 
@@ -115,8 +115,13 @@
   #legend i.you { border-radius: 0; background: none; box-shadow: none; width: 0; height: 0; border: 4.5px solid transparent; border-bottom: 9px solid var(--c); border-top: 0; }
   #places { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 44px; gap: 6px; align-content: start; overflow-y: auto; touch-action: pan-y; min-height: 0; }
   #places .key { font-size: 13px; line-height: 1.1; padding: 0 6px; overflow: hidden; }
-  /* the sound mixer: every layer's slider at once - the cluster folds away while it's open to make room */
-  main.full .cluster, main.full #steer { display: none; }
+  /* the extras page, over the whole pad (the pedals and paddles too): its own header, tabs and room */
+  #extras { position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; padding: inherit; background: var(--base); }
+  #extras[hidden] { display: none; }
+  #extras header { height: 36px; }
+  #extras nav { flex: 1; }
+  #extras-close { color: var(--m-light); }
+  /* the sound mixer: every layer's slider at once */
   #tab-sound { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); grid-auto-rows: minmax(24px, 1fr); gap: 6px; }
   .mix { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px; min-height: 0; overflow: hidden;
          border-radius: 10px; border: 1px solid var(--line); background: var(--panel); font-size: 12px; font-weight: 600; touch-action: none; }
@@ -124,6 +129,13 @@
   .mix i { position: absolute; inset: 0 auto 0 0; width: var(--v, 0%); background: color-mix(in srgb, var(--m-light) 38%, transparent); }
   .mix span, .mix b { position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mix b { flex: none; font: 400 13px var(--num); }
+  /* the Mac's pointer: the touchpad, and its switch and buttons beside it */
+  #tab-mouse { grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); }
+  #mpad { grid-row: span 4; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; border-radius: 14px; border: 1px dashed var(--line);
+          color: var(--dim); line-height: 1.5; touch-action: none; background: var(--panel); }
+  #mpad > * { pointer-events: none; } /* offsets stay the pad's own, turned round or not */
+  #mpad.live { border-style: solid; border-color: var(--m-light); background: radial-gradient(circle, rgba(79, 168, 255, .1) 1px, transparent 1.5px) 0 0 / 18px 18px, var(--panel); }
+  #m-on small { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: var(--dim); }
   #mute.warn { border-color: var(--m-red); box-shadow: inset 0 0 0 1px var(--m-red); color: #ff8a8f; }
   .key { min-height: 0; font-weight: 600; line-height: 1.1; }
   .key.sel { font: 400 24px var(--num); }
@@ -157,8 +169,7 @@
 <main>
   <header>
     <span id="dot"></span><span id="car">Connecting to the Mac</span>
-    <button id="menu" aria-label="Car menu (Tab)">Tab</button>
-    <button id="esc" aria-label="Close (Esc)">Esc</button>
+    <button id="extras-open" aria-label="Extras: Tab, Esc, map, sound, mouse">Extras</button>
     <button id="ign">Start / stop</button>
   </header>
   <div class="cluster">
@@ -173,8 +184,6 @@
     <button role="tab" data-tab="setup" aria-selected="false">Setup</button>
     <button role="tab" data-tab="car" aria-selected="false">Car</button>
     <button role="tab" data-tab="view" aria-selected="false">View</button>
-    <button role="tab" data-tab="map" aria-selected="false">Map</button>
-    <button role="tab" data-tab="sound" aria-selected="false">Sound</button>
   </nav>
   <div class="tab" id="tab-drive" role="tabpanel"><p class="empty">Open the drive page on the Mac to get this car's controls</p></div>
   <div class="tab" id="tab-setup" role="tabpanel" hidden></div>
@@ -184,19 +193,41 @@
     <button class="key" id="cam" aria-label="Switch between the chase and in-car view">Chase / in-car</button>
     <button class="key" id="cam-reset">Reset view</button>
   </div>
-  <div class="tab" id="tab-sound" role="tabpanel" hidden><p class="empty">Open the drive page on the Mac</p></div>
-  <div class="tab" id="tab-map" role="tabpanel" hidden>
+</main>
+<section class="side">
+  <button class="paddle" id="down" aria-label="Shift down">−</button>
+  <div class="pedal" data-k="t" role="slider" aria-label="Throttle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span>Throttle</span><b>0</b><i></i></div>
+</section>
+<!-- the extras: everything that isn't driving, over the whole pad -->
+<div id="extras" hidden>
+  <header>
+    <button id="extras-close" aria-label="Back to the driving controls">‹ Drive</button>
+    <nav role="tablist">
+      <button role="tab" data-tab="map" aria-selected="true">Map</button>
+      <button role="tab" data-tab="sound" aria-selected="false">Sound</button>
+      <button role="tab" data-tab="mouse" aria-selected="false">Mouse</button>
+    </nav>
+    <button id="menu" aria-label="Car menu (Tab)">Tab</button>
+    <button id="esc" aria-label="Close (Esc)">Esc</button>
+  </header>
+  <div class="tab" id="tab-map" role="tabpanel">
     <div class="mapcol">
       <canvas id="mapc" aria-label="Map of the whole world, north up, with the car on it"></canvas>
       <div id="legend" aria-label="Map legend"></div>
     </div>
     <div id="places" role="list" aria-label="Teleport"><p class="empty">Open the drive page on the Mac</p></div>
   </div>
-</main>
-<section class="side">
-  <button class="paddle" id="down" aria-label="Shift down">−</button>
-  <div class="pedal" data-k="t" role="slider" aria-label="Throttle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span>Throttle</span><b>0</b><i></i></div>
-</section>
+  <div class="tab" id="tab-sound" role="tabpanel" hidden><p class="empty">Open the drive page on the Mac</p></div>
+  <div class="tab" id="tab-mouse" role="tabpanel" hidden>
+    <div id="mpad" role="application" aria-label="Touchpad for the Mac's pointer: drag to move, tap to click, two fingers to scroll, two-finger tap to right-click">
+      <span>Drag to move · tap to click<br>Two fingers: scroll · two-finger tap: right-click</span>
+    </div>
+    <button class="key" id="m-on"></button>
+    <button class="key" id="m-left">Click</button>
+    <button class="key" id="m-right">Right-click</button>
+    <button class="key" id="m-drag">Hold to drag</button>
+  </div>
+</div>
 <div class="cover" id="intro">
   <h1>Hold your phone sideways, like a wheel</h1>
   <p>Tilt to steer. Brake on the left, throttle on the right, with the shift paddles above them.</p>
@@ -269,11 +300,12 @@ $('look').onpointermove = e => {
 $('look').onpointerup = $('look').onpointercancel = () => { $('look').classList.remove('down'); lookFrom = null; };
 
 // buttons tap the car's own keys on the drive page (o.keyOf: which, at the time); o.drive taps one of the drive page's
-// (signals, view), o.msg sends its own message, o.hold sets pad[o.hold] while held (the handbrake)
+// (signals, view), o.msg sends its own message, o.do runs on the pad, o.hold sets pad[o.hold] while held (the handbrake)
 const codeOf = k => /^[a-z]$/.test(k) ? 'Key' + k.toUpperCase() : /^\d$/.test(k) ? 'Digit' + k : { ',': 'Comma', '.': 'Period' }[k];
 function hook(b, o) {
   const fire = shiftKey => {
     pressed = { label: b.textContent, at: Date.now() };
+    if (o.do) return o.do();
     const key = o.keyOf ? o.keyOf() : o.key;
     send(o.msg || (o.mode ? { mode: o.mode } : o.drive ? { tap: o.drive, drive: 1 } : { tap: { key, code: codeOf(key), shiftKey } }));
   };
@@ -386,7 +418,7 @@ function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift, pos: p, muted: m
   }
   for (const b of document.querySelectorAll('[data-map]')) b.classList.toggle('on', +b.dataset.map === slot);
   pos = p;
-  if (!$('tab-map').hidden) drawWorld();
+  if (extrasOpen() && !$('tab-map').hidden) drawWorld();
   muted = !!mu;
   if ($('mute')) { $('mute').classList.toggle('warn', muted); $('mute').textContent = muted ? 'Muted' : 'Mute'; }
   gearMode = /^D?S/.test(g || '') ? 'S' : (g || '')[0]; // R, N, D, S (S or DS), M - or P
@@ -414,13 +446,61 @@ function toast(title, text, ms = 1800) {
 }
 
 for (const t of document.querySelectorAll('[role=tab]')) t.onpointerdown = () => {
-  for (const o of document.querySelectorAll('[role=tab]')) {
+  for (const o of t.parentNode.querySelectorAll('[role=tab]')) { // (the driving tabs and the extras' each switch their own)
     o.setAttribute('aria-selected', o === t);
     $('tab-' + o.dataset.tab).hidden = o !== t;
   }
   if (t.dataset.tab === 'map') askWorld(), drawWorld();
-  document.querySelector('main').classList.toggle('full', t.dataset.tab === 'sound');
 };
+const extrasOpen = () => !$('extras').hidden;
+hook($('extras-open'), { do: () => { $('extras').hidden = false; if (!$('tab-map').hidden) askWorld(), drawWorld(); } });
+hook($('extras-close'), { do: () => { $('extras').hidden = true; } });
+
+// the Mouse tab: the phone as the Mac's touchpad. The relay on the Mac does it (scripts/pad-relay.mjs), once a dialog
+// there says yes and macOS has given it Accessibility. Drags add up between sends, like the look-around pad's
+const MOUSE = { off: ['Mouse off', 'Turn on'], asking: ['Asking the Mac', 'Allow it there'], on: ['Mouse on', 'Turn off'], denied: ['Not allowed', 'Try again'],
+  'no-access': ['Needs Accessibility', 'Then try again'], error: ["Couldn't start", 'Try again'] };
+let mouseState = 'off';
+const mouseSend = m => send({ mouse: m }), mouseAcc = { x: 0, y: 0, sx: 0, sy: 0 };
+function showMouse(state) {
+  mouseState = MOUSE[state] ? state : 'off';
+  const [title, hint] = MOUSE[mouseState];
+  $('m-on').innerHTML = `${title}<small>${hint}</small>`;
+  $('m-on').classList.toggle('on', mouseState === 'on');
+  $('mpad').classList.toggle('live', mouseState === 'on');
+  if (mouseState === 'no-access') toast('Mouse', 'On the Mac: System Settings › Privacy & Security › Accessibility - allow node (or Terminal)', 8000);
+}
+showMouse('off');
+hook($('m-on'), { do: () => mouseSend({ on: mouseState !== 'on' }) });
+hook($('m-left'), { do: () => mouseSend({ click: 'left' }) });
+hook($('m-right'), { do: () => mouseSend({ click: 'right' }) });
+$('m-drag').onpointerdown = e => { $('m-drag').setPointerCapture(e.pointerId); $('m-drag').classList.add('down'); mouseSend({ hold: true }); };
+$('m-drag').onpointerup = $('m-drag').onpointercancel = () => { $('m-drag').classList.remove('down'); mouseSend({ hold: false }); };
+{ // one finger moves the pointer (further the faster it goes), two scroll; a quick touch clicks, with two a right-click
+  const mp = $('mpad'), fingers = new Map();
+  let touch = null;
+  mp.onpointerdown = e => {
+    mp.setPointerCapture(e.pointerId);
+    fingers.set(e.pointerId, [e.offsetX, e.offsetY]);
+    if (fingers.size === 1) touch = { at: Date.now(), moved: 0, most: 1 }; else if (touch) touch.most = Math.max(touch.most, fingers.size);
+  };
+  mp.onpointermove = e => {
+    const was = fingers.get(e.pointerId);
+    if (!was) return;
+    const dx = e.offsetX - was[0], dy = e.offsetY - was[1];
+    fingers.set(e.pointerId, [e.offsetX, e.offsetY]);
+    if (touch) touch.moved += Math.hypot(dx, dy);
+    if (fingers.size > 1) { mouseAcc.sx += dx / fingers.size; mouseAcc.sy += dy / fingers.size; return; }
+    const k = 1.5 + Math.min(2.5, Math.hypot(dx, dy) / 6);
+    mouseAcc.x += dx * k; mouseAcc.y += dy * k;
+  };
+  mp.onpointerup = mp.onpointercancel = e => {
+    fingers.delete(e.pointerId);
+    if (fingers.size || !touch) return;
+    if (e.type === 'pointerup' && touch.moved < 10 && Date.now() - touch.at < 300) mouseSend({ click: touch.most > 1 ? 'right' : 'left' });
+    touch = null;
+  };
+}
 
 // the Sound tab: Mute, then a slider per sound layer of the car page's mixer (sent once a second). A slider set here
 // ignores the page's echo for a moment, so it doesn't jump back to where it was
@@ -460,7 +540,7 @@ function drawMix(el, v) {
   el.setAttribute('aria-valuenow', v);
 }
 
-// the Map tab: the drive page sends its overview once asked (again every 3 s while none has come)
+// the Map tab (in the extras): the drive page sends its overview once asked (again every 3 s while none has come)
 function askWorld() {
   if (world || Date.now() - worldAsked < 3000) return;
   worldAsked = Date.now();
@@ -510,7 +590,7 @@ function drawWorld() {
   g.lineWidth = 1.5;
   g.beginPath(); g.moveTo(0, -8); g.lineTo(5.5, 6); g.lineTo(-5.5, 6); g.closePath(); g.fill(); g.stroke();
 }
-addEventListener('resize', () => $('tab-map').hidden || drawWorld());
+addEventListener('resize', () => extrasOpen() && !$('tab-map').hidden && drawWorld());
 
 const wake = () => navigator.wakeLock?.request('screen').catch(() => {}); // the screen sleeping mid-drive would drop the pad
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && wake());
@@ -532,16 +612,21 @@ $('go').onclick = async () => {
     if (m.tele) { lastTele = Date.now(); showTele(m.tele); }
     if (m.map) gotWorld(m.map);
     if (m.mix) showMix(m.mix);
+    if (m.mouseState) showMouse(m.mouseState);
     // the set-up pop-ups for engine, chassis... have no title on the cluster: name the button just pressed instead
     if (m.toast) toast(m.toast.title || (Date.now() - pressed.at < 1000 ? pressed.label : ''), m.toast.text);
   };
-  ws.onclose = () => setTimeout(connect, 1000);
+  ws.onclose = () => { showMouse('off'); setTimeout(connect, 1000); }; // (a new connection asks the Mac again)
 })();
 // a steady 30 Hz: the drive page lets go of everything when it hears nothing for half a second. Look-around drags
 // ride along, turned to the Mac trackpad's sense (fingers left, deltaX +) and doubled for the smaller pad
 setInterval(() => {
   send(look.x || look.y ? { ...pad, lx: -look.x * 2, ly: -look.y * 2 } : pad);
   look.x = look.y = 0;
+  const r = v => Math.round(v * 10) / 10;
+  if (mouseAcc.x || mouseAcc.y) mouseSend({ move: [r(mouseAcc.x), r(mouseAcc.y)] });
+  if (mouseAcc.sx || mouseAcc.sy) mouseSend({ scroll: [r(mouseAcc.sx * 2), r(mouseAcc.sy * 2)] });
+  mouseAcc.x = mouseAcc.y = mouseAcc.sx = mouseAcc.sy = 0;
 }, 33);
 setInterval(() => {
   const open = ws.readyState === WebSocket.OPEN, live = open && Date.now() - lastTele < 1500;
