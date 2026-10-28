@@ -137,10 +137,19 @@
   .mix b { flex: none; font: 400 13px var(--num); }
   /* the Mac's pointer: the touchpad, and its switch and buttons beside it */
   #tab-mouse { grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); }
-  #mpad { grid-row: span 4; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; border-radius: 14px; border: 1px dashed var(--line);
+  #mpad { grid-row: span 5; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; border-radius: 14px; border: 1px dashed var(--line);
           color: var(--dim); line-height: 1.5; touch-action: none; background: var(--panel); }
   #mpad > * { pointer-events: none; } /* offsets stay the pad's own, turned round or not */
   #mpad.live { border-style: solid; border-color: var(--m-light); background: radial-gradient(circle, rgba(79, 168, 255, .1) 1px, transparent 1.5px) 0 0 / 18px 18px, var(--panel); }
+  /* the keyboard, in the touchpad's place: five rows, ⌫ and the arrows repeating while held, ⇧ ⌃ ⌥ ⌘ for the next key */
+  #tab-mouse:not(.kb) #kbd, #tab-mouse.kb > :not(#kbd) { display: none; }
+  #tab-mouse.kb:not([hidden]) { display: flex; }
+  #kbd { flex: 1; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+  #kbd .kr { flex: 1; min-height: 0; display: flex; gap: 5px; }
+  #kbd .key { flex: 1; min-width: 0; padding: 0; font: 400 19px var(--num); }
+  #kbd .key.w { flex: 1.5; font: 600 14px var(--ui); }
+  #kbd .key[data-k=space] { flex: 4.5; }
+  #kbd .key[data-k=pad] { flex: 2; font: 600 13px var(--ui); color: var(--m-light); }
   #m-on small { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: var(--dim); }
   #mute.warn { border-color: var(--m-red); box-shadow: inset 0 0 0 1px var(--m-red); color: #ff8a8f; }
   .key { min-height: 0; font-weight: 600; line-height: 1.1; }
@@ -195,7 +204,7 @@
   <div class="tab" id="tab-setup" role="tabpanel" hidden></div>
   <div class="tab" id="tab-car" role="tabpanel" hidden></div>
   <div class="tab" id="tab-view" role="tabpanel" hidden>
-    <div id="look" role="application" aria-label="Look around: drag to turn the camera"><span>Drag to look around</span></div>
+    <div id="look" role="application" aria-label="Look around: drag to turn the camera"></div>
     <button class="key" id="cam" aria-label="Switch between the chase and in-car view">Chase / in-car</button>
     <button class="key" id="cam-reset">Reset view</button>
   </div>
@@ -227,13 +236,14 @@
   <div class="tab" id="tab-weather" role="tabpanel" hidden><p class="empty">Open the drive page on the Mac</p></div>
   <div class="tab" id="tab-sound" role="tabpanel" hidden><p class="empty">Open the drive page on the Mac</p></div>
   <div class="tab" id="tab-mouse" role="tabpanel" hidden>
-    <div id="mpad" role="application" aria-label="Touchpad for the Mac's pointer: drag to move, tap to click, two fingers to scroll, two-finger tap to right-click">
-      <span>Drag to move · tap to click<br>Two fingers: scroll · two-finger tap: right-click</span>
+    <div id="mpad" role="application" aria-label="Touchpad for the Mac's pointer: one finger moves and taps to click, two scroll and tap to right-click, three drag and tap to look up, four swipe between Spaces, up for Mission Control, down for App Exposé, pinch for Apps, spread for the desktop">
     </div>
     <button class="key" id="m-on"></button>
     <button class="key" id="m-left">Click</button>
     <button class="key" id="m-right">Right-click</button>
     <button class="key" id="m-drag">Hold to drag</button>
+    <button class="key" id="m-kb">Keyboard</button>
+    <div id="kbd" role="group" aria-label="Keyboard for the Mac"></div>
   </div>
 </div>
 <div class="cover" id="intro">
@@ -467,7 +477,8 @@ hook($('extras-close'), { do: () => { $('extras').hidden = true; } });
 // the Mouse tab: the phone as the Mac's touchpad. The relay on the Mac does it (scripts/pad-relay.mjs), once a dialog
 // there says yes and macOS has given it Accessibility. Drags add up between sends, like the look-around pad's
 const MOUSE = { off: ['Mouse off', 'Turn on'], asking: ['Asking the Mac', 'Allow it there'], on: ['Mouse on', 'Turn off'], denied: ['Not allowed', 'Try again'],
-  'no-access': ['Needs Accessibility', 'Then try again'], error: ["Couldn't start", 'Try again'] };
+  'no-access': ['Needs Accessibility', 'Then try again'], error: ["Couldn't start", 'Try again'],
+  restarting: ['Restarting the relay', 'Turn on again in a moment'] }; // (to pick up a newly granted Accessibility)
 let mouseState = 'off';
 const mouseSend = m => send({ mouse: m }), mouseAcc = { x: 0, y: 0, sx: 0, sy: 0 };
 function showMouse(state) {
@@ -482,31 +493,103 @@ showMouse('off');
 hook($('m-on'), { do: () => mouseSend({ on: mouseState !== 'on' }) });
 hook($('m-left'), { do: () => mouseSend({ click: 'left' }) });
 hook($('m-right'), { do: () => mouseSend({ click: 'right' }) });
+// the keyboard: characters are typed as such (whatever the Mac's layout); with ⌃ ⌥ ⌘ held, or the named keys, they
+// go as keys - ⌘ then C copies
+const KB = [['esc', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'delete'], ['tab', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '-'],
+  ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', "'", 'return'], ['shift', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '/', 'up'],
+  ['ctrl', 'opt', 'cmd', 'space', 'left', 'down', 'right', 'pad']];
+const KB_LABEL = { esc: 'esc', delete: '⌫', tab: '⇥', return: '↵', shift: '⇧', up: '↑', down: '↓', left: '←', right: '→', ctrl: '⌃', opt: '⌥', cmd: '⌘', space: 'space', pad: 'Touchpad' };
+const KB_ARIA = { esc: 'Escape', delete: 'Delete', tab: 'Tab', return: 'Return', shift: 'Shift', up: 'Up', down: 'Down', left: 'Left', right: 'Right', ctrl: 'Control', opt: 'Option', cmd: 'Command', space: 'Space', pad: 'Back to the touchpad' };
+const SHIFTED = { 1: '!', 2: '@', 3: '#', 4: '$', 5: '%', 6: '^', 7: '&', 8: '*', 9: '(', 0: ')', '-': '_', ';': ':', "'": '"', ',': '<', '.': '>', '/': '?' };
+const KB_MODS = ['shift', 'ctrl', 'opt', 'cmd'], KB_REPEAT = new Set(['delete', 'left', 'right', 'up', 'down']), armed = new Set();
+function drawKb() {
+  for (const b of $('kbd').querySelectorAll('.key')) {
+    const k = b.dataset.k;
+    if (KB_MODS.includes(k)) b.classList.toggle('on', armed.has(k));
+    else if (k.length === 1) b.textContent = armed.has('shift') ? SHIFTED[k] ?? k.toUpperCase() : k;
+  }
+}
+function kbPress(k) {
+  if (k === 'pad') return $('tab-mouse').classList.remove('kb');
+  if (KB_MODS.includes(k)) return armed.has(k) ? armed.delete(k) : armed.add(k), drawKb();
+  if (mouseState !== 'on') return toast('Keyboard', 'Turn the mouse on first', 1500);
+  if (k.length === 1 && !['ctrl', 'opt', 'cmd'].some(m => armed.has(m))) mouseSend({ type: armed.has('shift') ? SHIFTED[k] ?? k.toUpperCase() : k });
+  else mouseSend({ keys: [k, ...armed] });
+  if (armed.size) armed.clear(), drawKb(); // (one key's worth)
+}
+$('kbd').append(...KB.map(row => {
+  const r = Object.assign(document.createElement('div'), { className: 'kr' });
+  r.append(...row.map(k => {
+    const b = Object.assign(document.createElement('button'), { className: 'key' + (k.length > 1 ? ' w' : ''), textContent: KB_LABEL[k] ?? k });
+    b.dataset.k = k;
+    if (KB_ARIA[k]) b.setAttribute('aria-label', KB_ARIA[k]);
+    let again;
+    b.onpointerdown = e => {
+      b.setPointerCapture(e.pointerId);
+      b.classList.add('down');
+      kbPress(k);
+      if (KB_REPEAT.has(k)) again = setTimeout(function more() { kbPress(k); again = setTimeout(more, 70); }, 400); // held: repeats
+    };
+    b.onpointerup = b.onpointercancel = () => { b.classList.remove('down'); clearTimeout(again); };
+    return b;
+  }));
+  return r;
+}));
+hook($('m-kb'), { do: () => $('tab-mouse').classList.add('kb') });
 $('m-drag').onpointerdown = e => { $('m-drag').setPointerCapture(e.pointerId); $('m-drag').classList.add('down'); mouseSend({ hold: true }); };
 $('m-drag').onpointerup = $('m-drag').onpointercancel = () => { $('m-drag').classList.remove('down'); mouseSend({ hold: false }); };
-{ // one finger moves the pointer (further the faster it goes), two scroll; a quick touch clicks, with two a right-click
+// The touchpad, as the Mac's trackpad is set up: one finger moves the pointer (further the faster it goes), two scroll,
+// three drag (Three Finger Drag); a quick tap clicks, with two right-clicks, with three looks up. Four fingers swipe
+// left / right between Spaces, up for Mission Control, down for App Exposé; pinch for Apps, spread for the desktop -
+// read when they lift. (The Mac can't take real gestures from outside: its shortcuts for them are pressed instead)
+{
   const mp = $('mpad'), fingers = new Map();
+  const centre = () => { let x = 0, y = 0; for (const [a, b] of fingers.values()) x += a, y += b; return [x / fingers.size, y / fingers.size]; };
+  const spread = () => { const [x, y] = centre(); let d = 0; for (const [a, b] of fingers.values()) d += Math.hypot(a - x, b - y); return d / fingers.size; };
   let touch = null;
   mp.onpointerdown = e => {
     mp.setPointerCapture(e.pointerId);
     fingers.set(e.pointerId, [e.offsetX, e.offsetY]);
-    if (fingers.size === 1) touch = { at: Date.now(), moved: 0, most: 1 }; else if (touch) touch.most = Math.max(touch.most, fingers.size);
+    if (fingers.size === 1) touch = { at: Date.now(), moved: 0, most: 1 };
+    if (!touch || fingers.size < touch.most) return;
+    touch.most = fingers.size;
+    if (fingers.size >= 3) Object.assign(touch, { from: centre(), went: [0, 0], s0: spread(), s1: spread() }); // (measured from all of them down)
   };
   mp.onpointermove = e => {
     const was = fingers.get(e.pointerId);
-    if (!was) return;
-    const dx = e.offsetX - was[0], dy = e.offsetY - was[1];
+    if (!was || !touch) return;
+    const dx = e.offsetX - was[0], dy = e.offsetY - was[1], k = 1.5 + Math.min(2.5, Math.hypot(dx, dy) / 6);
     fingers.set(e.pointerId, [e.offsetX, e.offsetY]);
-    if (touch) touch.moved += Math.hypot(dx, dy);
-    if (fingers.size > 1) { mouseAcc.sx += dx / fingers.size; mouseAcc.sy += dy / fingers.size; return; }
-    const k = 1.5 + Math.min(2.5, Math.hypot(dx, dy) / 6);
+    touch.moved += Math.hypot(dx, dy);
+    if (fingers.size >= 3 && fingers.size === touch.most) { // the centre's travel and the hand's spread, while they're all down
+      const c = centre(), mx = c[0] - touch.from[0], my = c[1] - touch.from[1];
+      touch.from = c;
+      touch.went[0] += mx; touch.went[1] += my;
+      touch.s1 = spread();
+      if (fingers.size !== 3) return;
+      if (!touch.drag && Math.hypot(...touch.went) > 8) touch.drag = true, mouseSend({ hold: true }); // three fingers dragging
+      if (touch.drag) mouseAcc.x += mx * k, mouseAcc.y += my * k;
+      return;
+    }
+    if (touch.most >= 3) return; // (fingers lifting off a gesture don't move or scroll)
+    if (fingers.size === 2) { mouseAcc.sx += dx / 2; mouseAcc.sy += dy / 2; return; }
     mouseAcc.x += dx * k; mouseAcc.y += dy * k;
   };
   mp.onpointerup = mp.onpointercancel = e => {
     fingers.delete(e.pointerId);
     if (fingers.size || !touch) return;
-    if (e.type === 'pointerup' && touch.moved < 10 && Date.now() - touch.at < 300) mouseSend({ click: touch.most > 1 ? 'right' : 'left' });
+    const t = touch, tap = e.type === 'pointerup' && t.moved < 10 * t.most && Date.now() - t.at < 300;
     touch = null;
+    if (t.drag) return mouseSend({ hold: false });
+    if (e.type !== 'pointerup') return;
+    if (t.most >= 4) {
+      const [x, y] = t.went, s = t.s1 / t.s0;
+      const key = s < 0.7 ? 'apps' : s > 1.4 ? 'desktop' : Math.max(Math.abs(x), Math.abs(y)) < 40 ? null
+        : Math.abs(x) > Math.abs(y) ? (x < 0 ? 'space-right' : 'space-left') : y < 0 ? 'mission' : 'expose'; // (the Spaces follow the fingers, as on the trackpad)
+      if (key) mouseSend({ key }), toast('Gesture', { apps: 'Apps', desktop: 'Show Desktop', 'space-right': 'Next Space', 'space-left': 'Previous Space', mission: 'Mission Control', expose: 'App Exposé' }[key], 900);
+      return;
+    }
+    if (tap) mouseSend(t.most === 3 ? { key: 'lookup' } : { click: t.most > 1 ? 'right' : 'left' });
   };
 }
 
