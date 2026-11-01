@@ -841,8 +841,11 @@ function strip(r, o1, y1, o2, y2, color, on = () => true) {
   const v = [];
   const at = (i, o, y) => [r.P[i].x + r.L[i].x * o, r.P[i].y + y, r.P[i].z + r.L[i].z * o];
   for (let i = 0; i < r.N; i++) {
-    if (!on(i)) continue;
-    const a = at(i, o1, y1), b = at(i, o2, y2), c = at(i + 1, o1, y1), d = at(i + 1, o2, y2);
+    const f = on(i); // a fraction paints just the start of the 3 m segment (dashes finer than the samples)
+    if (!f) continue;
+    const a = at(i, o1, y1), b = at(i, o2, y2);
+    let c = at(i + 1, o1, y1), d = at(i + 1, o2, y2);
+    if (f < 1) c = c.map((v, k) => a[k] + (v - a[k]) * f), d = d.map((v, k) => b[k] + (v - b[k]) * f);
     v.push(...a, ...b, ...c, ...b, ...d, ...c);
     if (o1 === o2 && Math.max(y1, y2) > 0.3) solid(a[0], a[2], c[0], c[2], 0, Math.min(a[1], b[1], c[1], d[1]), Math.max(a[1], b[1], c[1], d[1]));
   }
@@ -860,7 +863,7 @@ function endBatch() {
   for (const [color, geos] of batch) scene.add(new THREE.Mesh(mergeGeometries(geos), new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })));
   batch = undefined;
 }
-const dashed = i => i % 6 < 2; // 6 m dash, 12 m gap
+const dashed = i => [1, 0.5, 0, 0][i % 4]; // 4.5 m dash, 7.5 m gap (JKR's broken lane line, Malaysia)
 const paint = (r, o, w, on) => strip(r, o - w / 2, 0.02, o + w / 2, 0.02, 0xeeeeee, on);
 const nearStation = (i, m, s) => A_STATIONS.some(([at, side]) => side === s && Math.abs(i - at) <= m);
 const awayFrom = (r, p, m) => i => Math.hypot(r.P[i].x - p.x, r.P[i].z - p.z) > m;
@@ -984,7 +987,7 @@ for (const r of STREETS) {
   const gaps = r.P.map((_, i) => gapOf(r)(i)), gap = i => gaps[i];
   const lift = Math.abs(r.P[r.N].x - r.P[0].x) > 300 ? 0.003 : 0; // east-west a hair higher: no flicker where they overlap
   strip(r, -4.5, 0.012 + lift, 4.5, 0.012 + lift, 0x3a3a3c);
-  if (r !== RB) paint(r, 0, 0.15, i => dashed(i) && gap(i) > 14.5);
+  if (r !== RB) paint(r, 0, 0.15, i => gap(i) > 14.5 && dashed(i));
   for (const s of [1, -1]) {
     strip(r, s * 4.5, 0.02 + lift, s * 4.75, 0.02 + lift, 0xd4d2cc, i => gap(i) > 4.5 + KERB_R);  // kerb
     if (r !== RB || s > 0) strip(r, s * 4.75, 0.016 + lift, s * 7.5, 0.016 + lift, 0x9a9890, i => gap(i) > 4.5 + KERB_R); // pavement
@@ -2333,6 +2336,8 @@ function onKey(e) {
     return keys.delete(e.code);
   }
   keys.add(e.code);
+  actx ??= new AudioContext(); // (a key is a gesture: the wind can play)
+  if (actx.state === 'suspended') actx.resume();
   if (e.code === 'Tab' || e.code === 'Slash' || e.code === 'ArrowUp' || e.code === 'ArrowDown' || (e.code === 'Space' && own(e))) e.preventDefault(); // this page's keys, not focus or scrolling
   if (e.repeat) return;
   if (e.code === 'Tab') setPanel(!panelOpen);
@@ -2413,11 +2418,45 @@ function crash(hit) {
 function setView(seat) {
   inCar = seat;
   tintGlass();
-  camera.fov = inCar ? 50 : 65;
+  camera.fov = fovNow = inCar ? 50 : 65;
   camera.updateProjectionMatrix();
   if (usingModel) return; // the model's own cabin is the in-car view
   for (const m of [bodyMesh, ...trims]) m.visible = !inCar;
   hood.visible = inCar;
+}
+
+// The sense of speed: the view widens with speed (65° to ~82° behind the car, 50° to ~60° from the seat) and a little
+// under hard acceleration, the chase camera hangs back as the car pulls away and drops lower at speed, and the wind
+// roars up with speed² (quieter from the sealed cabin, silent with the car muted) - no streaks or shake, the road's
+// short dashes and the roadside sell the speed. The chase cluster panel keeps its size on screen
+let fovNow = 65, camLag = 0, wind = null;
+const FOV_T0 = Math.tan(65 * Math.PI / 360);
+function speedFeel(dt, w) {
+  const kmh = Math.abs(state.speed) * 3.6, rush = THREE.MathUtils.smoothstep(kmh, 40, 300);
+  camLag += (THREE.MathUtils.clamp(pull / 9.81, -1, 1) - camLag) * (1 - Math.exp(-dt * 2.5));
+  const fov = (inCar ? 50 + 10 * rush : 65 + 17 * rush) + Math.max(-1, camLag) * (inCar ? 2 : 4);
+  fovNow += (fov - fovNow) * (1 - Math.exp(-dt * 3));
+  if (Math.abs(camera.fov - fovNow) > 0.01) {
+    camera.fov = fovNow;
+    camera.updateProjectionMatrix();
+    hudAnchor.position.z = -FOV_T0 / Math.tan(fovNow * Math.PI / 360);
+  }
+  if (actx?.state === 'running') {
+    if (!wind) { // a looped burst of noise through a band-pass that opens with speed
+      const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0, b = 0; i < d.length; i++) d[i] = b = 0.97 * b + 0.03 * (Math.random() * 2 - 1) * 6; // (reddened: a rush, not a hiss)
+      const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+      Object.assign(src, { buffer: buf, loop: true });
+      f.type = 'bandpass'; f.Q.value = 0.6; g.gain.value = 0;
+      src.connect(f).connect(g).connect(actx.destination);
+      src.start();
+      wind = { f, g };
+    }
+    const k = Math.min(1, kmh / 300), muted = w.document?.querySelector('.mute-fab.muted');
+    wind.g.gain.setTargetAtTime(muted || panelOpen ? 0 : (inCar ? 0.05 : 0.11) * k * k, actx.currentTime, 0.25);
+    wind.f.frequency.setTargetAtTime(250 + 1500 * k, actx.currentTime, 0.25);
+  }
+  return rush;
 }
 
 // The car page drives: its own I/W/S/R keys run the engine, gearbox and brakes, and every frame it hands its speed
@@ -3658,6 +3697,7 @@ renderer.setAnimationLoop(() => {
     ?.parentNode.querySelector('.cs-tab[data-tab="dyno"]')?.click(); // drove off on the servicing tab
   wasInShop = atShop;
 
+  const rush = speedFeel(dt, w);
   if (inCar) { // from the driver's seat, looking where the car points (so up and down hills too); swipes turn the head
     camera.position.copy(EYE).applyMatrix4(body.matrixWorld);
     body.getWorldQuaternion(eyeQ);
@@ -3670,12 +3710,13 @@ renderer.setAnimationLoop(() => {
     const k = 1 - Math.exp(-dt * 4), yawTarget = state.heading + orbitYaw + drift.beta * 0.7; // (in a slide, round towards where it's going)
     camYaw += Math.atan2(Math.sin(yawTarget - camYaw), Math.cos(yawTarget - camYaw)) * k; // shortest way round
     camPitch += (orbitPitch - camPitch) * k;
-    const flat = Math.cos(camPitch) * CAM_DIST, cx = state.x - Math.sin(camYaw) * flat, cz = state.z - Math.cos(camYaw) * flat;
+    const dist = CAM_DIST * (1 + 0.12 * camLag - 0.1 * rush); // hangs back as the car pulls away, closes in on the brakes and at speed
+    const flat = Math.cos(camPitch) * dist, cx = state.x - Math.sin(camYaw) * flat, cz = state.z - Math.cos(camYaw) * flat;
     camera.up.set(0, 1, 0);
     const over = inCarPark(state.x, state.z) && onRoad(cx, cz, car.position.y + CP.h); // the deck or ramp over the car
-    camera.position.set(cx, Math.min(Math.max(car.position.y + 1 + Math.sin(camPitch) * CAM_DIST, terrainAt(cx, cz) + 0.5), over?.on ? over.y - 0.6 : Infinity), cz); // never under a hillside, or up through a deck
+    camera.position.set(cx, Math.min(Math.max(car.position.y + 1 + Math.sin(camPitch) * dist * (1 - 0.18 * rush), terrainAt(cx, cz) + 0.5), over?.on ? over.y - 0.6 : Infinity), cz); // never under a hillside, or up through a deck - and lower at speed
     camera.lookAt(state.x, car.position.y + 1, state.z);
-    camera.rotateX(-Math.atan(hudAnchor.position.y + clusterH * 0.00081 / 2 + CHASE_GAP)); // tipped down over a taller panel
+    camera.rotateX(-Math.atan((hudAnchor.position.y + clusterH * 0.00081 / 2) / -hudAnchor.position.z + CHASE_GAP)); // tipped down over a taller panel
   }
   // the cluster (and its hole) follows the dash from the seat, or the camera as a bottom panel; the car menu sits
   // where the CSS3D camera's perspective is exactly 1:1, so it's as sharp as a flat page
