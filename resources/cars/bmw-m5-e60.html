@@ -208,6 +208,8 @@
   .tuning-label{ font-size:.56rem; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); margin-bottom:8px; font-weight:600; }
   .tune-row{ display:flex; align-items:center; gap:8px; margin-bottom:9px; }
   .tune-row:last-child{ margin-bottom:0; }
+  .map-mods{ font-size:.56rem; color:#8d877e; line-height:1.45; margin:-4px 0 9px; }
+  .map-mods#map-name{ color:#d9d3c8; font-size:.62rem; }
   .tune-label{ font-size:.52rem; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); min-width:40px; font-weight:600; }
   .icon-btn{ width:30px; height:30px; padding:0; border-radius:8px; border:1px solid #2e2c29; background:#171615; color:var(--dim); display:flex; align-items:center; justify-content:center; flex:none; }
   .icon-btn:hover{ color:var(--white); border-color:var(--accent); }
@@ -439,7 +441,7 @@
   <div class="keys">
     <span><kbd>I</kbd>ignition / start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
     <span><kbd>Q</kbd><kbd>E</kbd>shift (D &rarr; S)</span><span><kbd>M</kbd>D / S</span><span><kbd>K</kbd>D</span><span><kbd>N</kbd>neutral</span><span><kbd>R</kbd>reverse</span>
-    <span><kbd>G</kbd>/<kbd>Shift</kbd>+<kbd>G</kbd>Drivelogic</span><span><kbd>P</kbd>POWER</span><span><kbd>T</kbd>DSC</span><span><kbd>C</kbd>EDC</span><span><kbd>1</kbd>MDrive</span><span><kbd>B</kbd>Stage 2</span>
+    <span><kbd>G</kbd>/<kbd>Shift</kbd>+<kbd>G</kbd>Drivelogic</span><span><kbd>P</kbd>POWER</span><span><kbd>T</kbd>DSC</span><span><kbd>C</kbd>EDC</span><span><kbd>1</kbd>MDrive</span><span><kbd>B</kbd>Map 1 / 2</span>
     <span><kbd>F</kbd>cruise <kbd>,</kbd><kbd>.</kbd></span><span><kbd>L</kbd><kbd>H</kbd>lights</span>
     <span>launch: S6 + DSC OFF, hold <kbd>Q</kbd>, floor <kbd>W</kbd>, release <kbd>Q</kbd></span>
   </div>
@@ -515,12 +517,14 @@
       </button>
     </div>
     <div class="tune-row">
-      <span class="tune-label">Tune</span>
+      <span class="tune-label">Map</span>
       <div class="seg" id="tune-seg" style="flex:1">
-        <button data-stage="0" style="flex:1" title="Stock: 507 hp / 520 Nm (B)">Stock</button>
-        <button data-stage="2" style="flex:1" title="Stage 2: 650 hp / 680 Nm (B)">Stage 2</button>
+        <button data-map="1" style="flex:1" title="Map 1 (B)">Map 1</button>
+        <button data-map="2" style="flex:1" title="Map 2 (B)">Map 2</button>
       </div>
     </div>
+    <div class="map-mods" id="map-name"></div>
+    <div class="map-mods" id="map-mods"></div>
   </div>
 
   <div class="tuning-section sec-live">
@@ -1040,7 +1044,8 @@
   // radiator fan (all cars): on above 92C, runs until the coolant is back under 90C
   let fanGain, fanTrim, fanFilter, fanHum, fanOn = false;
   function updateFan(){
-    fanOn = ignition && (coolantC > 92 || (fanOn && coolantC > 90));
+    const ts = CarTune.tstat(); // the fitted thermostat's rating
+    fanOn = ignition && (coolantC > ts || (fanOn && coolantC > ts - 2));
     if(!actx) return;
     const t = actx.currentTime, tau = fanOn ? 0.7 : 1.6;
     fanGain.gain.setTargetAtTime(fanOn ? 0.3 : 0, t, tau);
@@ -1066,12 +1071,9 @@
   // 507 PS @ 7,750, 420 Nm at the stock 8,250 governor; past it (the cut is raised to 9,500 here) the S85 runs out of
   // breath, so power falls away rather than climbing
   const TORQUE_CURVE = [[0,0],[500,280],[800,335],[1250,392],[1900,386],[2500,390],[3100,433],[4000,455],[5200,475],[6100,520],[7000,497],[7750,460],[8250,420],[8600,390],[9000,350],[9500,300],[9900,250]];
-  // Stage 2: 680 Nm @ 6,100 and 650 hp across 7,000-7,300 - the stock curve's shape, lifted
-  const STAGE2_CURVE = [[0,0],[500,300],[800,360],[1250,430],[1900,445],[2500,470],[3100,530],[4000,575],[5200,620],[6100,680],[7000,652],[7750,585],[8250,535],[8600,495],[9000,440],[9500,370],[9900,300]];
-  const TUNES = { 0:{ curve:TORQUE_CURVE, name:'Stock', hp:507, nm:520 }, 2:{ curve:STAGE2_CURVE, name:'Stage 2', hp:650, nm:680 } };
-  let stage = 0;
+  // the tune (car-tune.js, Map 1 / Map 2) scales it: CarTune.tick's tqMul
   function torqueAt(rpm){
-    const curve = TUNES[stage].curve;
+    const curve = TORQUE_CURVE;
     for(let i=1;i<curve.length;i++){
       const [r1,t1] = curve[i];
       if(rpm <= r1){ const [r0,t0] = curve[i-1]; return t0 + (t1-t0)*(rpm-r0)/(r1-r0); }
@@ -1087,8 +1089,8 @@
     p500s: { k:1,     curve:0.72, tau:0.035, rev:26, name:'P500 Sport' },
   };
   const MASS = 1830, WHEEL_R = 0.338; // unladen weight; 285/35 R19 rear
-  const GEAR_RATIOS = [3.985, 2.652, 1.806, 1.392, 1.159, 1.000, 0.833]; // Getrag 247 SMG III
-  const REVERSE_RATIO = 3.985, FINAL_DRIVE = 3.62, DRIVELINE_EFF = 0.85;
+  let GEAR_RATIOS = [3.985, 2.652, 1.806, 1.392, 1.159, 1.000, 0.833]; // Getrag 247 SMG III - the tune's Gearbox map can change them
+  let FINAL_DRIVE = 3.62; const REVERSE_RATIO = 3.985, DRIVELINE_EFF = 0.85; // the final drive is a part (car-tune.js)
   // the engine, flywheel and clutch spin up with the car: ~0.28 kg m^2 seen through the gearing (+460 kg in 1st), plus the wheels
   const massEff = ratio => MASS + 42 + 0.28*Math.pow(ratio/WHEEL_R, 2);
   const WHEEL_KMH_PER_KRPM = 2*Math.PI*WHEEL_R*60;
@@ -1096,8 +1098,10 @@
   const CDA = 0.74, AIR_RHO = 1.225, ROLL_DECEL = 0.13; // Cd 0.32 x 2.32 m^2
   const BRAKE_DECEL = 11.0;  // compound brakes: ~36 m from 100 km/h
   const GRIP = 8.4;          // what the 285 rears put down, m/s^2 (calibrated: 0-100 4.3 s, 0-160 9.0 s, as tested)
-  // fuel cut raised from the stock 8,250 to 9,500; D still upshifts at 8,000, where the power is
-  const IDLE_RPMK = 0.80, REV_LIMIT_K = 9.5, LAUNCH_RPM_K = 4.0, SHIFT_K = 8.0;
+  let TC_GRIP = GRIP;        // x the tune's T.grip: the Handling tab's tyres, springs and diff, worn tyres
+  // fuel cut raised from the stock 8,250 to 9,500; D still upshifts at 8,000, where the power is (the tune's limits)
+  const IDLE_RPMK = 0.80;
+  let REV_LIMIT_K = 9.5, LAUNCH_RPM_K = 4.0, SHIFT_K = 8.0, heatTuneMul = 1;
 
   // ---- SMG III Drivelogic. S (sequential): six programmes, each a faster, harder shift - S6 is the 65 ms one with
   // the kick on re-engagement. D (automated): five programmes, from early soft shifts to holding gears high. ----
@@ -1160,7 +1164,7 @@
   let odometer = savedState.odometer ?? 1250.0, trip=0.0, tripFuelUsedL=0.0, fuelFrac = savedState.fuelLevel ?? 1.0;
   let wearPct = savedState.wearPct ?? 0;
   let coolantC = 20, oilC = 20, overheatBuildup = 0, egrC = 23, oilPressureBar = 0, sapUntil = 0;
-  let torqueReq = 0, loadFrac = 0, dispHp = 0, dispTq = 0, dispConsumption = 0;
+  let torqueReq = 0, loadFrac = 0, dispHp = 0, dispTq = 0, dispConsumption = 0, boostFrac = 0, boostBar = 0;
   let rpmK = 0, gearIdx = -1, transmissionMode = 'N', smgMode = 'D', shift = null, shiftCooldown = 0, kickT = 0, shiftCount = 0;
   let zeroThrottleTime = 0, throttleTrend = 0, limiterCut = false;
   const CRANK_S = 0.65, FLARE_S = 1.3;
@@ -1203,22 +1207,43 @@
   const em = Math.max(1, Math.min(8, savedState.engineMap || 4));
   const mdrive = { power: MD_POWER[(em - 1) % 4], edc:'sport', dsc:'mdm', smg:'S5' };
 
-  const specText = () => `${POWER[power].name} (${Math.round(TUNES[stage].hp*POWER[power].k)} hp${stage ? ', Stage 2' : ''})`;
+  // Map 1 / Map 2 are the tune's two calibration slots (car-tune.js); engine_map carries the slot as +4 on Map 2
+  let currentMap = em > 4 ? 2 : 1;
+  const specText = () => `${POWER[power].name} (${Math.round(CarTune.predict(currentMap).hp*POWER[power].k)} hp, Map ${currentMap})`;
   function setPower(p, quiet){
     power = p;
     pwrBtn.querySelector('.leds i').classList.toggle('on', p !== 'p400');
     $('spec-power').textContent = specText();
     if(!quiet){ flashMsg('POWER', POWER[p].name); leaveM(); }
   }
-  const tuneBtns = [...document.querySelectorAll('#tune-seg button')];
-  function setStage(s, quiet){
-    stage = s;
-    tuneBtns.forEach(b => b.classList.toggle('active', +b.dataset.stage === s));
-    $('spec-power').textContent = specText();
-    if(!quiet) flashMsg(TUNES[s].name, `${TUNES[s].hp} hp`);
+  const mapBtns = [...document.querySelectorAll('#tune-seg button')];
+  function setMap(n, quiet){
+    currentMap = n;
+    mapBtns.forEach(b => b.classList.toggle('active', +b.dataset.map === n));
+    CarTune.setSlot(n);
+    showMapNames();
+    const p = CarTune.predict(n);
+    CarDyno.init({ hpMax: Math.ceil(p.hp/10)*10, tqMax: Math.ceil(p.tq/10)*10 });
+    if(!quiet) flashMsg(`Map ${n}`, CarTune.label(n).split(' · ')[0]);
   }
-  tuneBtns.forEach(b => b.addEventListener('click', ()=>{ setStage(+b.dataset.stage); b.blur(); }));
-  setStage(em > 4 ? 2 : 0, true);
+  // the map readout, button titles, spec line and the fitted hardware: the slot's calibration and its predicted peak
+  function showMapNames(){
+    $('map-name').textContent = CarTune.label(currentMap);
+    $('map-mods').textContent = CarTune.mods();
+    $('spec-power').textContent = specText();
+    mapBtns.forEach(b => { b.title = `Map ${b.dataset.map}: ${CarTune.label(+b.dataset.map)} (B)`; });
+  }
+  CarTune.init({ engine:'S85', torque:TORQUE_CURVE, rev:9500, shift:8000, launch:4000, vmax:0, finalDrive:3.62, gears:GEAR_RATIOS.slice(), wheelR:WHEEL_R,
+    slot: currentMap, slots: ['stock', em > 4 ? 'sc' : 'stage1'], setMap:(n)=> setMap(n), // (a car on the old 650 hp Stage 2 starts on the supercharged build, its nearest)
+    onChange(T){
+      REV_LIMIT_K = T.rev; SHIFT_K = T.shift; LAUNCH_RPM_K = T.launch; FINAL_DRIVE = T.finalDrive;
+      GEAR_RATIOS = T.gears;
+      TC_GRIP = GRIP*T.grip;
+      heatTuneMul = 1 + Math.max(0, T.powerRatio - 1)*2.5;
+      showMapNames();
+    } });
+  mapBtns.forEach(b => b.addEventListener('click', ()=>{ setMap(+b.dataset.map); b.blur(); }));
+  setMap(currentMap, true);
   function setEdc(v, quiet){
     edc = v;
     edcBtn.querySelectorAll('.leds i').forEach((d,i)=> d.classList.toggle('on', i === EDC_OPTS.indexOf(v)));
@@ -1287,7 +1312,7 @@
   // identical from ~200 km/h), off lets it all spin
   function applyTraction(a){
     if(launchState === 'armed') return 0;
-    const grip = GRIP*(window.surfaceGrip || 1); // a wet or snowy road (drive.html's weather)
+    const grip = TC_GRIP*(window.surfaceGrip || 1); // a wet or snowy road (drive.html's weather)
     if(a <= grip) return a;
     if(launchState === 'go'){ tcSlipK = 0.35; return grip*1.02; }
     const mdmK = dsc === 'mdm' ? clamp01(1 - speed/200) : 0;
@@ -1535,14 +1560,23 @@
     syncField(ignition ? fStart : 99);
     idleK = IDLE_RPMK + clamp01((60 - oilC)/40)*0.35; // ~1,150 rpm fast idle from cold, 800 warm
 
-    // ---- engine torque ----
+    // ---- manifold pressure: vacuum on a part throttle, near 0 flat out; a supercharger kit (Tuning > Parts) makes its
+    // share of the torque as it spins up - with none fitted boostAt is 0 ----
+    const bMap = running ? CarTune.boostAt(Math.max(rpmK, idleK)) : 0, naF = 1/(1 + Math.max(0, bMap));
+    const boostWant = bMap > 0.02 ? clamp01((torqueReq - naF)/(1 - naF)) : 0;
+    boostFrac += (boostWant - boostFrac)*(1 - Math.exp(-dt/(boostWant > boostFrac ? 0.15 : 0.1)));
+    boostBar += ((!running ? 0 : torqueReq < naF ? -0.75*(1 - torqueReq/naF)*clamp01(rpmK/0.6) : boostFrac*bMap) - boostBar)*Math.min(1, dt*8);
+
+    // ---- engine torque: the tune's multiplier on the stock curve, its cuts (misfires, limp), exhaust temp, fuel ----
     if(rpmK >= REV_LIMIT_K) limiterCut = true;
     else if(rpmK < REV_LIMIT_K - 0.15) limiterCut = false;
-    let frac = torqueReq;
+    const fuelCut = running && pedalRaw < 0.02 && rpmK > idleK + 0.3 && gearIdx >= 0 && speed > 8; // overrun: injectors off
+    const tune = CarTune.tick({ dt, ignition: running, rpm: Math.max(rpmK, running ? idleK : 0)*1000, pedal: torqueReq, boost: boostBar, speed, gear: gearIdx, coolant: coolantC, fuelCut });
+    let frac = Math.min(torqueReq, naF + (1 - naF)*boostFrac)*tune.cut;
     if(shift && shift.up) frac *= 0.1;                          // throttle shut while the clutch is open
     if(limiterCut || !running) frac = 0;
     const wearMul = 1 - (wearPct/100)*0.1, rpm = rpmK*1000;
-    const engineTq = running ? torqueAt(rpm)*pw.k*frac*wearMul - frictionAt(rpm)*Math.max(0, 1 - frac/0.05) : 0;
+    const engineTq = running ? torqueAt(rpm)*tune.tqMul*pw.k*frac*wearMul - frictionAt(rpm)*Math.max(0, 1 - frac/0.05) : 0;
     loadFrac = frac;
 
     // ---- drivetrain ----
@@ -1582,6 +1616,7 @@
     speed = Math.max(0, speed + (a - dragA)*3.6*dt); // no cap: drag and the rev limiter set the top speed
     if(braking && speed < 0.3) speed = 0;
     if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit or a teleport on the driving page (drive.html), km/h
+    if(window.speedLoss){ speed = Math.max(0, speed - window.speedLoss); window.speedLoss = 0; } // taken off by the handbrake or a wing's drag on the driving page, km/h
 
     // ---- gear selection ----
     if(running && (transmissionMode === 'D' || transmissionMode === 'S')){
@@ -1642,7 +1677,7 @@
     const enginePowerKw = running ? Math.max(0, engineTq)*rpm/9549 : 0;
     const loadShare = clamp01(enginePowerKw/Math.max(30, torqueAt(rpm)*rpm/9549));
     const bsfc = 255 + 180*Math.pow(1 - loadShare, 2);
-    const fuelFlowLph = running ? (1.6*Math.pow(rpmK/IDLE_RPMK, 0.8) + enginePowerKw*bsfc/1000/PETROL_KG_PER_L)*(1 + (wearPct/100)*0.06) : 0;
+    const fuelFlowLph = running && !fuelCut ? (1.6*Math.pow(rpmK/IDLE_RPMK, 0.8) + enginePowerKw*bsfc/1000/PETROL_KG_PER_L*tune.fuelMul)*(1 + (wearPct/100)*0.06) : 0;
     const consumptionL100 = !running ? 0 : speed < 2 ? Math.min(60, fuelFlowLph*0.5) : Math.min(60, fuelFlowLph/speed*100);
     const inReserve = fuelFrac*TANK_SIZE_L <= RESERVE_L;
     CarService.tick({ dt, speed, braking, slip: Math.max(wheelspinK, tcSlipK, launchState === 'go' ? 0.35 : 0), engineWear: wearPct, ignition, lowFuel: inReserve });
@@ -1677,10 +1712,10 @@
     if(running){
       if(rpmK >= REV_LIMIT_K - 0.05) overheatBuildup = Math.min(1, overheatBuildup + dt*0.0034);
       else overheatBuildup = Math.max(0, overheatBuildup - dt*(isCoastCooling ? 0.05 : 0.018));
-      const baseTarget = isCoastCooling ? 80 : 90;
+      const baseTarget = isCoastCooling ? 80 : 90 + CarTune.tstat() - 92; // the fitted thermostat's
       const targetC = baseTarget + Math.max(0, (overheatBuildup - 0.18)/0.82)*(160 - baseTarget);
-      const idleRate = 0.0009, loadRate = (rpmK/8.25)*0.0035*1.3, coastRate = isCoastCooling ? 0.007 : 0;
-      const combustionHeat = Math.min(1, engineOnTime/3);
+      const idleRate = 0.0009, loadRate = (rpmK/8.25)*0.0035*1.3*heatTuneMul, coastRate = isCoastCooling ? 0.007 : 0; // (a tune's extra power is extra heat)
+      const combustionHeat = Math.min(1, crankT/3);
       let approachRate;
       if(targetC <= coolantC) approachRate = idleRate + loadRate + coastRate;
       else if(coolantC < 89) approachRate = (idleRate + loadRate)*1.2*combustionHeat + coastRate;
@@ -1703,7 +1738,7 @@
     }
 
     // ---- EGT / oil pressure ----
-    const egtTarget = running ? 330 + loadFrac*clamp01(rpmK/8)*620 : 23;
+    const egtTarget = running ? tune.egt : 23; // the tune's exhaust model: mixture, timing, boost
     egrC += (egtTarget - egrC)*(running ? 0.03 : 0.01);
     egrC = Math.max(23, Math.min(1000, egrC));
     const oilTargetBar = running ? Math.min(6.5, (1.0 + rpmK*0.62 + Math.max(0, 60 - oilC)*0.02)*(1 - (wearPct/100)*0.3)) : 0;
@@ -1725,7 +1760,7 @@
     const bulb = ignition && engineOnTime < 2.2;
     const overheating = coolantC > 112, oilLow = running && crankT > 2 && oilPressureBar < 0.5;
     setWl('airbag', bulb ? 'on-red' : '');
-    setWl('engine', bulb || (ignition && (wearPct > 50 || overheating)) ? 'on-amber' : '');
+    setWl('engine', bulb || (ignition && (wearPct > 50 || overheating || CarTune.warnLight())) ? 'on-amber' : '');
     setWl('abs', bulb ? 'on-amber' : (ignition && braking > 60 && speed > 5) ? 'on-amber blink' : '');
     setWl('belt', bulb ? 'on-red' : '');
     setWl('rpa', bulb ? 'on-amber' : '');
@@ -1824,7 +1859,7 @@
       case 't': pressDsc(); break;
       case 'c': cycleEdc(); break;
       case '1': pressM(); break;
-      case 'b': setStage(stage ? 0 : 2); break;
+      case 'b': setMap(currentMap === 1 ? 2 : 1); break;
       case 'l': toggleLights(); break;
       case 'h': toggleHighBeam(); break;
       case 'f':
@@ -1859,7 +1894,7 @@
 
   // autosave: periodically and on tab close; engine_map carries the stored MDrive POWER
   function currentSaveData(){
-    return { odometer, fuel_level: fuelFrac, engine_wear_pct: wearPct, engine_map: 1 + MD_POWER.indexOf(mdrive.power) + (stage ? 4 : 0) };
+    return { odometer, fuel_level: fuelFrac, engine_wear_pct: wearPct, engine_map: 1 + MD_POWER.indexOf(mdrive.power) + (currentMap === 2 ? 4 : 0) };
   }
   setInterval(()=> CarAPI.save(currentSaveData()), 10000);
   window.addEventListener('pagehide', ()=> CarAPI.save(currentSaveData()));

@@ -388,6 +388,64 @@
           make: (e, s) => ({ ...s, boost: e.turbos.sc.map((c) => +Math.min(0.5, c * 0.95).toFixed(2)), afr: e.axis.map((r) => (r < 3000 ? 12.6 : 11.8)), tq: 380, rev: 8300, shift: 8000 }) },
       ],
     },
+    // M5 (E60): the S85B50 5.0 V10 - ten individual throttle bodies, 12:1, double-VANOS, a dry-sump-style oil system,
+    // 507 PS at 7,750 and an 8,250 governor (the car page raises the fuel cut to 9,500). NA like the NSX-R: the boost map
+    // does nothing until the supercharger kit (an ESS-style centrifugal VT2) goes on. What holds a big tune back is the
+    // SMG III's single-plate clutch and the V10's rod bearings
+    S85: {
+      fuel: 'petrol', name: 'S85B50 5.0 V10', cyl: 10, maxRpm: 9700, tstat: 92, na: true,
+      axis: [1000, 2000, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500],
+      boost: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      afr: [13.2, 13.0, 12.9, 12.8, 12.8, 12.7, 12.7, 12.6, 12.6, 12.6, 12.5, 12.5, 12.5, 12.5, 12.4, 12.4],
+      // written for RON 98: 12:1 on 95 is knock-limited from 3,000 to peak torque
+      margin: [0.8, 0.5, 0.1, -0.1, -0.2, -0.2, -0.1, 0.1, 0.3, 0.6, 0.9, 1.1, 1.3, 1.4, 1.5, 1.5],
+      cylMargin: [0, 0.2, -0.1, 0, -0.3, 0.1, 0, -0.2, 0.1, -0.4], // the back cylinders of each bank run hottest
+      turboLabel: 'Forced induction',
+      turboOpts: [['stock', 'None (NA)', 'Naturally aspirated through ten individual throttle bodies: no boost, so the boost map does nothing.', { sound: { turbo: 0 } }],
+        ['sc', 'Supercharger kit', 'Centrifugal supercharger off the crank: boost climbs with the revs to ~0.6 bar at 8,500. Needs bigger injectors, a pump, an intercooler and a stronger clutch.', { sound: { turbo: 0.7 } }]],
+      turbos: {
+        stock: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        sc: [0.02, 0.05, 0.1, 0.13, 0.16, 0.2, 0.24, 0.28, 0.33, 0.38, 0.43, 0.48, 0.53, 0.57, 0.6, 0.62],
+      },
+      krpm: { stock: 0, sc: 55 },
+      tq: 520, rod: 700, trans: { name: 'Getrag SMG III 7-speed', cap: 600, uprated: 760, built: 900 },
+      swap: {
+        intercooler: { opts: [['stock', 'None', 'Nothing to cool on the NA engine. With the supercharger the charge goes in hot.', { ic: 0, soak: 0 }],
+          ['kit', 'Kit core', 'Air-to-water core in the V: what the supercharger needs.', { ic: 0.75, soak: 8 }],
+          ['big', 'Big core', 'Larger core with its own pump: cooler, steadier intake temps.', { ic: 0.85, soak: 4 }]] },
+        chargepipe: { opts: [['stock', 'Kit pipes', 'The supercharger kit\'s own silicone pipes (nothing on the NA engine): hard pulls on high boost fatigue them until one splits.'],
+          ['alu', 'Aluminium', 'Aluminium pipes and silicone couplers: hold any boost and barely age.', { cpWear: 0.08 }]] },
+        diverter: { label: 'Bypass valve', opts: [['stock', 'Kit diaphragm', 'The supercharger kit\'s bypass valve (nothing on the NA engine): high boost tears it and it bleeds boost.'],
+          ['piston', 'Uprated piston', 'Billet piston valve: holds any boost, practically never wears.', { dvWear: 0.1, sound: { turbo: 1.05 } }]] },
+        intake: { opts: [['stock', 'Stock', 'Carbon airbox feeding ten individual throttle bodies.'],
+          ['open', 'Race intake', 'Freer filters and a carbon plenum: +1.5% flow up top and a louder V10 howl.', { flow: 0.015, iat: 1, sound: { intake: 1.35, turbo: 1.1 } }]] },
+        downpipe: { label: 'Headers & cats', opts: [['stock', 'Stock', 'Factory 5-into-1 headers into the four cats.'],
+          ['sport', 'Sport cats', '200-cell cats: +2.5% flow and cooler exhaust.', { flow: 0.025, egt: -15, spool: -100, sound: { ex: 1.15, turbo: 1.1 } }],
+          ['catless', 'Race headers', 'Equal-length race headers, no cats: +4% flow and a Formula 1 shriek. Off-road only - the cat monitor flags P0420.', { flow: 0.04, egt: -25, spool: -150, sound: { ex: 1.3, turbo: 1.2 }, catless: true }]] },
+        injection: { label: 'Injectors', opts: [['stock', 'Stock', 'Sequential port injection: ~40% headroom over the stock fuelling.', { fuelCap: 1.4 }],
+          ['port', 'Big injectors', 'Higher-flow injectors: ~70% more fuel - what the supercharger and E85 need.', { fuelCap: 1.4, port: 0.7 }]] },
+        hpfp: { label: 'Fuel pump', opts: [['stock', 'Stock', 'In-tank pumps at 5 bar: ~25% headroom over the stock fuelling.', { pump: 1.25 }],
+          ['uprated', 'Uprated', 'High-flow in-tank pumps: hold pressure at ~60% more flow.', { pump: 1.6 }]] },
+        trans: { label: 'Clutch & gearbox', opts: [['stock', 'Stock', 'The SMG III\'s single-plate clutch: slips once the torque passes its rating.'],
+          ['uprated', 'Uprated clutch', 'A twin-disc clutch and an SMG pump flash: holds far more torque.', { trans: 'uprated' }],
+          ['built', 'Built', 'Race twin-disc, uprated synchros and a race SMG map: holds the most, but grabs and wears ~50% faster on the road.', { trans: 'built', transWear: 1.5 }]] },
+        fuel: { opts: [['98', 'RON 98', 'Super Plus: what BMW M specifies for the S85, and what the stock map is written for.', { octane: 2, k: 1 }],
+          ['95', 'RON 95', 'Regular premium: allowed, but 12:1 on it is knock-limited around peak torque - a little less power.', { octane: 0, k: 1 }],
+          ['102', 'RON 102', 'Race fuel: ~5° more margin than RON 95 - what a supercharged build on stock internals runs.', { octane: 5, k: 1 }],
+          ['e85', 'E85', 'Ethanol: ~9° more margin and a cooler charge, but ~40% more fuel flow than the stock injectors give.', { octane: 9, k: 1.4, iat: -6 }]] },
+      },
+      presets: [
+        { id: 'stock', name: 'Stock', desc: 'Factory M5 calibration: 507 PS / 520 Nm, fuel cut at 9,500 (raised from the 8,250 governor).', needs: {}, make: (e, s) => s },
+        { id: 'stage1', name: 'Stage 1', desc: 'ECU reflash with sport cats on RON 98: more timing up top. ~525 PS / 535 Nm.', needs: { downpipe: ['sport', 'catless'], fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, timing: e.axis.map((r) => (r < 4000 ? 0.5 : 1.5)), tq: 540 }) },
+        { id: 'stage2', name: 'Stage 2', desc: 'Race headers and intake, fast-road cams on uprated valve springs and an alloy radiator, 9,700 rpm: ~555 PS / 550 Nm.',
+          needs: { downpipe: ['catless'], intake: ['open'], cams: ['fast', 'race'], springs: ['uprated', 'titanium'], radiator: ['alu', 'race'], fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, timing: e.axis.map((r) => (r < 4000 ? 0.5 : 1.5)), afr: add(s.afr, -0.1), rev: 9700, shift: 8400, tq: 560, dpf: false }) }, // cat monitor off for the race headers
+        { id: 'sc', name: 'Supercharged', desc: 'The supercharger kit at ~0.5 bar on RON 98: big injectors, uprated pumps, an intercooler, alloy pipes and a twin-disc clutch. ~660 PS / 640 Nm.',
+          needs: { turbo: ['sc'], injection: ['port'], hpfp: ['uprated'], lpfp: ['uprated'], intercooler: ['kit', 'big'], chargepipe: ['alu'], diverter: ['piston'], trans: ['uprated', 'built'], fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, boost: e.turbos.sc.map((c) => +Math.min(0.5, c * 0.95).toFixed(2)), afr: e.axis.map((r) => (r < 3000 ? 12.6 : 11.8)), tq: 660, rev: 9000, shift: 8000 }) },
+      ],
+    },
     // GT-R NISMO (R35, MY17+): the VR38DETT 3.8 twin-turbo V6, each one built by hand by a single takumi. The NISMO runs
     // the GT3 race car's IHI turbos (bigger compressor wheels) at ~1.05 bar for 600 PS / 652 Nm; port injection, plasma-
     // sprayed bores. What holds a tune back is the GR6 dual-clutch transaxle's clutch packs
