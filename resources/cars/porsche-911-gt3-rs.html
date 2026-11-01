@@ -346,7 +346,7 @@
     </div>
   </div>
   <div class="keys">
-    <span><kbd>I</kbd>start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
+    <span><kbd>I</kbd>ignition / start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
     <span><kbd>Q</kbd><kbd>E</kbd>paddles (D &rarr; M)</span><span><kbd>M</kbd>D / M</span><span><kbd>K</kbd>D</span><span><kbd>N</kbd>neutral</span><span><kbd>R</kbd>reverse</span><span><kbd>P</kbd>park</span>
     <span><kbd>G</kbd>/<kbd>Shift</kbd>+<kbd>G</kbd>drive mode</span><span><kbd>1</kbd><kbd>2</kbd>engine map</span><span><kbd>T</kbd>PSM</span>
     <span><kbd>F</kbd>cruise <kbd>,</kbd><kbd>.</kbd></span><span><kbd>L</kbd><kbd>H</kbd>lights</span>
@@ -1029,6 +1029,8 @@
 
   const savedState = window.__CAR_STATE__ || {};
   let ignition=false, braking=0, speed=0, engineOnTime=0;
+  let started = false, crankT = 0; // the ignition can be on with the engine off; crankT: time since START
+  const CREEP_KMH = 6, CREEP_A = 0.6; // in 1st off the pedal the PDK's clutch slips it along at a walking pace
   let odometer = savedState.odometer ?? 1250.0, trip=0.0, tripFuelUsedL=0.0, fuelFrac = savedState.fuelLevel ?? 1.0;
   let wearPct = savedState.wearPct ?? 0;
   let coolantC = 20, oilC = 20, overheatBuildup = 0, egrC = 23, oilPressureBar = 0, battV = 12.5, sapUntil = 0;
@@ -1110,7 +1112,7 @@
   // Porsche's procedure: Sport or Track, in D or M, left foot hard on the brake, floor the throttle (the revs hold
   // and "Launch Control" comes up), then let the brake go.
   let tcIntervening = false, wheelspinK = 0, tcSlipK = 0, launchState = 'idle';
-  const launchReady = () => ignition && engineOnTime > CRANK_S && (transmissionMode === 'D' || transmissionMode === 'M') && mode !== 'normal' && gearIdx === 0;
+  const launchReady = () => ignition && started && crankT > CRANK_S && (transmissionMode === 'D' || transmissionMode === 'M') && mode !== 'normal' && gearIdx === 0;
   function updateLaunch(pedalRaw){
     tcIntervening = false; wheelspinK = 0; tcSlipK = 0;
     if(launchState === 'idle'){ if(launchReady() && speed < 1 && braking >= 50 && pedalRaw >= 0.95) launchState = 'armed'; }
@@ -1175,21 +1177,27 @@
   }
   const speedSpring = needleSpring(90), tachSpring = needleSpring(300), fuelSpring = needleSpring(3);
 
-  powerBtn.addEventListener('click', ()=>{
-    if(!ignition && fuelFrac <= 0) return; // dry tank: it won't fire
-    ignition = !ignition;
-    powerBtn.classList.toggle('active', ignition);
-    clusterEl.classList.toggle('lit', ignition); sideLit(ignition);
-    if(ignition){
+  // the key: a turn to on lights the cluster (the bulb check), a second turn starts it; held, or with the brake down,
+  // it starts straight away (CarService.startButton)
+  CarService.startButton({ button: powerBtn, brake: () => sDown || spaceDown || mouseBrakeDown,
+    state: () => !ignition ? 'off' : !started ? 'on' : 'running',
+    on(){
+      ignition = true; started = false;
+      clusterEl.classList.add('lit'); sideLit(true);
       engineOnTime = 0;
       initAudio();
       if(actx.state === 'suspended') actx.resume();
-      sapUntil = coolantC < 45 ? 80 : 0;
       CarService.holdMessages(3); // the bulb check first
-    } else shutDown();
-  });
+    },
+    start(){
+      if(fuelFrac <= 0) return; // dry tank: it won't fire
+      started = true; crankT = 0;
+      powerBtn.classList.add('active');
+      sapUntil = coolantC < 45 ? 80 : 0;
+    },
+    stop: () => shutDown() });
   function shutDown(){
-    ignition = false;
+    ignition = false; started = false;
     powerBtn.classList.remove('active');
     clusterEl.classList.remove('lit'); sideLit(false);
     throttleSlider.value = 0; throttleVal.textContent = '0%';
@@ -1336,9 +1344,10 @@
       }
     }
 
-    if(ignition) engineOnTime += dt;
-    const cranking = ignition && engineOnTime < CRANK_S;
-    const running = ignition && !cranking;
+    if(ignition) engineOnTime += dt; // since the ignition came on (the bulb check)
+    if(ignition && started) crankT += dt;
+    const cranking = ignition && started && crankT < CRANK_S;
+    const running = ignition && started && !cranking;
     const pedalRaw = running ? parseFloat(throttleSlider.value)/100 : 0;
     const md = MODES[mode];
     torqueReq += (Math.pow(pedalRaw, md.curve) - torqueReq)*(1 - Math.exp(-dt/md.tau));
@@ -1390,7 +1399,7 @@
     const v = speed/3.6;
     const dragA = (0.5*AIR_RHO*CDA*v*v)/MASS + (speed > 0.5 ? ROLL_DECEL : 0);
     const inGear = gearIdx >= 0 && isDrive();
-    // off the pedal near idle the clutch simply opens (no creep)
+    // off the pedal near idle the clutch opens - in 1st it slips it along at a crawl instead (the creep below)
     const decoupled = inGear && !shift && launchState !== 'go' && (launchState === 'armed' || (pedalRaw < 0.02 && gearRpm(gearIdx, speed) < idleK + 0.15));
     let a = 0;
     if(inGear && !decoupled){
@@ -1401,6 +1410,9 @@
       const wheelF = Math.max(0, engineTq)*REVERSE_RATIO*FINAL_DRIVE*DRIVELINE_EFF/WHEEL_R;
       a = Math.min(3.5, wheelF/massEff(REVERSE_RATIO*FINAL_DRIVE))*clamp01(1 - speed/30);
     }
+    // creep: in 1st (or R) off the pedal, the clutch slips it along at a walking pace until the brake holds it
+    if(running && !shift && pedalRaw < 0.02 && ((inGear && gearIdx === 0) || transmissionMode === 'R'))
+      a = Math.max(a, CREEP_A*Math.max(0, 1 - speed/(transmissionMode === 'R' ? CREEP_KMH*0.75 : CREEP_KMH)));
     if(braking) a = Math.min(a, 0) - BRAKE_DECEL*(braking/100)*CarService.brakeMul();
     if(!running && !braking) a = Math.min(a, 0);
     speed = Math.max(0, speed + (a - dragA)*3.6*dt); // no cap: drag and the rev limiter set the top speed
@@ -1425,10 +1437,10 @@
     // ---- engine speed ----
     const coupled = inGear && !decoupled && gearIdx >= 0;
     let targetRpmK;
-    if(!ignition) targetRpmK = 0;
+    if(!ignition || !started) targetRpmK = 0;
     else if(cranking) targetRpmK = 0.22;
     else {
-      const flareT = engineOnTime - CRANK_S, cold = clamp01((60 - oilC)/40);
+      const flareT = crankT - CRANK_S, cold = clamp01((60 - oilC)/40);
       const flare = flareT < FLARE_S ? (0.6 + 0.6*cold)*Math.pow(1 - flareT/FLARE_S, 2)*clamp01(flareT/0.1) : 0; // catches with a flare, bigger cold
       if(coupled) targetRpmK = gearRpm(gearIdx, speed);
       else if(transmissionMode === 'R' && pedalRaw > 0.02) targetRpmK = Math.max(idleK + torqueReq*1.8, speed*REVERSE_RATIO*FINAL_DRIVE/WHEEL_KMH_PER_KRPM);
@@ -1495,13 +1507,13 @@
 
     // ---- coolant: warms to 87C, heat-soaks toward 120C only when held on the limiter ----
     const isCoastCooling = torqueReq < 0.05 && rpmK < 3.0 && speed > 15 && coolantC > 83;
-    if(ignition){
+    if(running){
       if(rpmK >= REV_LIMIT_K - 0.05) overheatBuildup = Math.min(1, overheatBuildup + dt*0.0034);
       else overheatBuildup = Math.max(0, overheatBuildup - dt*(isCoastCooling ? 0.05 : 0.018));
       const baseTarget = isCoastCooling ? 80 : 87;
       const targetC = baseTarget + Math.max(0, (overheatBuildup - 0.18)/0.82)*(160 - baseTarget);
       const idleRate = 0.0009, loadRate = (rpmK/9)*0.0035*1.3, coastRate = isCoastCooling ? 0.007 : 0;
-      const combustionHeat = Math.min(1, engineOnTime/3);
+      const combustionHeat = Math.min(1, crankT/3);
       let approachRate;
       if(targetC <= coolantC) approachRate = idleRate + loadRate + coastRate;
       else if(coolantC < 86) approachRate = (idleRate + loadRate)*1.2*combustionHeat + coastRate;
@@ -1514,7 +1526,7 @@
     if(tune.coolant != null) coolantC = tune.coolant; // car-tune.js's cooling: heat from the fuel burned, out through the radiator, pump + thermostat
     coolantC = Math.max(15, Math.min(170, coolantC));
     updateFan();
-    updateSap(running && engineOnTime < sapUntil);
+    updateSap(running && crankT < sapUntil);
     engTempReadout.textContent = '+' + coolantC.toFixed(1) + '°C';
     oilTxt.textContent = '+' + oilC.toFixed(1) + '°C';
 
@@ -1547,7 +1559,7 @@
 
     // ---- tell-tales: bulb check at terminal 15, then what the car reports ----
     const bulb = ignition && engineOnTime < 2.2;
-    const overheating = coolantC > 112, oilLow = running && engineOnTime > 2 && oilPressureBar < 0.5;
+    const overheating = coolantC > 112, oilLow = running && crankT > 2 && oilPressureBar < 0.5;
     setWl('airbag', bulb ? 'on-red' : '');
     setWl('belt', bulb ? 'on-red' : '');
     setWl('engine', bulb || (ignition && (wearPct > 50 || overheating || CarTune.warnLight())) ? 'on-amber' : '');
@@ -1655,7 +1667,6 @@
     if(e.key === ' ' || e.code === 'Space') e.preventDefault();
     if(e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
     switch(e.key.toLowerCase()){
-      case 'i': powerBtn.click(); break;
       case 'm': if(isDrive()) setPdkMode(pdkMode === 'D' ? 'M' : 'D'); else setTransmission('DM'); break;
       case 'k': setTransmission('D'); break;
       case 'g': cycleMode(e.shiftKey ? -1 : 1); break;

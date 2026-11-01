@@ -1111,6 +1111,8 @@
   tickClock(); setInterval(tickClock, 10000);
 
   let ignition=false, braking=0, speed=0, engineOnTime=0;
+  let keyOn = false; // the ignition on with the engine off
+  const CREEP_KMH = 6, CREEP_A = 0.6; // in gear off the pedal the auto-clutch lets it idle along at a walking pace
   const wlTc = document.getElementById('wl-tc');
 
   // ---- traction control + launch control ----
@@ -1266,7 +1268,7 @@
   }
 
   function killEngine(){
-    ignition = false; stallTimer = 0;
+    ignition = false; keyOn = true; stallTimer = 0; // stalled: the key is still on
     powerBtn.classList.remove('active');
     throttleSlider.value = 0; throttleVal.textContent = '0%';
     setGear(0);
@@ -1276,22 +1278,29 @@
   const STALL_TIME = 0.35;
   let stallTimer = 0;
   const stallIndicator = document.getElementById('stall-indicator');
-  powerBtn.addEventListener('click', ()=>{
-    stallIndicator.style.display = 'none';
-    ignition=!ignition;
-    powerBtn.classList.toggle('active', ignition);
-    if(ignition){
-      engineOnTime = 0;
-      const firstTime = !actx;
+  // the key: a turn to on (the belt and handbrake lamps), a second turn starts it; held, or with the brake down, it
+  // starts straight away (CarService.startButton). After a stall the ignition is still on: one press restarts it
+  CarService.startButton({ button: powerBtn, brake: () => sDown || spaceDown || mouseBrakeDown,
+    state: () => ignition ? 'running' : keyOn ? 'on' : 'off',
+    on(){
+      keyOn = true;
       initAudio();
       if(actx.state==='suspended') actx.resume();
-      if(!firstTime) startEngineSequence();
-    }
-    if(!ignition){
+    },
+    start(){
+      stallIndicator.style.display = 'none';
+      keyOn = false; ignition = true;
+      powerBtn.classList.add('active');
+      engineOnTime = 0;
+      startEngineSequence();
+    },
+    stop(){
+      stallIndicator.style.display = 'none';
+      ignition = false; keyOn = false;
+      powerBtn.classList.remove('active');
       throttleSlider.value=0; throttleVal.textContent='0%';
       setGear(0);
-    }
-  });
+    } });
   const SND_ON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M19.5 5.5a9 9 0 0 1 0 13"/></svg>';
   const SND_OFF_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>';
   muteBtn.innerHTML = SND_ON_ICON;
@@ -1388,13 +1397,15 @@
       // model caps it at what the front tyres can take. Off the throttle the same path is engine braking.
       let a_ms2 = engineTq * GEAR_RATIO[gear-1] * FINAL_DRIVE * (engineTq > 0 ? DRIVELINE_EFF : 1) / WHEEL_R / MASS;
       if(engineTq < 0) a_ms2 *= Math.min(1, speed/8); // the clutch slips it out at a crawl - no braking to a stop
+      if(throttlePct < 0.02 && speed < CREEP_KMH) a_ms2 = Math.max(a_ms2, CREEP_A*(1 - speed/CREEP_KMH)); // idle creep
       if(a_ms2 > 0) a_ms2 = applyTraction(a_ms2, throttlePct);
       a_ms2 -= (dragDecel_ms2 + rollA);
       speed = Math.max(0, speed + a_ms2 * 3.6 * dt);
-    } else if(gear === -1 && throttlePct > 0.02 && shiftTimer <= 0){
+    } else if(gear === -1 && shiftTimer <= 0){
       const REVERSE_MAX_SPEED = 20;
       const revSpeedFrac = Math.min(1, speed/REVERSE_MAX_SPEED);
       let a_ms2 = 2.4 * throttlePct * (1 - revSpeedFrac*0.85);
+      if(throttlePct < 0.02) a_ms2 = Math.max(a_ms2, CREEP_A*Math.max(0, 1 - speed/(CREEP_KMH*0.75))); // it creeps back at idle
       a_ms2 -= (dragDecel_ms2 + rollA);
       speed = Math.max(0, Math.min(REVERSE_MAX_SPEED, speed + a_ms2 * 3.6 * dt));
     } else {
@@ -1453,7 +1464,7 @@
     const currentPowerW = ignition ? Math.max(0, engineNm)*rpmNow*Math.PI/30 : 0; // what the engine is actually making
     const currentPowerHp = currentPowerW/735.5;
     const fuelFlowLph = ignition ? (IDLE_FLOW_LPH + currentPowerHp*PETROL_BSFC_LPH_PER_HP) * (1 + (wearPct/100)*0.06) : 0;
-    CarService.tick({ dt, speed, braking, slip: Math.max(wheelspinK, launchState === 'go' ? 0.35 : 0), engineWear: wearPct, ignition, lowFuel: fuelFrac <= 0.1 }); // every frame, so the screech can't stick on with the ignition off
+    CarService.tick({ dt, speed, braking, slip: Math.max(wheelspinK, launchState === 'go' ? 0.35 : 0), engineWear: wearPct, ignition: ignition || keyOn, lowFuel: fuelFrac <= 0.1 }); // every frame, so the screech can't stick on with the ignition off
     if(speed > 0){
       odometer += speed*dt/3600;
       trip += speed*dt/3600;
@@ -1470,8 +1481,8 @@
     setLedBar(fuelLedSegs, fuelFrac, fuelFrac<=0.1 ? 'var(--red)' : null);
     odoTxt.textContent = Math.floor(odometer);
     tripTxt.textContent = trip.toFixed(1);
-    lampBelt.classList.toggle('on', ignition && engineOnTime < 6); // seatbelt reminder after start
-    lampPark.classList.toggle('on', ignition && gear === 0 && speed < 0.5); // handbrake on when parked in neutral
+    lampBelt.classList.toggle('on', keyOn || (ignition && engineOnTime < 6)); // seatbelt reminder from key-on to a little after start
+    lampPark.classList.toggle('on', (ignition || keyOn) && gear === 0 && speed < 0.5); // handbrake on when parked in neutral
     const avgL100 = trip > 0.05 ? (tripFuelUsedL/trip)*100 : 0;
     avgTxt.textContent = avgL100.toFixed(1) + ' L/100km';
     // range: the trip's own average once it's long enough to mean something, the Iriz's rated ~6.5 L/100km before that
@@ -1626,7 +1637,6 @@
     if(e.key === ' ' || e.code === 'Space') e.preventDefault();
     if(e.repeat) return;
     switch(e.key){
-      case 'i': case 'I': powerBtn.click(); break;
       case 'e': case 'E': setGear(gear + 1); break;
       case 'q': case 'Q': setGear(gear - 1); break;
       case 'w': case 'W': wDown = true; startThrottleKeyLoop(); break;

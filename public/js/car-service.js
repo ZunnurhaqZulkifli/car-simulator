@@ -7,6 +7,8 @@
 //        lowFuel = the car is into its fuel reserve (pops the Low Fuel message)
 //   CarService.holdMessages(sec)        - hold dashboard messages for up to sec (0 releases them), e.g. while
 //        the car's own start-up chime plays
+//   CarService.startButton({ button, state, on, start, stop, brake }) - the START button and I key: press = ignition on,
+//        press again = start, hold or brake + press = straight to start, press while running = off (state(): off|on|running)
 //   CarService.brakeMul()                - multiply brake decel (worn pads + tyres stop longer)
 //   CarService.oilMul()                  - multiply engine wear rate (old oil wears the engine faster)
 //   CarService.attachAudio(ctx, out, { chime, randomFaults }) - once its Web Audio graph exists. The screech
@@ -790,6 +792,38 @@
     drive.top = Math.max(drive.top, speed);
   }
   window.addEventListener('pagehide', endDrive); // registered before the car's own pagehide save, so it rides along
+
+  // the START button and I, as every car's: a press turns the ignition on, a second press starts the engine; held
+  // (~0.6 s) or pressed with the brake down it goes straight through to starting; with the engine running (or on the
+  // starter) a press switches it off. state() -> 'off' | 'on' | 'running'. Each start first fires a cancellable
+  // 'carstart' on document: car-tune.js cancels it for a seized engine or a flat battery (and plays what they do)
+  function startButton({ button, state, on, start, stop, brake = () => false, holdMs = 600 }) {
+    let down = false, timer = 0;
+    const go = () => { if (document.dispatchEvent(new Event('carstart', { cancelable: true }))) start(); };
+    const press = () => {
+      if (down) return;
+      down = true;
+      const s = state();
+      if (s === 'running') return stop();
+      if (s === 'on') return go();
+      on();
+      if (brake()) return go();
+      clearTimeout(timer);
+      timer = setTimeout(() => { if (down && state() === 'on') go(); }, holdMs);
+    };
+    const release = () => { down = false; clearTimeout(timer); };
+    const typing = (e) => e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || '');
+    addEventListener('keydown', (e) => { if ((e.key === 'i' || e.key === 'I') && !e.repeat && !typing(e)) press(); });
+    addEventListener('keyup', (e) => { if (e.key === 'i' || e.key === 'I') release(); });
+    addEventListener('blur', release);
+    if (!button) return;
+    button.style.touchAction = 'none';
+    button.addEventListener('contextmenu', (e) => e.preventDefault()); // a long press on touch shouldn't open a menu
+    button.addEventListener('pointerdown', (e) => { if (e.button) return; button.setPointerCapture?.(e.pointerId); press(); });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => button.addEventListener(t, release));
+    button.addEventListener('click', (e) => { if (e.detail === 0) { press(); release(); } button.blur(); }); // Enter / Space on the focused button
+  }
+
   window.CarService = {
     tick({ dt, speed, braking, slip = 0, engineWear = 0, ignition, lowFuel = false }) {
       const screech = screechAmount(slip);
@@ -871,6 +905,7 @@
     announce,
     selectTab: (id) => selectTab(id),
     holdMessages: (sec) => { holdFor = sec; },
+    startButton,
     setLayout, // for car-dyno.js / car-layout.js: their settings ride along in the per-car layout
     layout,
     areas,

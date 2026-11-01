@@ -427,7 +427,7 @@
     </div>
   </div>
   <div class="keys">
-    <span><kbd>I</kbd>start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
+    <span><kbd>I</kbd>ignition / start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
     <span><kbd>Q</kbd><kbd>E</kbd>shift</span><span><kbd>M</kbd>manual</span><span><kbd>K</kbd>D</span><span><kbd>G</kbd>DS</span><span><kbd>N</kbd>neutral</span><span><kbd>R</kbd>reverse</span>
     <span><kbd>1</kbd><kbd>2</kbd>map</span><span><kbd>T</kbd>DSC</span><span><kbd>W</kbd>+<kbd>S</kbd>launch</span><span><kbd>F</kbd>cruise <kbd>,</kbd><kbd>.</kbd></span><span><kbd>L</kbd><kbd>H</kbd>lights</span>
   </div>
@@ -1171,7 +1171,11 @@
 
   let ignition = false, braking = 0, speed = 0, engineOnTime = 0, powerOnTime = 0;
   // start-up: press START - the starter cranks, it catches
-  let startPhase = 'off', phaseT = 0, crankS = 0.5; // off | crank | run
+  let startPhase = 'off', phaseT = 0, crankS = 0.5; // off | on (ignition, engine off) | crank | run
+  // P until the driver first touches the brake or the throttle after starting (it has no P on the lever: that's taking
+  // it out of park); after that it stays in gear when stopped and creeps without the brake, as a converter does
+  let parked = true;
+  const CREEP_KMH = 6, CREEP_A = 0.6; // walking pace; m/s^2 of idle drag off the line
 
   // ---- traction + launch control (the 320d's): past TC_GRIP the tyres let go. DSC trims the drive back to it,
   // DTC lets a little slip through, DSC OFF spins the excess (the revs flare). Launch control: at a standstill in
@@ -1266,18 +1270,25 @@
     Object.values(wl).forEach(w => lamp(w, ''));
     setCruise(false);
   }
-  powerBtn.addEventListener('click', ()=>{
-    if(ignition){ shutDown(); return; }
-    ignition = true;
-    powerBtn.classList.add('active');
-    powerOnTime = 0; engineOnTime = 0; phaseT = 0;
-    crankS = 0.4 + clamp01((40 - coolantC)/30)*0.25;                     // a cold engine cranks a little longer
-    startPhase = 'crank';
-    initAudio();
-    if(actx.state === 'suspended') actx.resume();
-    playStarter(crankS);
-    CarService.holdMessages(12); clearTimeout(chimeTimer); chimeTimer = setTimeout(() => { if(ignition) playStartChime(); }, 1800);
-  });
+  // START / I: a press turns the ignition on (the cluster wakes, the bulb check, the chime), a second press starts it;
+  // held, or with the brake down, it starts straight away (CarService.startButton)
+  CarService.startButton({ button: powerBtn, brake: () => sDown || spaceDown || mouseBrakeDown,
+    state: () => !ignition ? 'off' : startPhase === 'on' ? 'on' : 'running',
+    on(){
+      ignition = true; startPhase = 'on';
+      powerOnTime = 0; engineOnTime = 0; phaseT = 0;
+      initAudio();
+      if(actx.state === 'suspended') actx.resume();
+      CarService.holdMessages(12); clearTimeout(chimeTimer); chimeTimer = setTimeout(() => { if(ignition) playStartChime(); }, 1800);
+    },
+    start(){
+      powerBtn.classList.add('active');
+      engineOnTime = 0; phaseT = 0; parked = true;
+      crankS = 0.4 + clamp01((40 - coolantC)/30)*0.25;                     // a cold engine cranks a little longer
+      startPhase = 'crank';
+      playStarter(crankS);
+    },
+    stop: () => shutDown() });
   const SND_ON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M19.5 5.5a9 9 0 0 1 0 13"/></svg>';
   const SND_OFF_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>';
   const muteBtn = $('mute-btn');
@@ -1432,6 +1443,7 @@
 
     const cfg = modeCfg[currentMode];
     const throttleRaw = running ? (parseFloat(throttleSlider.value)/100) : 0;
+    if(running && parked && (braking > 0 || throttleRaw > 0.02 || transmissionMode === 'R')) parked = false; // out of P
     const throttlePct = Math.pow(throttleRaw, PEDAL_EXP[currentMode] || 1.2); // mildly progressive - small inputs still pull
     updateLaunch(dt, running);
     const v_ms = speed/3.6;
@@ -1483,10 +1495,12 @@
       speed = Math.max(0, speed - 40*dt); // key off: it pulls up
     } else if(braking){
       speed = Math.max(0, speed - (BRAKE_DECEL*(braking/100)*CarService.brakeMul() + dragA + rollA + gradeA)*3.6*dt);
-    } else if(transmissionMode === 'R' && throttlePct > 0.02){
-      // reverse: a short ratio, weak next to the forward gears and capped to a low speed, tapering toward the cap
+    } else if(transmissionMode === 'R' && running){
+      // reverse: a short ratio, weak next to the forward gears and capped to a low speed, tapering toward the cap; it
+      // creeps back at idle
       const REVERSE_MAX_SPEED = 25, revSpeedFrac = Math.min(1, speed/REVERSE_MAX_SPEED);
-      const a = 3.2*throttlePct*cfg.accelFeel*wearPowerMul*(1 - revSpeedFrac*0.85) - (dragA + rollA - gradeA); // backing up a slope is going downhill
+      const creepR = throttlePct < 0.02 ? CREEP_A*Math.max(0, 1 - speed/(CREEP_KMH*0.75)) : 0;
+      const a = (3.2*throttlePct*cfg.accelFeel + creepR)*wearPowerMul*(1 - revSpeedFrac*0.85) - (dragA + rollA - gradeA); // backing up a slope is going downhill
       speed = Math.max(0, Math.min(REVERSE_MAX_SPEED, speed + a*3.6*dt));
     } else if(transmissionMode !== 'N' && transmissionMode !== 'R' && gearIdx >= 0){
       // in gear: wheel force = engine torque x gear x final drive / tyre radius (x converter multiplication off the
@@ -1494,6 +1508,7 @@
       const tcMul = gearIdx <= 1 ? 1 + 0.8*Math.max(0, 1 - speed/12) : 1;
       let a = engineTq*GEAR_RATIOS[gearIdx]*FINAL_DRIVE*(engineTq > 0 ? DRIVELINE_EFF*tcMul : 1)/WHEEL_R/MASS;
       if(engineTq < 0 && gearIdx <= 1) a *= Math.min(1, speed/(gearIdx === 0 ? 18 : 30));
+      if(throttlePct < 0.02 && speed < CREEP_KMH) a = Math.max(a, CREEP_A*(1 - speed/CREEP_KMH)); // idle creep
       if(a > 0) a = applyTraction(a);
       if(upshiftCutT > 0 && a > 0) a *= 1 - SHIFT_CUT[1]*Math.sin(Math.PI*(1 - upshiftCutT/SHIFT_CUT[0])); // drive eases off and back through the upshift
       speed = Math.max(0, speed + (a - dragA - rollA - gradeA)*3.6*dt);
@@ -1522,7 +1537,7 @@
         manualGearIdx -= 1; shiftCooldown = 0.25; // coasting in M still drops a gear for engine braking; upshifts stay yours
       }
       newGearIdx = manualGearIdx;
-    } else if(speed <= 0.4 && throttlePct < 0.02 && !braking && launchState === 'idle'){
+    } else if(parked){
       newGearIdx = -1;
     } else {
       // D: light throttle shifts early, a floored pedal holds each gear to the shift point; a coasting downshift only
@@ -1787,7 +1802,6 @@
     if(e.key === ' ' || e.code === 'Space') e.preventDefault();
     if(e.repeat) return;
     switch(e.key){
-      case 'i': case 'I': powerBtn.click(); break;
       case 'm': case 'M': setTransmission('M'); break;
       case 'k': case 'K': setTransmission('D'); break;
       case 'g': case 'G': toggleSportGate(); break;

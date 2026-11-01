@@ -1665,16 +1665,15 @@
     }
     weakCyl = Math.floor(Math.random() * E.cyl);
     blown = (w.blown || 0) >= 100;
-    // a seized engine: the start button gets a starter clunk instead; a flat 12V battery (the Servicing tab's) only
-    // clicks the solenoid (switching off still goes through)
-    document.addEventListener('click', (e) => {
+    // a seized engine: the start gets a starter clunk instead; a flat 12V battery (the Servicing tab's) only clicks
+    // the solenoid. CarService.startButton asks first with 'carstart' (switching off still goes through)
+    document.addEventListener('carstart', (e) => {
       const flat = sharedWear('battery') >= 100;
-      if (!(blown || flat) || !e.target.closest || !e.target.closest('#power-btn') || (window.CarService && CarService.ignitionOn())) return;
-      e.stopImmediatePropagation();
+      if (!(blown || flat)) return;
       e.preventDefault();
       if (blown) crank();
       else if (audioReady()) { if (actx.state === 'suspended') actx.resume(); sound('clicks'); CarService.announce('Battery flat', 'The starter only clicks - replace the 12V battery in Servicing.', '#ff9d2e'); }
-    }, true);
+    });
     // the car's own engine repair rebuilds it
     const repair = document.getElementById('repair-btn');
     if (repair) repair.addEventListener('click', () => rebuild(blown ? 'Blown engine rebuilt (repair)' : null));

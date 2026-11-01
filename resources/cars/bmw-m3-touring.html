@@ -675,7 +675,7 @@
     </div>
   </div>
   <div class="keys">
-    <span><kbd>I</kbd>start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
+    <span><kbd>I</kbd>ignition / start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
     <span><kbd>Q</kbd><kbd>E</kbd>paddles</span><span><kbd>M</kbd>D / M gate</span><span><kbd>K</kbd>D</span><span><kbd>G</kbd>Drivelogic</span><span><kbd>N</kbd>neutral</span><span><kbd>R</kbd>reverse</span>
     <span><kbd>X</kbd>engine</span><span><kbd>C</kbd>chassis</span><span><kbd>V</kbd>steering</span><span><kbd>U</kbd>brake</span><span><kbd>Z</kbd>M xDrive</span><span><kbd>Y</kbd>M Mode</span><span><kbd>T</kbd>DSC</span><span><kbd>J</kbd>MTC</span>
     <span><kbd>1</kbd><kbd>2</kbd>M1 / M2</span><span><kbd>B</kbd>bootmod3</span><span><kbd>F</kbd>cruise <kbd>,</kbd><kbd>.</kbd></span><span><kbd>L</kbd><kbd>H</kbd>lights</span>
@@ -1595,6 +1595,11 @@
 
   const savedState = window.__CAR_STATE__ || {};
   let ignition=false, braking=0, speed=0, engineOnTime=0;
+  let started = false, crankT = 0; // the ignition can be on with the engine off; crankT: time since START
+  // P until the driver first touches the brake or the throttle after starting (it has no P on the lever: that's taking
+  // it out of park); after that it stays in gear when stopped and creeps without the brake, as a converter does
+  let parked = true;
+  const CREEP_KMH = 6, CREEP_A = 0.6; // walking pace; m/s^2 of idle drag off the line
   let odometer = savedState.odometer ?? 12.0, trip=0.0, tripFuelUsedL=0.0, fuelFrac = savedState.fuelLevel ?? 1.0;
   let wearPct = savedState.wearPct ?? 0;
   let coolantC = 20, oilC = 20, overheatBuildup = 0, egrC = 23, oilPressureBar = 0;
@@ -1771,7 +1776,7 @@
     const brakeHeld = sDown || spaceDown || mouseBrakeDown;
     const available = transmissionMode === 'M' && dsc !== 'on' && gearIdx >= 0;
     launchHint = ignition && wDown && brakeHeld && speed < 1 && !available && launchState === 'idle';
-    if(!ignition || !wDown || !available) launchState = 'idle';
+    if(!ignition || !started || !wDown || !available) launchState = 'idle';
     else if(launchState === 'idle' && brakeHeld && speed < 1) launchState = 'armed';
     else if(launchState === 'armed' && !brakeHeld){ launchState = 'engage'; launchTimer = 0.12; braking = 0; }
     else if(launchState === 'engage'){ if(brakeHeld) launchState = 'idle'; else if((launchTimer -= dt) <= 0) launchState = 'go'; }
@@ -1864,22 +1869,28 @@
   }
   const speedSpring = needleSpring(40), tachSpring = needleSpring(140);
 
-  powerBtn.addEventListener('click', ()=>{
-    if(!ignition && fuelFrac <= 0) return; // dry tank: it won't fire
-    ignition = !ignition;
-    powerBtn.classList.toggle('active', ignition);
-    clusterEl.classList.toggle('on', ignition);
-    if(ignition){
-      engineOnTime = 0; wasCranking = true;
+  // START / I: a press turns the ignition on (the welcome sweep, the bulb check, the chime), a second press starts it;
+  // held, or with the brake down, it starts straight away (CarService.startButton)
+  CarService.startButton({ button: powerBtn, brake: () => sDown || spaceDown || mouseBrakeDown,
+    state: () => !ignition ? 'off' : !started ? 'on' : 'running',
+    on(){
+      ignition = true; started = false;
+      clusterEl.classList.add('on');
+      engineOnTime = 0;
       bulbCheckUntil = 1.6; // all warning lights flash briefly, classic startup bulb-check
       initAudio();
       if(actx.state==='suspended') actx.resume();
-      playStarter(CRANK_S);
       CarService.holdMessages(12); clearTimeout(chimeTimer); chimeTimer = setTimeout(() => { if(ignition) playStartChime(); }, 1800);
-    } else shutDown();
-  });
+    },
+    start(){
+      if(fuelFrac <= 0) return; // dry tank: it won't fire
+      started = true; crankT = 0; parked = true; wasCranking = true;
+      powerBtn.classList.add('active');
+      playStarter(CRANK_S);
+    },
+    stop: () => shutDown() });
   function shutDown(){
-    ignition = false;
+    ignition = false; started = false;
     powerBtn.classList.remove('active');
     clusterEl.classList.remove('on');
     throttleSlider.value = 0; throttleVal.textContent = '0%';
@@ -2031,11 +2042,13 @@
       }
     }
 
-    if(ignition) engineOnTime += dt;
-    const cranking = ignition && engineOnTime < CRANK_S;
-    const running = ignition && !cranking;
+    if(ignition) engineOnTime += dt; // since the ignition came on (the sweep, the bulb check)
+    if(ignition && started) crankT += dt;
+    const cranking = ignition && started && crankT < CRANK_S;
+    const running = ignition && started && !cranking;
     if(wasCranking && running){ wasCranking = false; playCatch(); }
     const pedalRaw = running ? parseFloat(throttleSlider.value)/100 : 0;
+    if(running && parked && (braking > 0 || pedalRaw > 0.02 || transmissionMode === 'R')) parked = false; // out of P
     // pedal -> torque request through the M Engine map, with that mode's response lag
     const reqTarget = Math.pow(pedalRaw, PEDAL_CURVE[setup.engine]);
     torqueReq += (reqTarget - torqueReq) * (1 - Math.exp(-dt/PEDAL_TAU[setup.engine]));
@@ -2102,9 +2115,11 @@
       a = wheelF/MASS;
       if(a > 0 && !braking) a = applyTraction(a);
       if(engineTq < 0 && gearIdx <= 1) a *= clamp01(speed/(gearIdx === 0 ? 18 : 30)); // an unlocked converter barely passes engine braking
+      if(pedalRaw < 0.02 && speed < CREEP_KMH) a = Math.max(a, CREEP_A*(1 - speed/CREEP_KMH)); // idle creep
     } else if(transmissionMode === 'R' && running){
       const wheelF = Math.max(0, engineTq) * REVERSE_RATIO * FINAL_DRIVE * DRIVELINE_EFF / WHEEL_R;
       a = Math.min(4, wheelF/MASS) * clamp01(1 - speed/30);
+      if(pedalRaw < 0.02) a = Math.max(a, CREEP_A*Math.max(0, 1 - speed/(CREEP_KMH*0.75))); // it creeps back at idle
     }
     if(braking) a = Math.min(a, 0) - BRAKE_DECEL*(braking/100)*CarService.brakeMul();
     if(!running && !braking) a = Math.min(a, 0);
@@ -2123,8 +2138,8 @@
           if(speed < 3 && gearIdx > 0) shiftTo(Math.max(0, gearIdx-1)); // rolling to a stop: steps down to 1st
           else if(gearIdx > 0 && gearRpm(gearIdx, speed) < 1.0 && gearRpm(gearIdx-1, speed) < REV_LIMIT_K - 0.3) shiftTo(gearIdx-1); // anti-stall
         }
-      } else if(speed <= 0.4 && pedalRaw < 0.02 && !braking && launchState === 'idle'){
-        gearIdx = -1; // parked: P
+      } else if(parked){
+        gearIdx = -1; // parked: P (until the first brake or throttle after starting)
       } else {
         const g = autoGear(dt, pedalRaw);
         if(gearIdx < 0) gearIdx = g; else if(g !== gearIdx) shiftTo(g);
@@ -2134,10 +2149,10 @@
     // ---- engine speed ----
     const coupled = gearIdx >= 0 && (transmissionMode === 'D' || transmissionMode === 'M'); // gear selection above may just have parked it
     let targetRpmK;
-    if(!ignition) targetRpmK = 0;
+    if(!ignition || !started) targetRpmK = 0;
     else if(cranking) targetRpmK = 0.25;
     else {
-      const flareT = engineOnTime - CRANK_S;
+      const flareT = crankT - CRANK_S;
       const flare = flareT < FLARE_S ? (0.75 + 0.6*clamp01((60 - oilC)/40)) * Math.pow(1 - flareT/FLARE_S, 2) * clamp01(flareT/0.1) : 0; // M start flare, bigger cold
       if(coupled) targetRpmK = gearRpm(gearIdx, speed);
       else if(transmissionMode === 'R') targetRpmK = Math.max(idleK + torqueReq*1.6, speed*REVERSE_RATIO*FINAL_DRIVE/WHEEL_KMH_PER_KRPM);
@@ -2227,14 +2242,14 @@
 
     // ---- coolant: warms to 92C, heat-soaks toward 120C only when held on the limiter ----
     const isCoastCooling = torqueReq < 0.05 && rpmK < 3.0 && speed > 15 && coolantC > 88;
-    if(ignition){
+    if(running){
       if(rpmK >= REDLINE - 0.05) overheatBuildup = Math.min(1, overheatBuildup + dt*0.0034);
       else overheatBuildup = Math.max(0, overheatBuildup - dt*(isCoastCooling ? 0.05 : 0.018));
       const baseTarget = isCoastCooling ? 80 : 92;
       const soak = Math.max(0, (overheatBuildup - 0.18) / 0.82);
       const targetC = baseTarget + soak*(160-baseTarget);
       const idleRate = 0.0009, loadRate = (rpmK/7.2)*0.0035*1.3, coastRate = isCoastCooling ? 0.007 : 0;
-      const combustionHeat = Math.min(1, engineOnTime / 3);
+      const combustionHeat = Math.min(1, crankT / 3);
       let approachRate;
       if(targetC <= coolantC) approachRate = idleRate + loadRate + coastRate;
       else if(coolantC < 91) approachRate = (idleRate + loadRate) * 1.2 * combustionHeat + coastRate;
@@ -2282,12 +2297,12 @@
     // ---- warning lights ----
     if(ignition && engineOnTime < bulbCheckUntil) mainLights.forEach(w=>w.className='wl on-red');
     else if(ignition){
-      wlBattery.className = cranking ? 'wl on-red' : 'wl';
+      wlBattery.className = !running ? 'wl on-red' : 'wl';
       wlBelt.className = 'wl';
       const overheating = coolantC > 112;
       wlEngine.className = (overheating || wearPct > 50 || CarTune.warnLight()) ? 'wl on-red' : 'wl';
       wlTemp.className = overheating ? 'wl on-red blink' : (coolantC < CarTune.tstat() - 5 ? 'wl on-blue' : 'wl');
-      wlOil.className = (engineOnTime > 2 && oilPressureBar < 0.5) ? 'wl on-red blink' : 'wl';
+      wlOil.className = !running ? 'wl on-red' : (crankT > 2 && oilPressureBar < 0.5) ? 'wl on-red blink' : 'wl';
       wlAbs.className = (braking > 60 && speed > 5) ? 'wl on-amber blink' : 'wl';
       wlTc.className = tcIntervening ? 'wl on-amber blink' : (dsc !== 'on' ? 'wl on-amber' : 'wl'); // solid = MDM / off, flicker = cutting in
     }
@@ -2400,7 +2415,6 @@
     if(e.key === ' ' || e.code === 'Space') e.preventDefault();
     if(e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
     switch(e.key.toLowerCase()){
-      case 'i': powerBtn.click(); break;
       case 'm': if(transmissionMode === 'D' || transmissionMode === 'M') setTransmission(transmissionMode === 'M' ? 'D' : 'M'); break;
       case 'k': setTransmission('D'); break;
       case 'g': setDrivelogic(drivelogic % 3 + 1); break;

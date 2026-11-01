@@ -456,7 +456,7 @@
     </div>
   </div>
   <div class="keys">
-    <span><kbd>I</kbd>start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
+    <span><kbd>I</kbd>ignition / start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
     <span><kbd>Q</kbd><kbd>E</kbd>shift</span><span><kbd>M</kbd>manual</span><span><kbd>K</kbd>D</span><span><kbd>G</kbd>DS</span><span><kbd>N</kbd>neutral</span><span><kbd>R</kbd>reverse</span>
     <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd>map</span><span><kbd>Z</kbd>xDrive</span><span><kbd>T</kbd>DSC</span><span><kbd>F</kbd>cruise <kbd>,</kbd><kbd>.</kbd></span><span><kbd>L</kbd><kbd>H</kbd>lights</span>
   </div>
@@ -1208,7 +1208,11 @@
 
   let ignition = false, braking = 0, speed = 0, engineOnTime = 0, powerOnTime = 0;
   // start-up: press START - the plugs pre-glow if the engine is cold, the starter cranks, it catches
-  let startPhase = 'off', phaseT = 0, glowS = 0, crankS = 0.5; // off | glow | crank | run
+  let startPhase = 'off', phaseT = 0, glowS = 0, crankS = 0.5; // off | glow | on (ignition, engine off) | crank | run
+  // P until the driver first touches the brake or the throttle after starting (it has no P on the lever: that's taking
+  // it out of park); after that it stays in gear when stopped and creeps without the brake, as a converter does
+  let parked = true;
+  const CREEP_KMH = 6, CREEP_A = 0.6; // walking pace; m/s^2 of idle drag off the line
 
   // ---- xDrive: an electronically controlled multi-plate clutch in the transfer case (VTG) splits drive between
   // the axles. Each axle can put down mu*g x its share of the weight (which moves rearward under acceleration);
@@ -1321,19 +1325,31 @@
     Object.values(wl).forEach(w => lamp(w, ''));
     setCruise(false);
   }
-  powerBtn.addEventListener('click', ()=>{
-    if(ignition){ shutDown(); return; }
-    ignition = true;
-    powerBtn.classList.add('active');
-    powerOnTime = 0; engineOnTime = 0; phaseT = 0;
-    glowS = coolantC < 50 ? 0.4 + (50 - coolantC)/35*0.8 : 0;          // ~1.25 s pre-glow at 13C, none once warm
-    crankS = 0.45 + clamp01((40 - coolantC)/30)*0.45;                    // a cold diesel cranks a little longer
-    startPhase = glowS > 0 ? 'glow' : 'crank';
-    initAudio();
-    if(actx.state === 'suspended') actx.resume();
-    if(startPhase === 'crank') playStarter(crankS);
-    CarService.holdMessages(12); clearTimeout(chimeTimer); chimeTimer = setTimeout(() => { if(ignition) playStartChime(); }, 1800);
-  });
+  // START / I: a press turns the ignition on - the glow plugs pre-heat a cold engine (the glow lamp) and the chime plays -
+  // a second press starts it, once the glow is done if it isn't yet; held, or with the brake down, it starts straight
+  // through (CarService.startButton)
+  let crankPending = false;
+  CarService.startButton({ button: powerBtn, brake: () => sDown || spaceDown || mouseBrakeDown,
+    state: () => !ignition ? 'off' : startPhase === 'on' || (startPhase === 'glow' && !crankPending) ? 'on' : 'running',
+    on(){
+      ignition = true;
+      powerOnTime = 0; engineOnTime = 0; phaseT = 0; crankPending = false;
+      glowS = coolantC < 50 ? 0.4 + (50 - coolantC)/35*0.8 : 0;          // ~1.25 s pre-glow at 13C, none once warm
+      startPhase = glowS > 0 ? 'glow' : 'on';
+      initAudio();
+      if(actx.state === 'suspended') actx.resume();
+      CarService.holdMessages(12); clearTimeout(chimeTimer); chimeTimer = setTimeout(() => { if(ignition) playStartChime(); }, 1800);
+    },
+    start(){
+      powerBtn.classList.add('active');
+      parked = true;
+      crankS = 0.45 + clamp01((40 - coolantC)/30)*0.45;                    // a cold diesel cranks a little longer
+      if(startPhase === 'glow'){ crankPending = true; return; }            // it cranks as the glow lamp goes out
+      engineOnTime = 0; phaseT = 0;
+      startPhase = 'crank';
+      playStarter(crankS);
+    },
+    stop: () => shutDown() });
   const SND_ON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M19.5 5.5a9 9 0 0 1 0 13"/></svg>';
   const SND_OFF_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M23 9l-6 6M17 9l6 6"/></svg>';
   const muteBtn = $('mute-btn');
@@ -1502,7 +1518,7 @@
     // ---- start sequence: pre-glow, crank, catch ----
     if(ignition){
       powerOnTime += dt;
-      if(startPhase === 'glow' && (phaseT += dt) >= glowS){ startPhase = 'crank'; phaseT = 0; playStarter(crankS); }
+      if(startPhase === 'glow' && (phaseT += dt) >= glowS){ phaseT = 0; if(crankPending){ crankPending = false; startPhase = 'crank'; playStarter(crankS); } else startPhase = 'on'; }
       else if(startPhase === 'crank' && (phaseT += dt) >= crankS){ startPhase = 'run'; phaseT = 0; engineOnTime = 0; }
     }
     const running = ignition && startPhase === 'run', cranking = ignition && startPhase === 'crank';
@@ -1523,6 +1539,7 @@
 
     const cfg = modeCfg[currentMode];
     const throttleRaw = running ? (parseFloat(throttleSlider.value)/100) : 0;
+    if(running && parked && (braking > 0 || throttleRaw > 0.02 || transmissionMode === 'R')) parked = false; // out of P
     const throttlePct = Math.pow(throttleRaw, (PEDAL_EXP[currentMode] || 1.2)*(xdrive === 'traction' ? 1.25 : 1));
     const v_ms = speed/3.6;
     const cold = clamp01((70 - coolantC)/55);
@@ -1572,9 +1589,10 @@
       if(bd > limit && speed > 5){ bd = limit*0.97; absActive = true; }
       speed = Math.max(0, speed - (bd + dragA + rollA + gradeA)*3.6*dt);
       xdriveTraction(0, dt);
-    } else if(transmissionMode === 'R' && throttlePct > 0.02){
+    } else if(transmissionMode === 'R' && running){
       const REVERSE_MAX_SPEED = 25, revSpeedFrac = Math.min(1, speed/REVERSE_MAX_SPEED);
-      let a = xdriveTraction(3.2*throttlePct*wearPowerMul*(1 - revSpeedFrac*0.85), dt);
+      const creepR = throttlePct < 0.02 ? CREEP_A*Math.max(0, 1 - speed/(CREEP_KMH*0.75)) : 0; // it creeps back at idle
+      let a = xdriveTraction((3.2*throttlePct + creepR)*wearPowerMul*(1 - revSpeedFrac*0.85), dt);
       a -= dragA + rollA - gradeA; // backing up a slope is going downhill
       speed = Math.max(0, Math.min(REVERSE_MAX_SPEED, speed + a*3.6*dt));
     } else if(transmissionMode !== 'N' && transmissionMode !== 'R' && gearIdx >= 0){
@@ -1582,6 +1600,7 @@
       const tcMul = gearIdx <= 1 ? 1 + 0.9*Math.max(0, 1 - speed/14) : 1;
       let a = engineTq*GEAR_RATIOS[gearIdx]*FINAL_DRIVE*(engineTq > 0 ? DRIVELINE_EFF*tcMul : 1)/WHEEL_R/MASS;
       if(engineTq < 0 && gearIdx <= 1) a *= Math.min(1, speed/(gearIdx === 0 ? 18 : 30));
+      if(throttlePct < 0.02 && speed < CREEP_KMH) a = Math.max(a, CREEP_A*(1 - speed/CREEP_KMH)); // idle creep
       a = xdriveTraction(a, dt);
       driveA = Math.max(0, a);
       if(upshiftCutT > 0 && a > 0) a *= 1 - SHIFT_CUT[1]*Math.sin(Math.PI*(1 - upshiftCutT/SHIFT_CUT[0]));
@@ -1611,7 +1630,7 @@
         manualGearIdx -= 1; shiftCooldown = 0.3; // coasting in M still drops a gear for engine braking; upshifts stay yours
       }
       newGearIdx = manualGearIdx;
-    } else if(speed <= 0.4 && throttlePct < 0.02 && !braking){
+    } else if(parked){
       newGearIdx = -1;
     } else {
       let g = gearIdx===-1 ? pickGearForSpeed(speed) : gearIdx;
@@ -1635,7 +1654,7 @@
 
     // ---- rpm ----
     let targetRpmK;
-    if(!ignition || startPhase === 'glow') targetRpmK = 0;
+    if(!ignition || startPhase === 'glow' || startPhase === 'on') targetRpmK = 0;
     else if(cranking) targetRpmK = 0.21 + 0.03*Math.sin(phaseT*52); // starter labouring through each compression
     else if(transmissionMode === 'N' || gearIdx === -1) targetRpmK = idleK + throttlePct*(REV_LIMIT_K + 0.25 - idleK); // asks for more than the cut allows
     else {
@@ -1887,7 +1906,6 @@
     if(e.key === ' ' || e.code === 'Space') e.preventDefault();
     if(e.repeat) return;
     switch(e.key){
-      case 'i': case 'I': powerBtn.click(); break;
       case 'm': case 'M': setTransmission('M'); break;
       case 'k': case 'K': setTransmission('D'); break;
       case 'g': case 'G': toggleSportGate(); break;

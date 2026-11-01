@@ -561,7 +561,7 @@
     </div>
   </div>
   <div class="keys">
-    <span><kbd>I</kbd>start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
+    <span><kbd>I</kbd>ignition / start</span><span><kbd>W</kbd>accelerate</span><span><kbd>S</kbd>/<kbd>Space</kbd>brake</span>
     <span><kbd>Q</kbd><kbd>E</kbd>shift</span><span><kbd>K</kbd>D</span><span><kbd>G</kbd>S gearbox</span><span><kbd>M</kbd>manual</span><span><kbd>N</kbd>neutral</span><span><kbd>R</kbd>reverse</span>
     <span><kbd>X</kbd>eDrive mode</span><span><kbd>Z</kbd>xDrive</span><span><kbd>C</kbd>plug in</span><span><kbd>F</kbd>cruise <kbd>,</kbd><kbd>.</kbd></span>
     <span><kbd>L</kbd><kbd>H</kbd>lights</span><span>launch: hold <kbd>W</kbd>+<kbd>S</kbd>, release <kbd>S</kbd></span>
@@ -1937,7 +1937,12 @@
   const ledRpmTxt = document.getElementById('led-rpm-txt');
 
   const savedState = window.__CAR_STATE__ || {};
-  let ignition=false, braking=0, speed=0, engineOnTime=0;
+  let ignition=false, braking=0, speed=0, engineOnTime=0; // ignition: READY
+  let keyOn = false, keyT = 0; // keyOn: the ignition on, not READY; keyT: since the ignition came on (the bulb check)
+  // P until the driver first touches the brake or the throttle after READY (it has no P on the lever: that's taking
+  // it out of park); after that it stays in gear when stopped and the motor creeps it along without the brake
+  let parked = true;
+  const CREEP_KMH = 6, CREEP_A = 0.6; // walking pace; m/s^2 off the line
 
   // ---- traction control + launch control ----
   // TC: on a hard launch, drive demanded past the tyres' grip limit is cut back (TC light flickers);
@@ -2250,26 +2255,35 @@
     }
   }
   function allWarningLights(){ return [wlEngine,wlBattery,wlOil,wlTemp,wlAbs,wlBelt,wlTc,wlHv,wlCharge]; }
-  powerBtn.addEventListener('click', ()=>{
-    ignition=!ignition;
-    powerBtn.classList.toggle('active', ignition);
-    clusterEl.classList.toggle('on', ignition);
-    if(ignition){
-      engineOnTime = 0;
+  // START / I: a press turns the ignition on (the cluster wakes, the bulb check), a second press is READY - the chime
+  // comes with READY here, not the ignition, as the e-motor drives off at once; held, or with the brake down, it goes
+  // straight to READY (CarService.startButton)
+  CarService.startButton({ button: powerBtn, brake: () => sDown || spaceDown || mouseBrakeDown,
+    state: () => ignition ? 'running' : keyOn ? 'on' : 'off',
+    on(){
+      keyOn = true; keyT = 0;
+      clusterEl.classList.add('on');
       bulbCheckUntil = 1.6; // all warning lights flash briefly, classic startup bulb-check
       initAudio();
       if(actx.state==='suspended') actx.resume();
-      CarService.holdMessages(12); clearTimeout(chimeTimer); chimeTimer = setTimeout(() => { if(ignition) playStartChime(); }, 1800); // chime a beat after power-up, like the real car
+    },
+    start(){
+      keyOn = false; ignition = true; parked = true;
+      powerBtn.classList.add('active');
+      engineOnTime = 0;
+      CarService.holdMessages(12); clearTimeout(chimeTimer); chimeTimer = setTimeout(() => { if(ignition) playStartChime(); }, 1800); // chime a beat after READY, like the real car
       setCharging(false);
-    } else {
+    },
+    stop(){
+      ignition = false; keyOn = false;
+      powerBtn.classList.remove('active');
+      clusterEl.classList.remove('on');
       setEngine(false);
       throttleSlider.value=0; throttleVal.textContent='0%';
       setTransmission('D'); manualGearIdx=0;
       allWarningLights().forEach(w=>w.className='wl');
       setCruise(false);
-    }
-    powerBtn.blur();
-  });
+    } });
   muteBtn.addEventListener('click', ()=>{
     soundOn = !soundOn;
     muteBtn.classList.toggle('muted', !soundOn);
@@ -2459,11 +2473,13 @@
 
     const cfg = modeCfg[currentMode];
     const throttleRaw = ignition ? (parseInt(throttleSlider.value,10)/100) : 0;
+    if(ignition && parked && (braking || throttleRaw > 0.02 || transmissionMode === 'R')) parked = false; // out of P
     const throttlePct = Math.pow(throttleRaw, PEDAL_EXP[currentMode] || 1.2); // mildly progressive - small inputs still pull
     updateLaunch(dt);
     updateLiftCrackle(throttlePct, dt);
     let v_ms = speed/3.6;
     if(ignition) engineOnTime += dt;
+    if(ignition || keyOn) keyT += dt;
     const sysW = SYS_PS*735.5;
 
     // ================= HYBRID CONTROLLER =================
@@ -2573,11 +2589,12 @@
       // the first part of the pedal is the motor recuperating; friction brakes blend in past ~2.5 m/s^2
       if(canRegen) regenDecel = Math.min(pedalDecel, 2.5);
       speed = Math.max(0, speed - (pedalDecel + dragDecel_ms2 + rollA)*3.6*dt);
-    } else if(transmissionMode === 'R' && throttlePct > 0.02){
+    } else if(transmissionMode === 'R' && ignition){
       // reverse is driven by the e-motor alone, capped to a low top speed
       const REVERSE_MAX_SPEED = 30;
       const revSpeedFrac = Math.min(1, speed/REVERSE_MAX_SPEED);
       let a_ms2 = 3.2 * throttlePct * (1 - revSpeedFrac*0.85);
+      if(throttlePct < 0.02) a_ms2 = Math.max(a_ms2, CREEP_A*Math.max(0, 1 - speed/(CREEP_KMH*0.75))); // it creeps back off the pedal
       deliveredW = Math.min(ELEC_W, MASS*a_ms2*Math.max(v_ms,1));
       a_ms2 -= (dragDecel_ms2 + rollA);
       speed = Math.max(0, Math.min(REVERSE_MAX_SPEED, speed + a_ms2 * 3.6 * dt));
@@ -2595,9 +2612,10 @@
       // coasting: off the pedal the motor recuperates (BMW's coasting regen) - the engine, if awake,
       // is mostly decoupled so it adds only a little drag. Neutral is pure rolling/aero drag.
       const inGearCoasting = transmissionMode !== 'N' && gearIdx >= 0;
-      if(canRegen && inGearCoasting) regenDecel = 0.7;
+      if(canRegen && inGearCoasting && speed > CREEP_KMH) regenDecel = 0.7;
       const engineBrakeDecel = (inGearCoasting && engineRunning) ? gearRpmNow*0.12 : 0;
-      speed = Math.max(0, speed - (rollA + dragDecel_ms2 + engineBrakeDecel + regenDecel)*3.6*dt);
+      const creepA = inGearCoasting && speed < CREEP_KMH ? CREEP_A*(1 - speed/CREEP_KMH) : 0; // the motor creeps it along at a walking pace
+      speed = Math.max(0, speed + (creepA - rollA - dragDecel_ms2 - engineBrakeDecel - regenDecel)*3.6*dt);
     }
     speed = Math.max(0, Math.min(speed, 400)); // sanity ceiling only - drag sets the real top speed
     if(window.crashSpeed != null){ speed = Math.min(speed, window.crashSpeed); window.crashSpeed = null; } // a hit on the driving page (drive.html), km/h
@@ -2650,7 +2668,7 @@
         }
       }
       newGearIdx = manualGearIdx;
-    } else if(speed <= 0.4 && throttlePct < 0.02 && !braking){
+    } else if(parked){
       newGearIdx = -1;
     } else {
       let g = gearIdx===-1 ? pickGearForSpeed(speed) : gearIdx;
@@ -2769,7 +2787,7 @@
     if(!engineRunning){ consumptionL100 = 0; }
     else if(speed < 2){ consumptionL100 = throttlePct > 0.05 ? CONSUMPTION_MAX : Math.min(CONSUMPTION_MAX, fuelFlowLph*0.4); }
     else { consumptionL100 = Math.min(CONSUMPTION_MAX, (fuelFlowLph/speed)*100); }
-    CarService.tick({ dt, speed, braking, slip: Math.max(wheelspinK, launchState === 'go' ? 0.35 : 0), engineWear: wearPct, ignition, lowFuel: fuelFrac*TANK_SIZE_L <= RESERVE_L }); // every frame, so the screech can't stick on with the ignition off
+    CarService.tick({ dt, speed, braking, slip: Math.max(wheelspinK, launchState === 'go' ? 0.35 : 0), engineWear: wearPct, ignition: ignition || keyOn, lowFuel: fuelFrac*TANK_SIZE_L <= RESERVE_L }); // every frame, so the screech can't stick on with the ignition off
     if(ignition){
       odometer += speed*dt/3600;
       trip += speed*dt/3600;
@@ -2883,10 +2901,13 @@
       gearLabel: transmissionMode==='R' || transmissionMode==='N' ? transmissionMode : `${transmissionMode==='M' ? 'M' : (transmissionMode==='S' ? 'S' : 'D')}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
 
     // ---- warning lights: startup bulb-check, then live conditions ----
-    if(!ignition){
+    if(!ignition && !keyOn){
       // all off (handled on ignition-off click)
-    } else if(engineOnTime < bulbCheckUntil){
+    } else if(keyT < bulbCheckUntil){
       allWarningLights().forEach(w=>w.className='wl on-red');
+    } else if(!ignition){
+      allWarningLights().forEach(w=>w.className='wl');
+      wlBattery.className = 'wl on-red'; // not READY: the 12 V side isn't being charged
     } else {
       wlBattery.className = 'wl';
       wlBelt.className = 'wl';
@@ -2898,10 +2919,10 @@
       wlTc.className = !tcOn ? 'wl on-amber' : (tcIntervening ? 'wl on-amber blink' : 'wl');
       wlHv.className = soc <= SOC_MIN ? 'wl on-amber' : 'wl';
     }
-    if(!ignition || engineOnTime >= bulbCheckUntil) wlCharge.className = charging ? 'wl on-green blink' : 'wl';
+    if((!ignition && !keyOn) || keyT >= bulbCheckUntil) wlCharge.className = charging ? 'wl on-green blink' : 'wl';
     wlFuel.className = (ignition && rangeKm <= 0) ? 'wl on-amber' : 'wl'; // into the reserve
-    wlLowBeam.className = (ignition && lightsOn) ? 'wl on-green' : 'wl';
-    wlHighBeam.className = (ignition && highBeamOn) ? 'wl on-blue' : 'wl';
+    wlLowBeam.className = ((ignition || keyOn) && lightsOn) ? 'wl on-green' : 'wl';
+    wlHighBeam.className = ((ignition || keyOn) && highBeamOn) ? 'wl on-blue' : 'wl';
 
     // ---- info field status line ----
     let status = '', statusCol = '#9aa0a8';
@@ -3052,9 +3073,6 @@
     if(e.key === ' ' || e.code === 'Space') e.preventDefault(); // stop page scroll / button re-click
     if(e.repeat) return;
     switch(e.key){
-      case 'i': case 'I':
-        powerBtn.click();
-        break;
       case 'm': case 'M':
         setTransmission('M');
         break;
