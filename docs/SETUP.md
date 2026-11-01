@@ -77,12 +77,12 @@ php artisan storage:link   # public/storage -> storage/app/public, so the car fi
 php artisan db:seed        # BMW 550D, Proton Iriz, BMW 320D, M140i xDrive, 530e xDrive
 ```
 
-Then register the other seven, all of them drivable in 3D. This copies each page into storage only if it isn't
+Then register the other nine, all of them drivable in 3D. This copies each page into storage only if it isn't
 there yet, and adds the car only if it's missing, so it's safe to run again:
 
 ```sh
 php artisan tinker --execute '
-$cars = ["bmw-x1-xdrive20d" => "BMW X1 xDrive20d", "bmw-m3-touring" => "BMW M3 Touring", "bmw-m5-cs" => "BMW M5 CS", "bmw-550d-mk2" => "BMW M550d xDrive", "bmw-m5-e60" => "BMW M5 E60", "porsche-911-gt3-rs" => "Porsche 911 GT3 RS", "bmw-335i-e90" => "BMW 335i"];
+$cars = ["bmw-x1-xdrive20d" => "BMW X1 xDrive20d", "bmw-m3-touring" => "BMW M3 Touring", "bmw-m5-cs" => "BMW M5 CS", "bmw-550d-mk2" => "BMW M550d xDrive", "bmw-m5-e60" => "BMW M5 E60", "porsche-911-gt3-rs" => "Porsche 911 GT3 RS", "bmw-335i-e90" => "BMW 335i", "honda-nsx-r" => "Honda NSX-R", "nissan-gt-r-nismo" => "Nissan GT-R NISMO"];
 foreach ($cars as $slug => $name) {
     $path = "cars/$slug.html";
     Storage::disk("public")->exists($path) || Storage::disk("public")->put($path, file_get_contents(resource_path($path)));
@@ -118,26 +118,27 @@ While you work on the garage's styles, `composer dev` runs Vite and the other de
 1. Open **http://sim-app.test**. That's the garage.
 2. Press **Drive** on a car. The drive page opens outside your home garage.
 3. Press any key or click once. Browsers only start audio after a gesture, and the engine sound is synthesised live.
-4. Press `I` to start the engine, `W` to go, `S` to brake, `A` / `D` to steer.
+4. Press `I` twice to start the engine (once is ignition on; hold it, or hold `S` and press it, to start in one go), `W` to go, `S` to brake, `A` / `D` to steer. In gear the car creeps forward until you brake.
 
 ### Keys on the drive page
 
 | Key | Does |
 |---|---|
-| `I` | engine start / stop |
+| `I` | ignition on; again (or hold, or with the brake) to start; again to stop |
 | `W` / `S` | throttle / brake |
 | `A` / `D` | steer |
 | `Space` | handbrake |
 | `R` / `N` | reverse / neutral (each car adds its own gearbox keys: D, S / DS, manual, paddles `Q` / `E`) |
 | `←` / `→` | turn signal (flashes 3 times) |
-| `L` / `H` | lights / high beam |
+| `L` / `H` | lights / high beam (flash it close behind a slower car on a multi-lane road and it moves over) |
 | `C` | in-car / chase view (two-finger swipe on the trackpad to look around; `W` swings it back) |
 | `F`, `,` / `.` | cruise control, set speed −5 / +5 km/h |
 | `↑` / `↓`, `O` / `P` | throttle limit, brake limit |
 | `Tab` | the car menu: the whole car page over the road (tuning, dyno, live data, diagnostics) |
 | `Esc` | close what's open |
 | `` ` `` | teleport (or click the mini map) |
-| `/` | Nordschleife lap timer |
+| `'` | overview map: every road and track by kind with a legend; scroll or pinch to zoom, drag to move |
+| `/` | Nordschleife lap timer and leaderboard |
 | `\` | time & weather (or click the clock in the HUD) |
 | `;` | drift mode |
 
@@ -163,12 +164,18 @@ Each car's own keys (xDrive, DSC, M modes, maps, Drivelogic…) are listed on it
   - Let go of the steering and the countersteer assist holds the drift. Steer into the turn for more angle, against
     it for less. Lift off to straighten up.
   - The 320d is the drift car: in rain and snow it gets the road's real, slippery friction.
+- **Handling** (car menu, `Tab` → Handling, or the mechanic / pit garage): fit chassis parts and set the car up -
+  pressures, camber, toe, springs, bars, dampers, ride height, aero, brake bias, the diff, the steering rack. Try the
+  Track day preset with **Fit parts + apply** and feel the car corner harder and answer quicker; the Drift preset
+  hangs the tail out even with drift mode off. The Analysis view charts grip against speed and the body's roll.
+- **Speed:** the view widens, the camera drops, the short lane dashes flick past and the wind builds - try the
+  autobahn flat out.
 - **Track day:** the lap timer (`/`) on the Nordschleife. The telemetry panel shows g-forces, pedals, temperatures
   and worn parts. The car menu's Dyno and Performance tabs run pulls and timed runs on rollers.
 
 URL options for `public/drive.html`:
 - `?car={slug}`
-- `&at=pits`, `&at=ring` or `&at=bay<n>` to start in a pit garage, at the Nordschleife or in a car park bay
+- `&at=pits`, `&at=ring`, `&at=bay<n>` or `&at=home2` to start in a pit garage, at the Nordschleife, in a car park bay or at the Westhaven home
 - `&hour=0-3&season=…&sky=…` to set the time and weather
 - `&test_drive=1` to drive without saving
 
@@ -279,6 +286,7 @@ changed those in System Settings › Keyboard › Keyboard Shortcuts › Mission
 | Pad: *Open the drive page on the Mac* | The relay is up, but no drive page is open at `http://sim-app.test` |
 | Pad: *Tilt steering is off* | Open the https link (not http), and allow Motion & Orientation for Safari in Settings |
 | Mouse: *Needs Accessibility* or nothing moves | Step 8.2 for the right process, then Turn on again; the relay's log shows each step (`pad mouse: …`) |
+| *Couldn't save this car* after updating | Run `php artisan migrate` (new columns, such as `handling`) and reload the car |
 | Self-check failures | The drive page and the shared scripts check themselves on load; failures show in the browser's console |
 
 Run the test suite with `composer test`.
