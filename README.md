@@ -23,8 +23,9 @@ and a memory.
 ## 🔎 What is this?
 
 Pick a car in the **garage** and press **Drive**. It starts outside your home garage in a 3D world with an autobahn,
-mountain roads, a village, three towns, an airfield, a multi-storey car park, a racetrack and the Nordschleife, by day
-or night, in any season and any weather. The in-car view shows the car's own live instrument cluster in the dash.
+mountain roads, a village, three towns, an airfield, a multi-storey car park, a racetrack and the Nordschleife, a drift
+park, a drag strip, a mall, and Westhaven - a second city with a second home 50 km down the west road - with traffic on
+every road, by day or night, in any season and any weather. The in-car view shows the car's own live instrument cluster in the dash.
 Press **Tab** and the whole car page opens over the road: every control, live data, the tuning maps, the dyno and the
 diagnostics, while the car keeps rolling. Your phone can be the steering wheel, and even the Mac's trackpad.
 
@@ -46,11 +47,13 @@ are saved per car, and every drive, refuel, service and tune is logged so you ca
 | BMW M140i xDrive | B58 3.0 turbo I6 | ZF 8HP | ✅ | xDrive switchable to 2WD, paddles |
 | BMW 530e xDrive | B48 2.0 turbo I4 + motor | ZF 8HP eDrive | ✅ | plug-in hybrid: eDrive modes, plug in to charge (drives on the M550d's body) |
 | BMW M550d xDrive (550d Mk2) | B57 3.0 quad-turbo diesel I6 | ZF 8HP | ✅ | bootmod3 maps, big-turbo builds |
-| BMW M3 Competition Touring | S58 3.0 twin-turbo I6 | ZF 8HP | ✅ | engine / chassis / steering / brake set-up, M xDrive, M Mode, MTC, M1/M2 |
-| BMW M5 CS | S63 4.4 twin-turbo V8 | ZF 8HP | ✅ | as the M3, plus M Sound and storable M1/M2 |
-| BMW M5 E60 | S85 5.0 V10 | SMG III | ✅ | Drivelogic, BMW's launch-control procedure, POWER / EDC / MDrive, 9,500 rpm cut |
+| BMW M3 Competition Touring | S58 3.0 twin-turbo I6 | ZF 8HP | ✅ | engine / chassis / steering / brake set-up, M xDrive, M Mode, MTC, M1/M2; corners and leans like the GT-R (its grip, springs and bars, M Chassis Sport from the start) |
+| BMW M5 CS | S63 4.4 twin-turbo V8 | ZF 8HP | ✅ | as the M3 (GT-R grip and agility too), plus M Sound and storable M1/M2 |
+| BMW M5 E60 | S85 5.0 V10 | SMG III | ✅ | Drivelogic, BMW's launch-control procedure, POWER / EDC / MDrive, 9,500 rpm cut, Map 1 / 2 (`B`) on the full tune: parts, ECU maps, a supercharger kit |
 | Porsche 911 GT3 RS | 4.0 flat-six (no turbo) | PDK | ✅ | 9,000 rpm, PSM, twin-turbo kits up to ~960 hp; drives lime with a black bonnet and white wheels, the grippiest car in the garage |
 | BMW 335i (E90) | N55 3.0 turbo I6 | ZF 6HP | ✅ | rear-drive N55 on the 320d's physics loop; drives Titanium Silver on black 18" double-spokes with the M Sport front |
+| Honda NSX-R (NA1) | C30A 3.0 VTEC V6 (no turbo) | 5-speed manual | ✅ | VTEC from 5,800 rpm you can hear and feel (it needs load, a warm engine and road speed, so not in neutral), 8,000 rpm red line, mph cluster from a US NA1, supercharger kit; drives the stock right-hand-drive 1992 car in metallic Formula Red on its own white wheels, red Recaros inside |
+| Nissan GT-R NISMO (R35, 2018) | VR38DETT 3.8 twin-turbo V6 | GR6 dual-clutch | ✅ | mph cluster from a US NISMO with the night bulb-check lamps, the centre screen's meter page for live data; drives the N-Attack Package car in Nismo white on its black wheels (right-hand drive, the SUSP switch firms its roll); ATTESA E-TS all-wheel drive with a live front-torque split, R / Normal / Save TRANS, SUSP and VDC switches, R-mode launch, two-step start (ignition, then brake + START) with a needle sweep; twin-turbo whistle and bypass whoosh, the GR6's idle rattle, dual-clutch shift bark and rev-matched blips |
 | BMW 550D | twin-turbo diesel I6 | ZF 8HP | — | the original cluster |
 | Proton Iriz | petrol I4 | CVT | — | hatchback cluster |
 
@@ -64,11 +67,15 @@ Clusters are matched to reference photos of the real cars, down to the numeral f
 
 | | |
 |---|---|
-| 🛣️ **Autobahn** | A ~17 km top-speed oval, 3 lanes each way, U-turn flyovers, an on-ramp and fuel stations |
+| 🛣️ **Autobahn** | A ~17 km top-speed oval, 3 lanes each way, U-turn flyovers, an on-ramp and fuel stations. Every junction keeps left: where the valley road and the west road would meet it head-on, a crossover flyover lifts them over the near carriageway into the far one's left lane (the old wrong-way lanes are barriered off), and the west link joins by a left-turn slip. The west road meets it at a full multi-level interchange: a slip out of the southbound carriageway, a slip into it, a crossover onto the northbound one, and a flyover from the northbound carriageway over both onto the west road |
 | ⛰️ **Mountain loop** | ~15 km of switchbacks up to a ~320 m summit lay-by with benches and a coin telescope |
 | 🏘️ **Village** | Stone houses, a church and its bell tower, a square with a fountain, cobbled lanes |
 | 🏙️ **City** | A street grid in a ring road, a roundabout, towers with a skybridge, a 200 m observation tower |
 | 🏘️ **Midtown & Southgate** | Two more towns on the oval's infield, each on its own ring road |
+| 🏁 **Drift park, drag strip, mall** | North of Midtown: a walled, floodlit skid pad with a figure of eight; a drag strip with start and finish gantries and a 402 m timer (time, speed at the line, best per car); the North Mall and its car park |
+| 🛣️ **West road & Westhaven** | Off the autobahn's west straight: a 2+2 highway with a double white line, 31 km of three-lane autobahn with a service area (fuel and a workshop both ways), then highway again, roadside fuel and a workshop, to Westhaven, a 2 x 1.5 km city 50 km west with a second home (its garage swaps cars too) |
+| 🔀 **Ring bypass** | Off the valley road east of home, straight over the direct road and up the hills to the Ring road above the Nordschleife's pits |
+| 🚗 **Traffic** | About 1,000 cars on every road, keeping left, at each road's pace: slowing for bends and for the car ahead (or yours), passing on the multi-lane roads, turning on and off side roads (only their own way down one-way ramps, and from their own side of the road; at a split before a closed lane they always take the ramp, and at a road's end they move over to a lane with a way on rather than turning round), round the city's roundabout, easing through turns, lamps lit at night. Flash your high beam from close behind at speed on a multi-lane road and the car ahead moves over. Hit one and it's shoved aside and turned while you carry on (never under 40% of your speed); it eases back into its lane. Six models (Audi RS4 B7, RS4 Avant, RS3 Sportback, VW Polo 170 TSI, Polo sedan, a Mercedes V8), the nearest drawn as themselves |
 | ✈️ **Airfield** | A runway to open it up on |
 | 🅿️ **Car park** | A multi-storey with ramps and bays; stop in a bay to swap cars, like the home garage |
 | 🏁 **Racetrack** | ~9 km with kerbs, gravel, chicanes, a grandstand, start lights, a pit lane and 12 garages |
@@ -76,12 +83,15 @@ Clusters are matched to reference photos of the real cars, down to the numeral f
 | 🏠 **Places that do things** | Home garage (swap cars), the mechanic (servicing and repairs happen only there), fuel pumps (engine off to refuel), pit garages (swap, tune, refuel) |
 | 💥 **Physical world** | Collisions with walls, rails, buildings and trees; crash sounds scaled to the hit |
 | 🌦️ **Time & weather** | `\` (or the HUD clock): Dawn / Day / Dusk / Night with a running clock (a day in 24 minutes), the four German seasons, Clear / Cloudy / Rain / Fog / Snow, or **Live**: the Nürburgring's clock, season and weather now (Open-Meteo). Rain and snow cut the cars' grip, traction and braking |
-| 💡 **Lights** | Low and high beam from each model's own lamps (`L` / `H`), a Beam brightness slider in the car menu, glowing brake lights, lit streets at night |
+| 💡 **Lights** | Low and high beam from each model's own lamps (`L` / `H`), a Beam brightness slider in the car menu, glowing brake lights. At night every road has street lamps (tall masts on the autobahn, small dim ones on the mountain roads and the Nordschleife), floodlights at home, the fuel stations, workshops, pits, airfield apron and every car park deck, the nearest lamps lighting your car as you pass, runway edge lights, and reflector posts that glint in your headlights |
 | 🛞 **Tyre physics & drift mode** | `;` switches drift mode (off by default). Off: the grip model, every car turns as hard as its tyres allow. On: tyres that slip - weight transfer, a friction circle, the drive split of each car's xDrive mode, DSC / DTC / MDM / PSM that catch or allow a slide, a handbrake that locks the rears, and a countersteer assist that holds a drift on the throttle. The 320d, the drift car, gets the road's real friction in rain and snow |
-| 🚗 **Body roll** | The body squats, dives and leans on its springs, firmer with each car's chassis / EDC / PASM setting |
+| 🚗 **Body roll** | The body squats, dives and leans on its springs, firmer with each car's chassis / EDC / PASM setting and the Handling tab's springs, bars and dampers; lowered cars sit lower |
+| 🛠️ **Tuned handling** | Every car's Handling tab feeds the tyre model each frame: cornering grip per axle (understeer / oversteer), downforce that grows with speed² (and drag that costs top speed), how fast the car answers the wheel, the tail stepping out near the limit on an oversteer setup, the CG height, brake bias, diff locking and the tyres' wet grip (slicks in the rain are treacherous) |
+| 💨 **Sense of speed** | The view widens with speed (65° to ~82° chase, 50° to ~60° in the car), the chase camera hangs back as the car pulls away and drops lower at speed, short Malaysian-style lane dashes (4.5 m line, 7.5 m gap) flicking past, and wind noise rising with speed² |
 | 📊 **Telemetry** | A g-g circle, the pedals, the temperatures that matter on a track day, and the worn parts |
-| 📍 **Teleport** | `` ` `` or a click on the mini map: the racetrack, the Nordschleife (both pits), the mountain, the autobahn, the airfield, home, the towns, the car park, the village, the mechanic |
-| ⏱️ **Lap timer** | `/` times Nordschleife laps: current, last and best |
+| 🗺️ **Overview map** | `'` opens the whole world north up: autobahn, highway, racetracks, ramps and flyovers, links and mountain roads, streets and the runway in their own colours with a legend, the places named, fuel, homes, mechanics and pits marked, your car on it, a scale bar; scroll or pinch zooms round the pointer, drag moves it, + / − / All / Me |
+| 📍 **Teleport** | `` ` `` or a click on the mini map: the racetrack, the Nordschleife (both pits), the mountain, the autobahn, the airfield, home, the towns, the car park, the village, the mechanic, the Ring bypass, the drift park, the drag strip, the mall, the west road, its service area, Westhaven and its home |
+| ⏱️ **Lap timer** | `/` times Nordschleife laps: current, last and best, with a leaderboard of every car's best lap (kept in this browser) |
 | 🔥 **Backfire** | Flame from the tips on every overrun pop, burble and upshift crack the car's sound plays, timed to it: a flicker for a crackle, a bigger lick for a bang |
 | 🛞 **Tyres and smoke** | Rubber marks on wheelspin, traction control and hard launches; tyre smoke; black diesel smoke that follows the tune |
 | 🎥 **Views** | Chase view, and an in-car view with the live cluster in the dash of a right-hand-drive cabin; two-finger swipe to look around |
@@ -104,7 +114,8 @@ Clusters are matched to reference photos of the real cars, down to the numeral f
 
 | Script | What it adds |
 |---|---|
-| `car-tune.js` | **Tuning.** An engine model (air, fuel, ignition / injection) with per-cylinder knock. Maps for boost, timing, AFR or fuel quantity, injection timing and rail pressure; rev, shift and launch rpm, the speed limiter, a torque limit, shift speed, burbles, smoke, EGR / DPF; gear ratios, shift points and torque limits per gear. Presets per engine (Stage 1–3, bootmod3, big turbos, twin-turbo kits). A parts catalogue with real dependencies: turbo, intercooler, downpipe, charge pipes, diverter, injectors, fuel pumps, port injection, RON 95 / 98 / 102 / E85, forged or built internals, head gasket, gearbox, radiator, brakes and chassis. It warns you (lean, over the rods' torque, knock-limited) and punishes you: parts wear, fault codes, limp mode. Two map slots, a library of 20 saved setups, a datalog and a guide |
+| `car-tune.js` | **Tuning.** An engine model (air, fuel, ignition / injection) with per-cylinder knock. Maps for boost, timing, AFR or fuel quantity, injection timing and rail pressure; rev, shift and launch rpm, the speed limiter, a torque limit, shift speed, burbles, smoke, EGR / DPF; gear ratios, shift points and torque limits per gear. Presets per engine (Stage 1–3, bootmod3, big turbos, twin-turbo kits). A parts catalogue with real dependencies: turbo, intercooler, downpipe, charge pipes, diverter, injectors, fuel pumps, port injection, RON 95 / 98 / 102 / E85, forged or built internals, head gasket, gearbox, radiator and brakes. It warns you (lean, over the rods' torque, knock-limited) and punishes you: parts wear, fault codes, limp mode. Two map slots, a library of 20 saved setups, a datalog and a guide |
+| `car-handling.js` | **Handling**, on every car. Chassis parts - tyres (road, UHP, cup, slick, winter, drift), lowering springs, a sport kit, coilovers, race 2-way dampers, adjustable and race anti-roll bars, a camber kit, a lip, ducktail or splitter + GT wing, a clutch-pack LSD or a welded diff, strut braces or a cage, a quick rack, a brake bias valve - and their setup: tyre pressures, camber, toe, springs, bars, bump / rebound, ride height, splitter and wing, brake bias, diff power / coast lock, steering ratio. Each part unlocks its settings. Presets (Fast road, Track day, Time attack, Drift, Rain), live hints on what each value does, a chassis diagram (top and side), entry / mid / exit balance meters, a character radar, grip-against-speed and body-roll charts, a grip envelope, a table of every figure, and a tuning guide |
 | `car-service.js` | **Servicing.** Oil life and level, coolant, brake pads, tyres and pressure, battery. Discs heat up and fade; worn pads and tyres stop longer; old oil wears the engine faster. Worn parts raise dashboard messages with a chime, and minor faults turn up with wear and mileage |
 | `car-diagnostics.js` | **Diagnostics.** A scan tool: health ring, ECM / TCM / ABS / TPMS / BMS / BCM modules, fault memory you can clear, live data, and service functions like a compression test and DPF regeneration |
 | `car-dyno.js` | **Dyno.** Logs power and torque as you drive, per gear, with AFR, knock, intake and exhaust temperature channels; runs save to the car's history and print as a PDF dyno sheet |
@@ -149,7 +160,7 @@ once macOS has given the relay Accessibility access. [docs/SETUP.md](docs/SETUP.
 
 | Key | Does |
 |---|---|
-| `I` | engine start / stop |
+| `I` | ignition on; again (or hold, or with the brake) to start; again to stop. In gear off the brake it creeps |
 | `W` / `S` | throttle / brake |
 | `A` / `D` | steer |
 | `Space` | handbrake (runs a pull in Dyno mode) |
@@ -162,6 +173,7 @@ once macOS has given the relay Accessibility access. [docs/SETUP.md](docs/SETUP.
 | `Tab` | the car menu: the whole car page over the road |
 | `Esc` | close what's open: the car menu, the teleport or weather menu, the garage / mechanic / pit menu |
 | `` ` `` | teleport (or click the mini map) |
+| `'` | overview map: every road and track by kind with a legend; scroll or pinch to zoom, drag to move |
 | `/` | Nordschleife lap timer on / off |
 | `\` | time & weather |
 | `;` | drift mode on / off |
@@ -209,7 +221,7 @@ its speed to the world each frame; the world steers it, moves it and draws it.
 | `POST` | `/car/{slug}/activities/{id}/restore` | Put the car back to that point |
 
 `public/drive.html?car={slug}` is a static page: `&at=pits` starts in the racetrack's pit garage, `&at=ring` at the
-Nordschleife, `&at=bay<n>` in a car park bay, `&hour=0-3&season=spring|summer|autumn|winter&sky=clear|cloudy|rain|fog|snow`
+Nordschleife, `&at=bay<n>` in a car park bay, `&at=home2` at the Westhaven home, `&hour=0-3&season=spring|summer|autumn|winter&sky=clear|cloudy|rain|fog|snow`
 sets the time and weather, `&test_drive=1` drives without saving.
 
 ---
@@ -224,7 +236,7 @@ sets the time and weather, `&test_drive=1` drives without saving.
 | `file_path` | the car's HTML on the `public` disk |
 | `odometer`, `fuel_level`, `engine_wear_pct`, `engine_map` | km, 0–1, 0–100, 1–9 |
 | `oil_wear_pct`, `oil_level_loss_pct`, `coolant_loss_pct`, `brake_wear_pct`, `tyre_wear_pct`, `tyre_pressure_loss_pct`, `battery_drain_pct` | 0–100 % worn or lost |
-| `service_wear`, `fault_codes`, `layout`, `tune`, `engine_mix` | json |
+| `service_wear`, `fault_codes`, `layout`, `tune`, `handling`, `engine_mix` | json (`handling`: the chassis parts and setup, car-handling.js) |
 
 Every state column is nullable: `null` means the car's own default.
 
@@ -245,7 +257,7 @@ php artisan storage:link       # serve the car files
 php artisan db:seed            # BMW 550D, Proton Iriz, BMW 320D, M140i xDrive, 530e xDrive
 ```
 
-then register the other seven cars (one command, in the setup guide), and serve it at **http://sim-app.test**
+then register the other eight cars (one command, in the setup guide), and serve it at **http://sim-app.test**
 (Laravel Herd): the phone pad's relay only accepts the drive page from there.
 
 **Phone pad** (optional): sign in to Tailscale on the Mac and the phone, then `npm run pad:install` to keep the relay
@@ -287,15 +299,19 @@ Upload it at `/upload`. To drive it in 3D as well, add a `.glb` to `public/model
 composer test
 ```
 
-Feature tests cover the garage menu, layouts, names, and the tune / history / restore flow (`tests/Feature/`). The
+Feature tests cover the garage menu, layouts, names, the tune / history / restore flow and the handling save
+(`tests/Feature/`). The
 drive page and the shared scripts run their own self-checks on load (steering, the tyre physics and drift mode,
 collisions, road heights, the phone pad's tilt) and report failures in the browser console.
 
 ## 🙏 Credits
 
-- 3D models from Sketchfab, credited on the drive page: M3 CS Touring, M5 Competition, M140i and 911 GT3 RS by
+- 3D models from Sketchfab, credited on the drive page: M3 CS Touring, M5 Competition, M140i, 911 GT3 RS, NSX-R and GT-R NISMO by
   [Ddiaz Design](https://sketchfab.com/ddiaz-design), as are the X1's M Y-spoke wheels (from their 2020 X1); X1 (E84), F30 (and the
   M140i's steering wheel) and E90 by DEMON_SCARY1235; G30 by
   Mona x Supercars; E60 by GT Cars: Hyperspeed. Licences are CC BY-NC-SA 4.0 or CC BY 4.0, as shown per car.
+- Traffic, cut down for it (`public/models/npc`): 2008 Audi RS4, 2013 Audi RS4 Avant, 2018 Audi RS3 Sportback and 2024
+  Volkswagen Polo 170 TSI by Ddiaz Design (CC BY-NC-SA 4.0); Cliff's Mercedes V8 Biturbo by Libau Media (CC BY 4.0);
+  2017 Volkswagen Polo Sedan by KOElkastasbers (Sketchfab Standard).
 - Nordschleife line: © [OpenStreetMap](https://www.openstreetmap.org/relation/38566) contributors (ODbL); heights
   from the Copernicus DEM via [Open-Meteo](https://open-meteo.com/).
