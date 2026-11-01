@@ -62,6 +62,14 @@
   #laptime b { display: block; margin: 2px 0; font: 600 28px ui-monospace, monospace; }
   #laptime i { font: 12px ui-monospace, monospace; }
   #laptime .best { color: #6fe08a; }
+  #lap-board-h { display: block; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, .15); }
+  #lap-board { margin: 4px 0 0; padding: 0; list-style: none; }
+  #lap-board li { display: grid; grid-template-columns: 12px 1fr auto; gap: 3px 4px; font-size: 11px; line-height: 17px; }
+  #lap-board small { color: #aab0b8; font-size: 11px; text-align: right; }
+  #lap-board em { font-style: normal; letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #lap-board i { font-size: 11px; }
+  #lap-board .me em, #lap-board .me i { color: #4fa8ff; }
+  #lap-board .none { opacity: .45; }
   #teleport-places { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; }
   #weather { width: min(520px, calc(100vw - 72px)); }
   #weather .wx-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); column-gap: 8px; margin-bottom: 10px; }
@@ -121,7 +129,7 @@
 <button id="panel-close" hidden>Back to driving <kbd>Tab</kbd></button>
 <canvas id="map" aria-label="Mini map"></canvas>
 <div id="map-legend" aria-label="Map legend"></div>
-<div id="laptime" hidden><span>Nordschleife</span><b id="lap-now">-:--.-</b>Last <i id="lap-last">-</i> · Best <i id="lap-best">-</i></div>
+<div id="laptime" hidden><span>Nordschleife</span><b id="lap-now">-:--.-</b>Last <i id="lap-last">-</i> · Best <i id="lap-best">-</i><span id="lap-board-h">Leaderboard</span><ol id="lap-board"></ol></div>
 <!-- track telemetry: the g-g circle, the pedals, the temperatures that matter on a track day and the worn parts, seen
      from above (nose up) - each takes the colour of its most worn part, white (as new) to red (worn out) -->
 <section id="tele" aria-label="Telemetry">
@@ -2873,6 +2881,21 @@ try { lap.on = localStorage.getItem('drive-laptimer') !== 'off'; lap.best = JSON
 const lapFmt = (t, dp = 3) => { const k = 10 ** dp, u = Math.floor(t * k), m = Math.floor(u / (60 * k)); return `${m}:${(u / k - m * 60).toFixed(dp).padStart(dp + 3, '0')}`; };
 console.assert(lapFmt(478.4129) === '7:58.412' && lapFmt(65.05, 1) === '1:05.0' && lapFmt(59.9999) === '0:59.999', 'lap times read m:ss.mmm');
 lapBest.textContent = lap.best[CAR.page] ? lapFmt(lap.best[CAR.page]) : '-';
+// the leaderboard under it: every drivable car with its best lap (this browser's), fastest first, then the ones
+// still without a lap; the car being driven in blue
+const lapBoard = document.getElementById('lap-board');
+function drawLapBoard() {
+  const cars = [...new Map(Object.values(CARS).map(c => [c.page, c])).values()]
+    .sort((a, b) => (lap.best[a.page] ?? Infinity) - (lap.best[b.page] ?? Infinity) || 0);
+  lapBoard.replaceChildren(...cars.map((c, n) => {
+    const li = document.createElement('li'), t = lap.best[c.page], el = (tag, text) => Object.assign(document.createElement(tag), { textContent: text });
+    li.className = (c.page === CAR.page ? 'me' : '') + (t ? '' : ' none');
+    li.append(el('small', t ? n + 1 : ''), el('em', c.name), el('i', t ? lapFmt(t) : '-'));
+    li.title = c.name;
+    return li;
+  }));
+}
+drawLapBoard();
 document.getElementById('lap-on').textContent = lap.on ? 'on' : 'off';
 function lapReset() { lap.i = -1; lap.start = null; }
 function setDriftMode(on) {
@@ -2927,6 +2950,7 @@ function lapDone(t) {
   lap.best[CAR.page] = t;
   lapBest.textContent = lapFmt(t);
   try { localStorage.setItem('drive-ring-best', JSON.stringify(lap.best)); } catch {}
+  drawLapBoard();
 }
 function drawMap(dt) {
   if ((mapView.look -= dt) <= 0) {
