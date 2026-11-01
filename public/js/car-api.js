@@ -88,6 +88,7 @@
         ...data,
         ...(window.CarService ? window.CarService.saveData() : {}),
         ...(window.CarTune && window.CarTune.on ? window.CarTune.saveData() : {}),
+        ...(window.CarHandling ? window.CarHandling.saveData() : {}),
         ...(events.length ? { events } : {}),
         page: window.__CAR_STATE__ && window.__CAR_STATE__.page,
       });

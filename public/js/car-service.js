@@ -25,7 +25,7 @@
 // codes and cleared fault memory all go into the car's history through CarAPI.log.
 //
 // The dyno panel is split into tabbed sections: Dyno (the car's own chart), Performance (filled by car-perf.js
-// through CarService.sections.perf), Tuning (car-tune.js, only on cars that call CarTune.init), Setup (the car's
+// through CarService.sections.perf), Tuning (car-tune.js, only on cars that call CarTune.init), Handling (car-handling.js), Setup (the car's
 // tuning panel, while it's hidden from beside the cluster), Servicing, Diagnostics (filled by car-diagnostics.js
 // through CarService.sections.diag), History (car-history.js) and Controls (the car's keyboard/info line, moved in). Service rows: the car's own engine Wear row
 // is moved in and cloned for the rest, so they pick up each car's styling. A part at 100% raises its own
@@ -73,7 +73,7 @@
     { key: 'alignment', code: 'C1A60', module: 'ABS', store: true, label: 'Alignment', group: 'Wheels & tyres', rate: (t) => t.km * 0.02 + t.brakeWork * 0.0002,
       title: 'Wheel alignment out', msg: 'Alignment out of spec - the tyres are wearing unevenly. Have it adjusted.' },
     // worn dampers let the car pitch and the tyres skip under braking: longer stops
-    { key: 'dampers', code: 'C1A50', module: 'ABS', store: true, label: 'Dampers', group: 'Chassis', rate: (t) => t.km * 0.012 * hw.damperWear,
+    { key: 'dampers', code: 'C1A50', module: 'ABS', store: true, label: 'Dampers', group: 'Chassis', rate: (t) => t.km * 0.012 * hw.damperWear * (window.CarHandling ? CarHandling.hd.damperWear : 1),
       title: 'Shock absorbers worn', msg: 'Dampers worn out: longer stopping distances. Replace them.' },
     { key: 'battery', code: 'P0562', module: 'BMS', col: 'battery_drain_pct', label: 'Battery', group: 'Electrical',
       rate: (t) => t.dt * 0.004 + t.km * 0.02 + (byKey.belt.value >= 100 && t.ignition ? t.dt * 0.12 : 0), // a snapped belt: nothing charges it
@@ -297,6 +297,7 @@
     dyno: '<path d="M4 4v16h16"/><path d="M7 14l3.5-4.5 3 2.5L18 6"/>',
     perf: '<circle cx="12" cy="14" r="7"/><path d="M12 14l3-3M10 3h4M12 3v4M19 7l1.5-1.5"/>',
     tune: '<path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/><circle cx="12" cy="12" r="4"/>',
+    handling: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 3v6.5M4.2 16.5l5.6-3.2M19.8 16.5l-5.6-3.2"/>',
     tuning: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
     service: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-2.4z"/>',
     diag: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M7 11h2l1.5-3 3 6 1.5-3h2"/><path d="M9 21h6"/>',
@@ -317,7 +318,7 @@
       btns[k].setAttribute('aria-selected', String(k === id));
     });
     const tuned = !!(window.CarTune && CarTune.on);
-    [['dyno', 'Dyno'], ['perf', 'Performance'], ['tune', 'Tuning'], ['tuning', 'Setup'], ['service', 'Servicing'], ['diag', 'Diagnostics'],
+    [['dyno', 'Dyno'], ['perf', 'Performance'], ['tune', 'Tuning'], ['handling', 'Handling'], ['tuning', 'Setup'], ['service', 'Servicing'], ['diag', 'Diagnostics'],
       ['history', 'History'], ['keys', 'Controls']].forEach(([id, label]) => {
       const sec = document.createElement('section');
       sec.className = 'cs-section';
@@ -331,7 +332,7 @@
       btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${TAB_ICONS[id]}</svg>${label}` +
         (id === 'diag' ? '<span class="cs-badge"></span>' : '');
       btn.addEventListener('click', () => { select(id); btn.blur(); });
-      btn.hidden = id === 'tuning' || (id === 'tune' && !tuned); // Setup: only while the tuning panel is hidden
+      btn.hidden = id === 'tuning' || (id === 'tune' && !tuned) || (id === 'handling' && !window.CarHandling); // Setup: only while the tuning panel is hidden
       btns[id] = btn;
       tabs.appendChild(btn);
     });
@@ -884,14 +885,15 @@
       if (screechGain) screechGain.gain.setTargetAtTime(screech * screechVol * 3.0, actx.currentTime, 0.06);
     },
     // braking power: the hardware's bite, cold race pads, fade past the pads' temperature, boiling fluid (a long
-    // pedal), and wear - 100% worn pads lose 40%, bald tyres 25%, worn discs 20%, worn dampers 15% - and a wet or snowy
+    // pedal), the chassis setup (car-handling.js), and wear - 100% worn pads lose 40%, bald tyres 25%, worn discs 20%, worn dampers 15% - and a wet or snowy
     // road (drive.html sets surfaceGrip from its weather)
     brakeMul: () => {
       const cold = brakeT < 150 ? hw.coldBite + (1 - hw.coldBite) * brakeT / 150 : 1;
       const fade = 1 - Math.max(0, Math.min(1, (brakeT - hw.fade) / 300)) * 0.5;
       const boil = brakeT * 0.35 > fluidBoil() ? 0.55 : 1;
       return hw.bite * hw.stab * cold * fade * boil * (1 - byKey.brake.value / 100 * 0.4) * (1 - byKey.tyre.value / 100 * 0.25) *
-        (1 - byKey.discs.value / 100 * 0.2) * (1 - byKey.dampers.value / 100 * 0.15) * (window.surfaceGrip || 1);
+        (1 - byKey.discs.value / 100 * 0.2) * (1 - byKey.dampers.value / 100 * 0.15) * (window.surfaceGrip || 1) *
+        (window.CarHandling ? CarHandling.hd.brake : 1); // the Handling tab's tyres, camber, bias
     },
     brakeTemp: () => brakeT,
     brakeFade: () => hw.fade, // the disc temperature the fitted pads start to fade at (the drive page's telemetry)

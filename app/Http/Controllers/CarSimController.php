@@ -122,6 +122,7 @@ class CarSimController extends Controller
             'faultCodes' => $car->fault_codes ?? [],
             'layout' => (object) ($car->layout ?? []),
             'tune' => $car->tune,
+            'handling' => $car->handling,
             'csrfToken' => csrf_token(),
             'page' => $page,
         ]);
@@ -139,6 +140,7 @@ class CarSimController extends Controller
             $js('car-dyno.js')."\n".
             $js('car-perf.js')."\n".
             $js('car-tune.js')."\n".
+            $js('car-handling.js')."\n".
             $js('car-history.js')."\n".
             $js('car-mixer.js')."\n".
             $js('car-layout.js').'</head>',
@@ -187,6 +189,13 @@ class CarSimController extends Controller
             'layout.*.h' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             'layout.*.hidden' => ['sometimes', 'boolean'],
             ...self::tuneRules(),
+            // car-handling.js: the chassis parts fitted and their setup (pressures, camber, springs, bars, aero...)
+            'handling' => ['sometimes', 'nullable', 'array:v,parts,setup'],
+            'handling.v' => ['integer'],
+            'handling.parts' => ['array', 'max:20'],
+            'handling.parts.*' => ['string', 'max:20'],
+            'handling.setup' => ['array', 'max:40'],
+            'handling.setup.*' => ['numeric', 'between:-100,1000'],
             // what happened since the last save (refuel, service, tune change...): logged with the state it left
             'events' => ['sometimes', 'array', 'max:30'],
             'events.*.type' => ['required', Rule::in(array_diff(CarActivity::TYPES, ['restore', 'rename']))],

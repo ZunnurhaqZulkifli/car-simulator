@@ -19,7 +19,7 @@ class Car extends Model
     public const STATE_COLUMNS = [
         'nickname', 'odometer', 'fuel_level', 'engine_wear_pct', 'engine_map', 'engine_mix',
         ...self::SERVICE_COLUMNS,
-        'service_wear', 'fault_codes', 'layout', 'tune',
+        'service_wear', 'fault_codes', 'layout', 'tune', 'handling',
     ];
 
     // garage photo file types, car-photos/{slug}.{ext} on the public disk
@@ -29,7 +29,7 @@ class Car extends Model
         'name', 'nickname', 'slug', 'subtitle', 'file_path', 'position',
         'odometer', 'fuel_level', 'engine_wear_pct', 'engine_map', 'engine_mix',
         ...self::SERVICE_COLUMNS,
-        'service_wear', 'fault_codes', 'layout', 'tune',
+        'service_wear', 'fault_codes', 'layout', 'tune', 'handling',
     ];
 
     protected function casts(): array
@@ -39,6 +39,7 @@ class Car extends Model
             'fault_codes' => 'array',
             'layout' => 'array',
             'tune' => 'array',
+            'handling' => 'array',
             'service_wear' => 'array',
         ];
     }

@@ -9,7 +9,8 @@
 //        slots      - [preset, preset] for Map 1 / Map 2 on a car with no saved tune yet (default stock / stage1); the
 //                     parts the starting slot's preset needs are fitted with it, so a car's old map carries over as it was
 //        onChange(T) - called with the live settings whenever they change (slot, edit, part, limp mode):
-//          T.rev / T.shift / T.launch (krpm), T.vmax, T.finalDrive, T.grip, T.shiftCut [s, depth], T.burble
+//          T.rev / T.shift / T.launch (krpm), T.vmax, T.finalDrive, T.grip (traction: the Handling tab's and worn tyres'),
+//          T.shiftCut [s, depth], T.burble
 //   CarTune.setSlot(n)       - from the car's setMap: which calibration drives the engine
 //   CarTune.boostAt(rpmK)    - full-pedal boost target (bar) at this rpm: the map, capped by the turbo, limp mode
 //   CarTune.tick({ dt, ignition, rpm, pedal, boost, speed, gear, coolant, fuelCut }) -> { tqMul, cut, egt, fuelMul }
@@ -442,7 +443,7 @@
 
   // ================= part catalogue: what fits, and what each option changes =================
   const opt = (id, label, desc, fx = {}) => ({ id, label, desc, fx });
-  // the bottom end, valvetrain and lubrication, the cooling system, the brakes and the suspension - on both engines
+  // the bottom end, valvetrain and lubrication, the cooling system and the brakes - on both engines
   const VALVETRAIN = (fuel) => [
     { k: 'cams', group: 'Engine', label: 'Camshafts', opts: fuel === 'petrol' ? [
       opt('stock', 'Stock', 'Factory cams: strong low down, smooth idle.'),
@@ -536,10 +537,6 @@
       opt('dot4', 'DOT 4', 'Road fluid: boils at ~230 °C fresh, far lower once it\'s soaked up moisture.'),
       opt('race', 'Racing', 'High-temp racing fluid: boils at ~310 °C.', { brake: { boil: 310 } })] },
   ];
-  const SUSPENSION = { k: 'suspension', group: 'Chassis', label: 'Suspension', opts: [
-    opt('stock', 'Stock', 'Factory springs and dampers.'),
-    opt('sport', 'Sport', 'Lower, stiffer springs and sport dampers: ~3% more grip, steadier under braking.', { grip: 1.03, brake: { stab: 1.03, damperWear: 0.8 } }),
-    opt('coilovers', 'Coilovers', 'Adjustable track coilovers: ~6% more grip, flat under braking - but they wear faster on the road.', { grip: 1.06, brake: { stab: 1.05, damperWear: 1.3 } })] };
   const COMMON = () => [
     { k: 'trans', group: 'Drivetrain', label: 'Transmission', opts: [
       opt('stock', 'Stock', 'Factory clutch packs. Slips once the torque passes their rating.'),
@@ -548,11 +545,7 @@
     { k: 'diff', group: 'Drivetrain', label: 'Final drive', opts: [[1, 'Stock ratio: relaxed cruising, highest top speed per rpm.'],
       [3.077 / 2.813, 'Shorter: ~9% more pull in every gear, top speed per gear drops.'], [3.385 / 2.813, 'Much shorter: strongest acceleration, busy at motorway speed.']]
       .map(([k, d]) => { const fd = +(cfg.finalDrive * k).toFixed(3); return opt(String(fd), fd.toFixed(2), d, { fd }); }) },
-    SUSPENSION,
-    { k: 'tyres', group: 'Chassis', label: 'Tyres', opts: [
-      opt('stock', 'Road', 'Stock performance road tyres.'),
-      opt('cup', 'Cup', 'Semi-slick cup tyres: ~12% more grip for launches and corner exits.', { grip: 1.12 })] },
-  ];
+  ]; // (the tyres, suspension and the rest of the chassis: car-handling.js's Handling tab)
   // building the engine: forged / fully built internals take far less damage, rev higher and hold more torque
   const INTERNALS = (fuel) => ({ k: 'internals', group: 'Engine', label: 'Engine internals', opts: [
     opt('stock', 'Stock', fuel === 'petrol' ? `Cast pistons and factory rods: good to ~${fmt(E.rod)} Nm, fragile once it detonates.`
@@ -1127,7 +1120,7 @@
     }
     out.tqMul = tqMul;
     // the tyres wear as it drives: hand the car its new grip once it has moved enough to matter
-    if ((gripT += dt) > 2) { gripT = 0; if (Math.abs(fx.grip * tyreGrip() - T.grip) > 0.004) apply(); }
+    if ((gripT += dt) > 2) { gripT = 0; if (Math.abs(gripNow() - T.grip) > 0.004) apply(); }
     out.fuelMul = E.fuel === 'petrol' ? (interp(E.axis, E.afr, rpm) / Math.max(10, m.afrT)) * fx.k : 1;
     ch.knock = knockLevel;
     return out;
@@ -1697,6 +1690,7 @@
   // the Servicing tab's tyres and dampers: worn tread, low pressure and tired dampers all cost traction
   const sharedWear = (k) => (window.CarService && (CarService.parts.find((p) => p.key === k) || {}).value) || 0;
   const tyreGrip = () => (1 - sharedWear('tyre') * 0.2 / 100) * (1 - sharedWear('pressure') * 0.12 / 100) * (1 - sharedWear('dampers') * 0.05 / 100);
+  const gripNow = () => fx.grip * tyreGrip() * (window.CarHandling ? CarHandling.hd.traction : 1); // and the Handling tab's tyres, springs and diff
   function apply() {
     invalidate();
     const c = cal();
@@ -1707,7 +1701,7 @@
       launch: c.launch / 1000,
       vmax: c.vmax,
       finalDrive: fd,
-      grip: fx.grip * tyreGrip(),
+      grip: gripNow(),
       shiftCut: [[0.22, 0.3], [0.15, 0.2], [0.08, 0.1]][c.shiftSpeed || 0],
       burble: E.fuel === 'petrol' ? [0, 1, 1.6, 2.4][c.burble ?? 1] : 1,
       sound: { ...fx.sound, exLp: 1 + (fx.sound.ex - 1) * 0.6 }, // layer volumes for the louder hardware
@@ -1831,6 +1825,7 @@
     render(true);
   };
   api.boostAt = (rpmK) => boostTarget(cal(), rpmK * 1000);
+  api.reapply = () => { if (tune) apply(); }; // car-handling.js: the traction in T.grip changed
   api.tick = (i) => { const r = tick(i); sample(i.dt); return r; }; // the datalog samples ride on the car's tick
   api.label = (n) => { const p = predicted(n || slot); return `${tune.slots[n || slot].name} · ${fmt(p.hp)} hp · ${fmt(p.tq)} Nm`; };
   api.slot = () => slot; // which map (1 or 2) drives the engine now
@@ -2750,7 +2745,7 @@
       card.querySelectorAll('[data-o]').forEach((b) => b.addEventListener('click', () => { setPart(p.k, b.dataset.o); b.blur(); render(true); }));
       body.querySelector(`[data-g="${p.group}"]`).appendChild(card);
     });
-    body.insertAdjacentHTML('beforeend', '<div class="ct-hint" style="margin-top:12px">Parts are the car\'s hardware, shared by both maps - but with one of your saved maps loaded, a change saves into it, and switching to a map slot that holds a saved map puts its parts back on. Every part with a condition bar wears as you drive - service it in the Servicing tab; fitting an upgrade starts that part fresh.</div>');
+    body.insertAdjacentHTML('beforeend', '<div class="ct-hint" style="margin-top:12px">Parts are the car\'s hardware, shared by both maps - but with one of your saved maps loaded, a change saves into it, and switching to a map slot that holds a saved map puts its parts back on. Every part with a condition bar wears as you drive - service it in the Servicing tab; fitting an upgrade starts that part fresh. Tyres, suspension, bars, aero and the diff are in the Handling tab.</div>');
     const search = body.querySelector('[data-partsearch]');
     const filter = () => {
       partQuery = search.value;
