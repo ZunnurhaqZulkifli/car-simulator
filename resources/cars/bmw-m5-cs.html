@@ -1438,7 +1438,7 @@
   };
   const DSC_OPTS = [['on','DSC On'],['mdm','M Dynamic'],['off','DSC Off']];
   const ENGINE_MODES = SETUP.engine.opts.map(o=>o[0]);
-  const setup = { engine: ENGINE_MODES[((savedState.engineMap||1)-1) % 3] || 'efficient', chassis:'comfort', steering:'comfort', xdrive:'4wd', mmode:'road', sound:'quiet' };
+  const setup = { engine: ENGINE_MODES[((savedState.engineMap||1)-1) % 3] || 'efficient', chassis:'sport', steering:'comfort', xdrive:'4wd', mmode:'road', sound:'quiet' };
   const mmodeBtn = $('mmode-btn');
   let dsc = 'on', drivelogic = 2, mActive = null, mRestore = null;
 

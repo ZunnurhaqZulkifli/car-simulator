@@ -1632,7 +1632,7 @@
   };
   const DSC_OPTS = [['on','DSC On'],['mdm','M Dynamic'],['off','DSC Off']];
   const ENGINE_MODES = SETUP.engine.opts.map(o=>o[0]);
-  const setup = { engine: ENGINE_MODES[((savedState.engineMap||1)-1) % 3] || 'efficient', chassis:'comfort', steering:'comfort', brake:'comfort', xdrive:'4wd', mmode:'road' };
+  const setup = { engine: ENGINE_MODES[((savedState.engineMap||1)-1) % 3] || 'efficient', chassis:'sport', steering:'comfort', brake:'comfort', xdrive:'4wd', mmode:'road' };
   let dsc = 'on', mtc = 5, drivelogic = 2, mActive = null, mRestore = null;
 
   const popEl = $('setup-pop'), popTitle = $('pop-title'), popItems = $('pop-items');

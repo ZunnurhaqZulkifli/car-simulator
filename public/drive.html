@@ -223,9 +223,9 @@ const CARS = {
   },
   m3: {
     name: 'BMW M3 CS Touring', page: 'bmw-m3-touring', model: '/models/bmw-m3-cs-touring.glb', length: 4.801, wheelbase: 2.857, redline: 7200,
-    grip: 2.1, // g: track-biased tyres (everyday cars: 0.92)
+    grip: 2.4, // g: track-biased tyres, the GT-R's grip (everyday cars: 0.92)
     chassis: { m: 1850, front: 0.52, rear: 0.75 }, // M xDrive, rear-biased (all of it in 2WD)
-    stiff: 2,
+    stiff: 2.4, // the GT-R's springs and bars (its page starts in M Chassis Sport, as the GT-R's in SUSP Normal)
     credit: ['2025 BMW M3 CS Touring', 'https://sketchfab.com/3d-models/2025-bmw-m3-cs-touring-ebda8c29a8ef4ec789391e918d52ef55'],
     glass: /\|glass\|/, 
     glassPlain: true,
@@ -241,7 +241,7 @@ const CARS = {
   },
   m5: {
     name: 'BMW M5 CS', page: 'bmw-m5-cs', model: '/models/bmw-m5-competition.glb', length: 4.983, wheelbase: 2.982, redline: 7200, 
-    grip: 2.3, stiff: 2.1,
+    grip: 2.4, stiff: 2.4, // as agile as the GT-R: its grip, springs and bars (M Chassis Sport by default, as the GT-R's SUSP Normal)
     chassis: { m: 1825, front: 0.53, rear: 0.75 },
     credit: ['2021 BMW M5 Competition', 'https://sketchfab.com/3d-models/2021-bmw-m5-competition-29a4c13761cb40e6a050871bd40a0963'],
     glass: /^bMAT_Glass1\|(?!bSM_FrontKit)/, glassPlain: true, cabin: /\|(bD_Body|bSM_Interior)_/, // (not the headlight lenses)
