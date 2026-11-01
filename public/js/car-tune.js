@@ -328,6 +328,65 @@
           ['big', 'Big front-mount', 'Larger stepped core: cooler, steadier intake temps.', { ic: 0.9, soak: 4 }]] },
       },
     },
+    // NSX-R (NA1): the C30A 3.0 V6, balanced and blueprinted - DOHC VTEC on both cams (the high-lift lobes from
+    // 5,800 rpm, which the car page runs), titanium rods, sequential port injection, 10.2:1 and an 8,000 redline.
+    // NA like the GT3: the boost map does nothing until the supercharger kit goes on
+    C30A: {
+      fuel: 'petrol', name: 'C30A 3.0 VTEC V6', cyl: 6, maxRpm: 8600, tstat: 92, na: true,
+      axis: [1000, 2000, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000],
+      boost: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      afr: [13.2, 13.0, 12.9, 12.8, 12.8, 12.7, 12.7, 12.6, 12.6, 12.6, 12.5, 12.5, 12.5, 12.5, 12.5],
+      // written for Japanese high-octane (RON 98-100): on 95 it gives up a little around peak torque
+      margin: [0.8, 0.6, 0.2, 0, -0.1, -0.1, 0, 0.2, 0.5, 0.8, 1.0, 1.2, 1.4, 1.5, 1.5],
+      cylMargin: [0, 0.2, -0.2, 0, -0.3, -0.4],
+      turboLabel: 'Forced induction',
+      turboOpts: [['stock', 'None (NA)', 'Naturally aspirated through the six-runner VVIS plenum: no boost, so the boost map does nothing.', { sound: { turbo: 0 } }],
+        ['sc', 'Supercharger kit', 'Centrifugal supercharger off the crank: boost climbs with the revs to ~0.6 bar at 8,000. Needs bigger injectors, a pump, an intercooler and a stronger clutch.', { sound: { turbo: 0.7 } }]],
+      turbos: {
+        stock: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        sc: [0.02, 0.06, 0.12, 0.16, 0.2, 0.25, 0.3, 0.35, 0.41, 0.47, 0.53, 0.58, 0.63, 0.66, 0.68],
+      },
+      krpm: { stock: 0, sc: 52 },
+      tq: 300, rod: 460, trans: { name: 'Honda 5-speed manual', cap: 380, uprated: 480, built: 600 },
+      // the parts that read wrong on this engine: a kit's plumbing isn't there until the kit is, it's port-injected,
+      // and the gearbox is a manual
+      swap: {
+        intercooler: { opts: [['stock', 'None', 'Nothing to cool on the NA engine. With the supercharger the charge goes in hot.', { ic: 0, soak: 0 }],
+          ['kit', 'Kit core', 'Air-to-air core in the side intake: what the supercharger needs.', { ic: 0.75, soak: 8 }],
+          ['big', 'Big core', 'Larger core with its own fan: cooler, steadier intake temps.', { ic: 0.85, soak: 4 }]] },
+        chargepipe: { opts: [['stock', 'Kit pipes', 'The supercharger kit\'s own silicone pipes (nothing on the NA engine): hard pulls on high boost fatigue them until one splits.'],
+          ['alu', 'Aluminium', 'Aluminium pipes and silicone couplers: hold any boost and barely age.', { cpWear: 0.08 }]] },
+        diverter: { label: 'Bypass valve', opts: [['stock', 'Kit diaphragm', 'The supercharger kit\'s bypass valve (nothing on the NA engine): high boost tears it and it bleeds boost.'],
+          ['piston', 'Uprated piston', 'Billet piston valve: holds any boost, practically never wears.', { dvWear: 0.1, sound: { turbo: 1.05 } }]] },
+        intake: { opts: [['stock', 'Stock', 'Airbox into the VVIS plenum: a second chamber opens at 4,800 rpm.'],
+          ['open', 'Race intake', 'Freer filter and a bigger throttle body: +1.5% flow up top and a much louder VTEC howl.', { flow: 0.015, iat: 1, sound: { intake: 1.35, turbo: 1.1 } }]] },
+        downpipe: { label: 'Headers & cats', opts: [['stock', 'Stock', 'Factory stainless headers into the cats and the NSX-R\'s light muffler.'],
+          ['sport', 'Sport cats', 'High-flow cats: +2.5% flow and cooler exhaust.', { flow: 0.025, egt: -15, spool: -100, sound: { ex: 1.15, turbo: 1.1 } }],
+          ['catless', 'Race headers', 'Equal-length race headers, no cats: +4% flow, the loudest. Off-road only - the cat monitor flags P0420.', { flow: 0.04, egt: -25, spool: -150, sound: { ex: 1.3, turbo: 1.2 }, catless: true }]] },
+        injection: { label: 'Injectors', opts: [['stock', 'Stock', 'Sequential port injection: ~40% headroom over the stock fuelling.', { fuelCap: 1.4 }],
+          ['port', 'Big injectors', 'Higher-flow injectors: ~70% more fuel - what the supercharger and E85 need.', { fuelCap: 1.4, port: 0.7 }]] },
+        hpfp: { label: 'Fuel pump', opts: [['stock', 'Stock', 'In-tank pump at 3 bar: ~25% headroom over the stock fuelling.', { pump: 1.25 }],
+          ['uprated', 'Uprated', 'High-flow in-tank pump: holds pressure at ~60% more flow.', { pump: 1.6 }]] },
+        trans: { label: 'Clutch & gearbox', opts: [['stock', 'Stock', 'Twin-plate clutch on the close-ratio 5-speed: slips once the torque passes its rating.'],
+          ['uprated', 'Uprated clutch', 'Heavier clamp and sintered plates: holds far more torque.', { trans: 'uprated' }],
+          ['built', 'Built', 'Racing twin-plate clutch and dog-ring gears: holds the most, but it grabs and wears ~50% faster on the road.', { trans: 'built', transWear: 1.5 }]] },
+        fuel: { opts: [['98', 'RON 98', 'Japanese high-octane premium: what the NSX-R\'s map is written for.', { octane: 2, k: 1 }],
+          ['95', 'RON 95', 'Regular premium: allowed, but knock-limited around peak torque - a little less power.', { octane: 0, k: 1 }],
+          ['102', 'RON 102', 'Race fuel: ~5° more margin than RON 95 - what a supercharged build on stock internals runs.', { octane: 5, k: 1 }],
+          ['e85', 'E85', 'Ethanol: ~9° more margin and a cooler charge, but ~40% more fuel flow than the stock injectors give.', { octane: 9, k: 1.4, iat: -6 }]] },
+      },
+      presets: [
+        { id: 'stock', name: 'Stock', desc: 'Factory NSX-R calibration: 280 PS / 294 Nm, VTEC at 5,800, fuel cut at 8,300.', needs: {}, make: (e, s) => s },
+        { id: 'stage1', name: 'Stage 1', desc: 'ECU reflash with sport cats on RON 98: more timing up top and an 8,500 rpm cut. ~290 PS / 300 Nm.', needs: { downpipe: ['sport', 'catless'], fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, timing: e.axis.map((r) => (r < 4000 ? 0.5 : 1.5)), rev: 8500, shift: 8200, tq: 310 }) },
+        { id: 'stage2', name: 'Stage 2', desc: 'Race headers and intake, fast-road cams on uprated springs and an alloy radiator, 8,800 rpm: ~310 PS / 305 Nm.',
+          needs: { downpipe: ['catless'], intake: ['open'], cams: ['fast', 'race'], springs: ['uprated', 'titanium'], radiator: ['alu', 'race'], fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, timing: e.axis.map((r) => (r < 4000 ? 0.5 : 1.5)), afr: add(s.afr, -0.1), rev: 8800, shift: 8500, tq: 320, dpf: false }) }, // cat monitor off for the race headers
+        { id: 'sc', name: 'Supercharged', desc: 'The supercharger kit at ~0.5 bar on RON 98: big injectors, uprated pumps, an intercooler, alloy pipes and an uprated clutch. ~400 PS / 360 Nm.',
+          needs: { turbo: ['sc'], injection: ['port'], hpfp: ['uprated'], lpfp: ['uprated'], intercooler: ['kit', 'big'], chargepipe: ['alu'], diverter: ['piston'], trans: ['uprated', 'built'], fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, boost: e.turbos.sc.map((c) => +Math.min(0.5, c * 0.95).toFixed(2)), afr: e.axis.map((r) => (r < 3000 ? 12.6 : 11.8)), tq: 380, rev: 8300, shift: 8000 }) },
+      ],
+    },
   };
 
   // ================= part catalogue: what fits, and what each option changes =================
