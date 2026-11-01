@@ -168,7 +168,7 @@ import NORDSCHLEIFE from './js/nordschleife.js';
 // paint (repainted Black Sapphire, or paintColor), glass (tinted), cabin (mirrored to right-hand drive), wheels and tyre (hung on
 // pivots that spin and steer), steering (searched for its rim, from `near` if it hides inside a bigger mesh; with
 // no `re`, the built wheel goes at `near`; `look`: how high over its centre the eye looks for the cluster; `inset`: how far short of what it sees there the cluster
-// goes, for dials deep in tubes; `size`: how wide it looks, 0.36 m at 1 m, smaller where the wheel hides more; `from`: the car whose model it came from, credited too), tail (its rear half glows when braking), head/tail/mirror lamps (where the
+// goes, for dials deep in tubes; `size`: how wide it looks, 0.36 m at 1 m, smaller where the wheel hides more; `depth`: how far behind the rim what turns reaches, 0.05 m; `from`: the car whose model it came from, credited too), tail (its rear half glows when braking), head/tail/mirror lamps (where the
 // amber signals go), credit (title, page, licence if not by-nc-sa, author if not Ddiaz Design and their page), stiff (its
 // springs and anti-roll bars: 1 = an everyday saloon, 3.2° of body roll per g; 2 = half that, a third less pitch, quicker)
 const CARS = {
@@ -320,6 +320,24 @@ const CARS = {
     popups: { re: /SK_Light_F/, lit: /^(\w*MI_Light1|glass_light)\|/, hinge: [0.67, 1.51], angle: 23 }, // the pods swing up about the lids' rear edge until the lenses face ahead
     exhaustX: 0.55, exhaustBoth: true, // a tip each side
     arrows: [14.7, 85.3, 25.8], // in the empty windows either side of the dials
+  },
+  // the N-Attack Package car, as it comes: nose-first, right-hand drive (its cabin isn't mirrored), Nismo white on black
+  // wheels and gold calipers. Prep merges each wheel's ~150 pieces (and each caliper's 24) into one mesh, so it draws as
+  // few meshes as the other cars, and cuts the steering wheel out of the one-piece interior (rim, spokes, pods, paddles)
+  gtr: {
+    name: 'Nissan GT-R NISMO', page: 'nissan-gt-r-nismo', model: '/models/nissan-gt-r-nismo.glb', length: 4.69, wheelbase: 2.78, redline: 7100,
+    credit: ['2017 Nissan GT-R Nismo (R35) N-Attack Package', 'https://sketchfab.com/3d-models/2017-nissan-gt-r-nismo-r35-n-attack-package-7cd3306866984e44979cb9b12e340c12'],
+    grip: 2.4, stiff: 2.4, // the Nismo's sticky Dunlops, stiff springs and bars
+    chassis: { m: 1720, front: 0.54, rear: 0.7, h: 0.48 }, // ATTESA E-TS: rear-biased, up to 50:50 when the rears slip
+    glass: /Window_Material1\|/, glassPlain: true,
+    wheels: /Wheel1A_3D/, tyre: /Wheel1A_3D/, // the calipers stay put
+    // the wheel on its own (its spokes reach 9 cm behind the rim); the cluster in front of the binnacle's side walls,
+    // which would clip the speedo and the small gauges, and over the model's own dials
+    steering: { re: /\|cabin_steering\|/, near: [-0.37, 0.889, 0.278], depth: 0.1, look: 0.12, inset: 0.15, size: 0.42 },
+    tail: { re: /LightA_Material1\|/, fromMap: true, idle: 0.25, brake: 6, keep: v => v.y > 0.7 && Math.abs(v.x) > 0.4 }, // the four round lamps
+    lamps: { head: /LightA_Material1\|/, tail: /LightA_Material1\|/ },
+    exhaustX: 0.61, exhaustBoth: true, // a pair of tips at each corner
+    arrows: [3.9, 90.85, 9.1], // in the binnacle's empty top corners
   },
 };
 CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', grip: 2.2, page: 'bmw-530e', redline: 6500, paintColor: 0x1a3363 }; // the M550d's body, in blue like the garage photo
@@ -2180,7 +2198,7 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
     for (const p of steerParts) {
       const [turning, fixed] = split(p, at => {
         const h = at.sub(pivot).dot(axis); // along the column, + into the dash
-        return h > -0.15 && h < 0.05 && Math.sqrt(at.lengthSq() - h * h) < 0.22;
+        return h > -0.15 && h < (CAR.steering.depth ?? 0.05) && Math.sqrt(at.lengthSq() - h * h) < 0.22; // depth: a wheel cut out on its own may reach further back
       });
       root.add(subMesh(p, fixed));
       if (is(p, CAR.steering.drop)) continue;

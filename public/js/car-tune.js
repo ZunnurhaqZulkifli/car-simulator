@@ -387,6 +387,57 @@
           make: (e, s) => ({ ...s, boost: e.turbos.sc.map((c) => +Math.min(0.5, c * 0.95).toFixed(2)), afr: e.axis.map((r) => (r < 3000 ? 12.6 : 11.8)), tq: 380, rev: 8300, shift: 8000 }) },
       ],
     },
+    // GT-R NISMO (R35, MY17+): the VR38DETT 3.8 twin-turbo V6, each one built by hand by a single takumi. The NISMO runs
+    // the GT3 race car's IHI turbos (bigger compressor wheels) at ~1.05 bar for 600 PS / 652 Nm; port injection, plasma-
+    // sprayed bores. What holds a tune back is the GR6 dual-clutch transaxle's clutch packs
+    VR38: {
+      fuel: 'petrol', name: 'VR38DETT 3.8 twin-turbo V6', cyl: 6, maxRpm: 7600, tstat: 92,
+      axis: [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000],
+      boost: [0.2, 0.5, 0.8, 1.0, 1.05, 1.05, 1.05, 1.05, 1.05, 1.0, 0.98, 0.95, 0.9],
+      afr: [13.0, 12.7, 12.4, 12.1, 11.9, 11.8, 11.7, 11.6, 11.5, 11.4, 11.3, 11.3, 11.2],
+      margin: [1.6, 1.1, 0.9, 1.0, 1.2, 1.5, 1.8, 2.1, 2.4, 2.7, 2.9, 3.1, 3.2],
+      cylMargin: [0, -0.2, 0.1, -0.3, 0.2, -0.4], // the rear pair runs hottest
+      turboLabel: 'Turbochargers',
+      turboOpts: [['stock', 'NISMO GT3 twins', 'IHI twins with the GT3 race car\'s bigger compressor wheels: good for ~1.6 bar before they run out of breath.'],
+        ['hybrid', 'Hybrid twins', 'Bigger billet compressor wheels in the stock housings: ~2 bar, a touch more lag.', { sound: { turbo: 1.25 } }],
+        ['big', 'Big twins', 'Big-turbo kit: ~2.4 bar and an enormous top end, soft below 3,500 rpm.', { sound: { turbo: 1.45 } }]],
+      turbos: {
+        stock: [0.3, 0.75, 1.15, 1.45, 1.6, 1.65, 1.65, 1.65, 1.6, 1.55, 1.5, 1.45, 1.35],
+        hybrid: [0.2, 0.55, 0.95, 1.4, 1.75, 1.95, 2.0, 2.0, 1.95, 1.9, 1.85, 1.75, 1.65],
+        big: [0.1, 0.25, 0.55, 0.95, 1.4, 1.8, 2.15, 2.35, 2.4, 2.4, 2.35, 2.3, 2.2],
+      },
+      krpm: { stock: 185, hybrid: 170, big: 150 },
+      tq: 652, rod: 950, trans: { name: 'GR6 dual-clutch', cap: 780, uprated: 1000, built: 1300 },
+      // its own wording: air-to-air front-mounts, two intakes and downpipes, port injection, in-tank pumps, recirculating valves, the GR6
+      swap: {
+        intercooler: { opts: [['stock', 'Stock', 'Front-mounted air-to-air cores: heat-soak a little over repeated pulls.', { ic: 0.8, soak: 10 }],
+          ['big', 'Big front-mount', 'Larger race cores: cooler, steadier intake temps.', { ic: 0.9, soak: 4 }]] },
+        intake: { opts: [['stock', 'Stock', 'Twin airboxes with paper filters behind the bumper.'],
+          ['open', 'Open intakes', 'Cone filters and big-bore inlet pipes: +1.5% flow and a lot more turbo whoosh.', { flow: 0.015, iat: 3, sound: { intake: 1.3, turbo: 1.2 } }]] },
+        downpipe: { label: 'Downpipes', opts: [['stock', 'Stock', 'Factory downpipes with the close-coupled cats.'],
+          ['sport', 'Sport cats', '100-cell cats: +2.5% flow, faster spool, cooler exhaust and a harder titanium rasp.', { flow: 0.025, egt: -15, spool: -100, sound: { ex: 1.15, turbo: 1.1 } }],
+          ['catless', 'Catless', 'Straight downpipes: +4% flow, the coolest exhaust, the loudest. Off-road only - the cat monitor flags P0420.', { flow: 0.04, egt: -25, spool: -150, sound: { ex: 1.3, turbo: 1.2 }, catless: true }]] },
+        injection: { label: 'Injectors', opts: [['stock', 'Stock', 'Sequential port injection: ~40% headroom over the stock fuelling.', { fuelCap: 1.4 }],
+          ['port', 'Big injectors', '1,000 cc injectors: ~70% more fuel - what E85 and the big turbos need.', { fuelCap: 1.4, port: 0.7 }]] },
+        hpfp: { label: 'Fuel pumps', opts: [['stock', 'Stock', 'Twin in-tank pumps: ~25% headroom over the stock fuelling.', { pump: 1.25 }],
+          ['uprated', 'Uprated', 'High-flow in-tank pumps: hold pressure at ~60% more flow.', { pump: 1.6 }]] },
+        diverter: { label: 'Bypass valves', opts: [['stock', 'Stock diaphragm', 'Recirculating valves: the boost goes back into the intakes on a lift. Well above stock boost the diaphragms tear and bleed it.'],
+          ['piston', 'Uprated piston', 'Billet piston valves: hold any boost, a crisper whoosh, practically never wear.', { dvWear: 0.1, sound: { turbo: 1.05 } }]] },
+        trans: { opts: [['stock', 'Stock', 'The GR6\'s factory clutch packs: they slip once the torque passes their rating.'],
+          ['uprated', 'Uprated packs', 'Extra clutch plates, stiffer springs and a TCU flash with more line pressure: holds far more torque.', { trans: 'uprated' }],
+          ['built', 'Built', 'Fully built GR6: billet baskets, more and thicker plates, a race TCU flash. Holds the most, but the stiff packs wear ~50% faster on the road.', { trans: 'built', transWear: 1.5 }]] },
+      },
+      presets: [
+        { id: 'stock', name: 'Stock', desc: 'Factory NISMO calibration: 600 PS / 652 Nm on ~1.05 bar, the R-mode shift speeds.', needs: {}, make: (e, s) => ({ ...s, shiftSpeed: 1 }) },
+        { id: 'stage1', name: 'Stage 1', desc: 'ECU + TCU flash on RON 98: ~1.3 bar, more timing, quicker shifts. ~690 PS / 780 Nm on the stock turbos and packs.', needs: { fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, boost: e.boost.map((b, i) => +Math.min(b + 0.25, e.turbos.stock[i] * 0.85).toFixed(2)), timing: e.axis.map((r) => (r < 3000 ? 0.5 : 1.5)),
+            afr: add(s.afr, -0.1), tq: 780, shiftSpeed: 2 }) },
+        { id: 'stage2', name: 'Stage 2', desc: 'Downpipes, intakes, uprated packs and ~1.5 bar on RON 102: ~780 PS / 880 Nm.',
+          needs: { downpipe: ['sport', 'catless'], intake: ['open'], chargepipe: ['alu'], diverter: ['piston'], trans: ['uprated', 'built'], fuel: ['102', 'e85'] },
+          make: (e, s) => ({ ...s, boost: e.boost.map((b, i) => +Math.min(b + 0.45, e.turbos.stock[i] * 0.92).toFixed(2)), timing: e.axis.map((r) => (r < 3000 ? 0.5 : r < 5000 ? 1.5 : 2.5)),
+            afr: add(s.afr, -0.2), tq: 880, rev: 7300, shift: 7200, shiftSpeed: 2 }) },
+      ],
+    },
   };
 
   // ================= part catalogue: what fits, and what each option changes =================
