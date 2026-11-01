@@ -55,12 +55,12 @@
   #panel-close { position: fixed; z-index: 4; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px;
                  border: 1px solid #3a3d42; background: rgba(15, 16, 18, .9); color: #fff; font: 13px system-ui, sans-serif; cursor: pointer; }
   #panel-close:hover, #panel-close:focus-visible { border-color: #4fa8ff; }
-  .panel-open #hud, .panel-open #map, .panel-open #tele, .panel-open #credit, .panel-open #teleport, .panel-open #weather, .panel-open #laptime { visibility: hidden; }
-  #laptime { position: fixed; z-index: 2; right: 12px; top: 310px; width: 200px; box-sizing: border-box; padding: 8px 12px; border-radius: 8px;
+  .panel-open #hud, .panel-open #map, .panel-open #tele, .panel-open #credit, .panel-open #teleport, .panel-open #weather, .panel-open #laptime, .panel-open #drag, .panel-open #overview { visibility: hidden; }
+  #laptime, #drag { position: fixed; z-index: 2; right: 12px; top: 310px; width: 200px; box-sizing: border-box; padding: 8px 12px; border-radius: 8px;
              background: rgba(0, 0, 0, .5); color: #fff; font: 12px system-ui, sans-serif; }
-  #laptime span { color: #aab0b8; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
-  #laptime b { display: block; margin: 2px 0; font: 600 28px ui-monospace, monospace; }
-  #laptime i { font: 12px ui-monospace, monospace; }
+  #laptime span, #drag span { color: #aab0b8; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+  #laptime b, #drag b { display: block; margin: 2px 0; font: 600 28px ui-monospace, monospace; }
+  #laptime i, #drag i { font: 12px ui-monospace, monospace; }
   #laptime .best { color: #6fe08a; }
   #lap-board-h { display: block; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, .15); }
   #lap-board { margin: 4px 0 0; padding: 0; list-style: none; }
@@ -132,6 +132,7 @@
 <canvas id="map" aria-label="Mini map"></canvas>
 <div id="map-legend" aria-label="Map legend"></div>
 <div id="laptime" hidden><span>Nordschleife</span><b id="lap-now">-:--.-</b>Last <i id="lap-last">-</i> · Best <i id="lap-best">-</i><span id="lap-board-h">Leaderboard</span><ol id="lap-board"></ol></div>
+<div id="drag" hidden><span>Drag strip · 402 m</span><b id="drag-now">-.---</b>Last <i id="drag-last">-</i> · Best <i id="drag-best">-</i></div>
 <!-- track telemetry: the g-g circle, the pedals, the temperatures that matter on a track day and the worn parts, seen
      from above (nose up) - each takes the colour of its most worn part, white (as new) to red (worn out) -->
 <section id="tele" aria-label="Telemetry">
@@ -683,6 +684,9 @@ const VL = makeRoad([onCR(5178, 321), [5170, 80, 360], [5190, 80, 410], [5240, 8
 const HOME = { x: 2700, z: -1283 }; // the middle of the garage; its door faces north, down the drive
 const D = makeRoad([[2700, 0, -1229], [2700, 0, -1250], [2700, 0, -1270], [2700, 0, -1288]], false, 3, 0.05);
 const Y = makeRoad([[2709, 0, -1262], [2709, 0, -1281], [2709, 0, -1300]], false, 10, 0.05);
+const HOME2 = { x: -50875, z: -2404 }, HOMES = [HOME, HOME2]; // the second in Westhaven (below), laid out as the first
+const D2 = makeRoad([54, 33, 13, -5].map(z => [HOME2.x, 0, HOME2.z + z]), false, 3, 0.05);
+const Y2 = makeRoad([21, 2, -17].map(z => [HOME2.x + 9, 0, HOME2.z + z]), false, 10, 0.05);
 // the viewpoint: a lay-by on the loop's left at the summit, 14 m out from its centre line, looking south
 const IV = nearestSample(M, 4950, 1790);
 const V = makeRoad(Array.from({ length: 11 }, (_, k) => {
@@ -717,6 +721,18 @@ const street = pts => makeRoad(pts.map(([x, z]) => [x, 0, z]), false, 7.5, 0.05)
 // north-south). Southgate, 1 km square (X3, Z3), is down the boulevard (BV) from Midtown's ring. The west link (K3)
 // leaves the southbound carriageway's left lane at EXIT3 for Midtown's south side
 const X2 = [500, 750, 1000, 1250, 1500, 1750], Z2 = [-1250, -1000, -750, -500, -250, 0], X3 = [500, 750, 1000, 1250, 1500], Z3 = [-3150, -2900, -2650, -2400, -2150];
+// Westhaven, 2 x 1.5 km, 50 km west at the end of the west road (W): off the autobahn's west straight from its
+// southbound left lane (the oval's outside), a 2+2 highway - two lanes each way either side of a double white line -
+// then from 5 km out 31 km of autobahn, three lanes each way, then highway again into the city's ring, on its z -1850
+// street. One road all the way (half: the autobahn's); its sections by sample, 180 m tapers between (W.iA, W.iB)
+const X4 = [-51000, -50750, -50500, -50250, -50000, -49750, -49500, -49250, -49000], Z4 = [-2600, -2350, -2100, -1850, -1600, -1350, -1100];
+const W = makeRoad([[-412, 0, -600], [-414, 0, -750], [-428, 0, -900], [-470, 0, -1020], [-560, 0, -1100], [-720, 0, -1140], [-1000, 0, -1150],
+  [-2000, 0, -1150], [-3500, 0, -1100], [-5500, 0, -950], [-9000, 0, -700], [-13000, 0, -1000], [-17000, 0, -1800], [-21000, 0, -2400],
+  [-25000, 0, -2600], [-29000, 0, -2200], [-33000, 0, -1500], [-37000, 0, -1100], [-41000, 0, -1300], [-44500, 0, -1700], [-47000, 0, -1850],
+  [-48500, 0, -1850], [X4.at(-1) + 7.5, 0, Z4[3]]], false, 16.75, 0);
+Object.assign(W, { iA: nearestSample(W, -5500, -950), iB: nearestSample(W, -37000, -1100), iS: nearestSample(W, -21000, -2400) }); // iS: the service area
+W.hw = i => i < W.iA || i >= W.iB; // the highway's samples, the autobahn's, and the tapers' between
+W.auto = i => i >= W.iA + 60 && i < W.iB - 60;
 const grid = (X, Z) => [ringRoad(X[0], X.at(-1), Z[0], Z.at(-1)), // a town's streets: its ring, and right across it along every line between
   ...X.slice(1, -1).map(x => street([[x, Z[0]], [x, Z.at(-1)]])), ...Z.slice(1, -1).map(z => street([[X[0], z], [X.at(-1), z]]))];
 const BR = makeRoad([[2450, 0, -750], [2350, 0.3, -750], [2250, 2.6, -750], [2140, 5.6, -750], [2050, 7.3, -750], [1950, 7.3, -750], [1880, 5.4, -750],
@@ -726,9 +742,67 @@ const RW = makeRoad([[150, 0, -2950], [150, 0, -450]], false, 30, 0); // half: o
 const K3 = makeRoad([[1988, 0, -1000], [1975, 0, -1150], [1930, 0, -1270], [1840, 0, -1340], [1700, 0, -1365], [1600, 0, -1360], [1530, 0, -1330],
   [1505, 0, -1290], [1500, 0, -1258]], false, 5.6);
 const EXIT3 = { x: 1983, z: -1180 };
+// crossovers, where a two-way road meets the autobahn beside one carriageway: its traffic towards the autobahn would
+// arrive head-on into that carriageway's - so it leaves the road early, rises over the near carriageway and the median
+// as the U-turns do (7.3 m) and comes down beside the far carriageway into its left lane, still heading the way it
+// was. XK: the valley road's westbound lane (past the on-ramp) onto the southbound carriageway, before its fuel
+// station; XW: the west road's eastbound lanes onto the oval's west straight the way they're heading. K3's eastbound
+// lane needs no bridge: KS turns left off it and joins XK once that's down. One lane each; past them the lanes on
+// towards the autobahn are closed (CLOSED: a barrier across, just past the split)
+const ease = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+const bez = (a, ta, b, tb, k, n) => Array.from({ length: n }, (_, j) => { // n points of a cubic from a (heading ta) to b (heading tb), handles k m
+  const t = (j + 1) / n, u = 1 - t, c1 = [a[0] + ta[0] * k, a[1] + ta[1] * k], c2 = [b[0] - tb[0] * k, b[1] - tb[1] * k];
+  return [0, 1].map(m => u ** 3 * a[m] + 3 * u * u * t * c1[m] + 3 * u * t * t * c2[m] + t ** 3 * b[m]);
+});
+const beside = (r, i0, i1, o0, o1, ie) => { // along r from sample i0 to i1 (every 4th), o m left of its centre line: o0, easing to o1 by ie
+  const pts = [];
+  for (let i = i0; (i1 - i) * Math.sign(i1 - i0) >= 0; i += 4 * Math.sign(i1 - i0)) {
+    const o = o0 + (o1 - o0) * ease((i - i0) / (ie - i0));
+    pts.push([r.P[i].x + r.L[i].x * o, r.P[i].z + r.L[i].z * o]);
+  }
+  return pts;
+};
+const unit = (a, b) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+function ramp(pts, up, down, half) { // [x, z] points; 7.3 m up between up ([from, to], m from the start) and down (m before the end), eased
+  const s = [0];
+  for (let k = 1; k < pts.length; k++) s.push(s[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+  const L = s.at(-1), y = v => up ? 7.3 * ease((v - up[0]) / (up[1] - up[0])) * (1 - ease((v - L + down[0]) / (down[0] - down[1]))) : 0;
+  return makeRoad(pts.map((p, k) => [p[0], y(s[k]), p[1]]), false, half, 0);
+}
+const xk = beside(K1, 180, 96, -2.25, -14.25, 132), xw = beside(W, 212, 124, -5.45, -19.45, 160), ks = beside(K3, 197, 185, -2.25, -4, 185);
+const XK = ramp([...xk, ...bez(xk.at(-1), unit(xk.at(-2), xk.at(-1)), [1975, -1525], [0, -1], 70, 9), [1975, -1600], [1975, -1690],
+  ...bez([1975, -1690], [0, -1], [1988.1, -1835], [0, -1], 55, 6), [1988.1, -1865]], [30, 230], [330, 180], 4.5);
+const XW = ramp([...xw, ...bez(xw.at(-1), unit(xw.at(-2), xw.at(-1)), [-376, -835], [0, 1], 75, 10), [-376, -770], [-376, -700],
+  ...bez([-376, -700], [0, 1], [-388.1, -565], [0, 1], 55, 6), [-388.1, -535]], [30, 230], [320, 165], 4.5);
+const KS = ramp([...ks, ...Array.from({ length: 12 }, (_, j) => { // a left-hander round to beside XK's way down, then into it
+  const a = (j + 1) / 12 * Math.PI / 2, [x, z] = ks.at(-1), R = 1962 - x;
+  return [x + R * Math.sin(a), z - R * (1 - Math.cos(a))];
+}), [1962, -1690], ...bez([1962, -1690], [0, -1], [1978.5, -1772], unit([1975, -1740], [1981, -1790]), 30, 5)], null, null, 5);
+// the west interchange's other two ways, so every way between the autobahn and the west road is its own: WS, a slip off
+// the west road's eastbound left lane before XW, round a ~300 m left-hander into the southbound carriageway's left lane;
+// NW, off the northbound left lane 240 m past where XW comes in, up alongside on the infield side and round a 45 m
+// right-hander over both carriageways (as the U-turns), then down beside the west road's start into its westbound left
+// lane, alongside it as it bends west. Past XW the west road's eastbound carriageway ends (W.iC); its start is the southbound one's slip out
+const run = pts => pts.slice(1).reduce((m, p, k) => m + Math.hypot(p[0] - pts[k][0], p[1] - pts[k][1]), 0); // a polyline's length
+const ws = beside(W, 330, 246, -5.45, -13, 290);
+const WS = ramp([...ws, ...bez(ws.at(-1), unit(ws.at(-2), ws.at(-1)), [-426, -1440], [0, -1], 165, 12), [-426, -1480],
+  ...bez([-426, -1480], [0, -1], [-411.9, -1610], [0, -1], 50, 6), [-411.9, -1640]], null, null, 5);
+const nwDown = [[-445, -120], [-445, -400], [-443, -640], ...beside(W, 72, 132, 22, 5.45, 128)], nwFall = run([[-445, -60], ...nwDown]);
+const NW = ramp([[-388.1, -300], ...bez([-388.1, -300], [0, 1], [-355, -190], [0, 1], 45, 8), [-355, -120],
+  ...Array.from({ length: 13 }, (_, k) => [-400 + 45 * Math.cos(k * Math.PI / 12), -60 + 45 * Math.sin(k * Math.PI / 12)]), ...nwDown], [60, 240], [nwFall, nwFall - 240], 4.5);
+W.iC = 182;
+const CLOSED = [[K1, 150], [K3, 160], [W, W.iC]]; // [road, sample]: its way -1 lanes closed from there on (to sample 0)
+// north of Midtown, off its x 1000 street carried on out of its ring: the drift park, a 390 x 120 m pad on its west side;
+// the drag strip, a loop off its east side - out along z 150, north up the strip (the start line at z 320, the finish
+// 402.3 m on), back along z 1250; and the mall at its end, its car park first
+const DRAG = { x: 1250, z0: 320, z1: 722.3 };
+const DP = makeRoad([[992.5, 0, 600], [800, 0, 600], [600, 0, 600]], false, 60, 0.05);
+const DS = makeRoad([[1007.5, 0, 150], [1150, 0, 150], [1235, 0, 185], [1250, 0, 270], [1250, 0, DRAG.z0], [1250, 0, DRAG.z1], [1250, 0, 1080], [1250, 0, 1130],
+  [1235, 0, 1215], [1150, 0, 1250], [1007.5, 0, 1250]], false, 9, 0.05);
+const MP = makeRoad([[1000, 0, 1300], [1000, 0, 1460]], false, 90, 0.05);
 const STREETS = [AV, RING, RB, ...grid(X2, Z2), ...grid(X3, Z3), BR, BV, AR,
   street([[2950, -1000], [2950, -750], [2950, ROUND.z - ROUND.r]]), street([[2950, ROUND.z + ROUND.r], [2950, -250], [2950, 0]]),
-  street([[3200, -1000], [3200, -500], [3200, 0]]),
+  street([[3200, -1000], [3200, -500], [3200, 0]]), street([[1000, 0], [1000, 650], [1000, 1300]]), ...grid(X4, Z4),
   ...[-750, -250].map(z => street([[2450, z], [2950, z], [3450, z]])),
   street([[2450, -500], [2700, -500], [ROUND.x - ROUND.r, -500]]), street([[ROUND.x + ROUND.r, -500], [3200, -500], [3450, -500]])];
 // the car park: a multi-storey on the avenue's corner with the ring road, in the city's first block north of home
@@ -755,7 +829,8 @@ const crossings = (X, Z) => X.flatMap((x, a) => Z.map((z, b) => (a % (X.length -
 const JUNCTIONS = [
   ...crossings(STREET_X, STREET_Z).filter(j => !(j.x === ROUND.x && j.z === ROUND.z)), ...crossings(X2, Z2), ...crossings(X3, Z3),
   ...[[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b]) => ({ x: ROUND.x + a * ROUND.r, z: ROUND.z + b * ROUND.r })),
-  { x: 2700, z: -1232 }, { x: atK2.x, z: atK2.z }, { x: (CP.door + CP.x1) / 2, z: STREET_Z[0] }];
+  { x: 2700, z: -1232 }, { x: atK2.x, z: atK2.z }, { x: (CP.door + CP.x1) / 2, z: STREET_Z[0] }, ...[150, 600, 1250].map(z => ({ x: 1000, z })),
+  ...crossings(X4, Z4), { x: HOME2.x, z: Z4[1] }];
 // the racetrack: ~9 km on the plain south of the hills, laid out as straights and arcs from the start line, heading
 // east. Fast: the 1.5 km pit straight, then 300-500 m bends and esses down the east side. Slow: a left-right-left
 // chicane, another splitting the back straight, then the infield - a tight left, a quick right, a 150° near-hairpin,
@@ -808,14 +883,26 @@ const [njx, , njz] = nAt(RIG - 65, 22), NJ = nearestSample(NPL, njx, njz); // wh
 const nplAt = o => [NPL.P[NJ].x + NPL.L[NJ].x * o, NPL.P[NJ].y, NPL.P[NJ].z + NPL.L[NJ].z * o];
 const NA = makeRoad([atM(4560, 1720), [4548, 295.5, 1780], [4545, 295, 1860], [4550, 294.5, 1960], [4580, 282, 2150], [4640, 262, 2450],
   [4700, 242, 2750], [4760, 225, 3000], [4780, 215, 3150], nplAt(58), nplAt(28), nplAt(0)], false, 5.6);
+// the Ring bypass: north off the valley road 950 m east of home, straight over the direct road and up the hills west of
+// the mountain loop (7% at most) to the Ring road just above the pits - home to the Nordschleife without the mountain.
+// Two halves, each from a road's asphalt edge so none overlaps another's (BP1 the valley road to the direct road, BP2
+// on from its far side to the Ring road)
+const edgeOf = (r, x, z, from) => { // road r's asphalt edge nearest (x, z), on the side towards `from`
+  const i = nearestSample(r, x, z), s = Math.sign((from[0] - r.P[i].x) * r.L[i].x + (from[2] - r.P[i].z) * r.L[i].z);
+  return [r.P[i].x + r.L[i].x * s * 4.5, r.P[i].y, r.P[i].z + r.L[i].z * s * 4.5];
+};
+const BP1 = makeRoad([edgeOf(K1, 3650, -1230, [3650, 0, 0]), [3650, 0, -1150], [3655, 5, -800], [3660, 14, -400], [3655, 24, -50], edgeOf(K2, 3650, 243, [3650, 0, -1230])], false, 5.6);
+const BP2 = makeRoad([edgeOf(K2, 3650, 243, [3650, 0, 1000]), [3645, 50, 500], [3625, 80, 900], [3615, 110, 1300], [3645, 140, 1700], [3800, 170, 2100],
+  [4100, 200, 2450], [4400, 225, 2650], edgeOf(NA, 4700, 2750, [4400, 0, 2650])], false, 5.6);
 // roadside fuel stations and workshops, each on a flat apron straight out from the road's left (a fuel station's 46 m
 // deep and 40 wide, a workshop's 66 by 18): on the valley road past the track road, and on the Ring road by the loop
 const apron = (r, i, len, half) => makeRoad([0, 1, 2, 3].map(k => [r.P[i].x + r.L[i].x * len * k / 3, r.P[i].y, r.P[i].z + r.L[i].z * len * k / 3]), false, half, 0.05);
-const SIDE = [[K1, 3900, -1230, true], [K1, 4010, -1225, false], [NA, 4548, 1835, true], [NA, 4548, 1925, false]].map(([r, x, z, fuel]) => {
+const SIDE = [[K1, 3900, -1230, true], [K1, 4010, -1225, false], [NA, 4548, 1835, true], [NA, 4548, 1925, false],
+  [W, -3000, -1120, true], [W, -43000, -1500, true], [W, -43200, -1520, false]].map(([r, x, z, fuel]) => {
   const i = nearestSample(r, x, z), half = fuel ? 20 : 9;
   return { r, i, fuel, half, apron: apron(r, i, fuel ? 46 : 66, half) };
 });
-const ROADS = [A, M, K1, K2, K3, RW, D, Y, V, S, ...STREETS, T, TR, PL, PG, ...UTURNS, CR, SL, VL, ON, NR, NPL, NPG, NA, ...SIDE.map(p => p.apron), ...CP_ROADS];
+const ROADS = [A, M, K1, K2, K3, RW, D, Y, V, S, ...STREETS, T, TR, PL, PG, ...UTURNS, CR, SL, VL, ON, NR, NPL, NPG, NA, BP1, BP2, DP, DS, MP, W, D2, Y2, ...SIDE.map(p => p.apron), ...CP_ROADS, XK, XW, KS, WS, NW];
 
 // the autobahn's fuel stations, [sample, side]: northbound 650 m past the start on its keep-left side, and southbound
 // 650 m further north
@@ -872,23 +959,26 @@ const spot = (r, i, m) => ({ x: r.P[i].x, z: r.P[i].z, m });
 const opens = (r, spots) => (i, s) => spots.some(p => Math.hypot(r.P[i].x - p.x, r.P[i].z - p.z) < p.m &&
   Math.sign((p.x - r.P[i].x) * r.L[i].x + (p.z - r.P[i].z) * r.L[i].z) === s);
 
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(24000, 24000), new THREE.MeshLambertMaterial({ color: 0x5a7a4a }));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(130000, 130000), new THREE.MeshLambertMaterial({ color: 0x5a7a4a }));
 ground.rotation.x = -Math.PI / 2;
-ground.position.y = -0.1; // just under the terrain, which takes over round the mountains
+ground.position.set(-25000, -0.1, 0); // just under the terrain, which takes over round the mountains; out past Westhaven
 scene.add(ground);
 
 // autobahn: asphalt, median wall, lines, guardrails - the outer ones open at the fuel stations, the northbound one at
-// both exits and the on-ramp too, the southbound one at the west link, both (and the hard shoulder lines) where the U-turns' slip roads leave and join
+// both exits and the on-ramp too, the southbound one at the west link, both (and the hard shoulder lines) where the U-turns' slip roads leave and join,
+// the southbound one's (and the west straight's northbound) where the crossovers join, the west straight's both where its
+// interchange's slip joins and its flyover leaves
 strip(A, -16.75, 0.01, 16.75, 0.01, 0x3a3a3c);
 strip(A, 0, 0, 0, 0.9, 0xb0b0a8);
 for (const [at, s] of A_STATIONS) strip(A, s * 16.75, 0.012, s * 46, 0.012, 0x4a4a4c, i => Math.abs(i - at) <= 22); // fuel station forecourts
-const exits = i => awayFrom(A, EXIT1, 280)(i) && awayFrom(A, EXIT2, 240)(i) && awayFrom(A, { x: 2017, z: -790 }, 110)(i), slips = i => UTURNS.every(u => awayFrom(A, { x: 2000, z: u.mid - 280 * u.dir }, 70)(i));
+const exits = i => awayFrom(A, EXIT1, 280)(i) && awayFrom(A, EXIT2, 240)(i) && awayFrom(A, { x: 2017, z: -790 }, 110)(i) && awayFrom(A, { x: -412, z: -850 }, 300)(i), slips = i => UTURNS.every(u => awayFrom(A, { x: 2000, z: u.mid - 280 * u.dir }, 70)(i));
+const merges = (i, s) => (s > 0 ? [WS] : [XK, XW]).every(r => awayFrom(A, r.P[r.N - 30], 95)(i)) && (s > 0 || awayFrom(A, NW.P[10], 50)(i));
 for (const s of [1, -1]) {
   paint(A, s * 2.5, 0.3);           // inner edge line
   paint(A, s * 6.25, 0.15, dashed); // lane lines
   paint(A, s * 10, 0.15, dashed);
-  paint(A, s * 13.75, 0.3, slips);  // hard shoulder line
-  strip(A, s * 17.5, 0, s * 17.5, 0.75, 0x9aa0a6, i => slips(i) && !nearStation(i, 24, s) && (s < 0 ? awayFrom(A, EXIT3, 220)(i) : exits(i)));
+  paint(A, s * 13.75, 0.3, i => slips(i) && merges(i, s));  // hard shoulder line
+  strip(A, s * 17.5, 0, s * 17.5, 0.75, 0x9aa0a6, i => slips(i) && !nearStation(i, 24, s) && merges(i, s) && (s < 0 ? awayFrom(A, EXIT3, 220)(i) : exits(i)));
 }
 // the U-turns: asphalt, edge lines, parapets and the deck's edges (down to the ground where it's low) once clear of
 // the autobahn's carriageways, the deck's underside, and piers - every ~20 m, either side of the autobahn and in its
@@ -943,14 +1033,15 @@ function twoLane(r, open = () => false, rails = () => true) {
 const sideSpots = r => SIDE.filter(p => p.r === r).map(p => spot(p.apron, 1, p.half + 4)); // its roadside aprons
 twoLane(M, opens(M, [spot(K1, K1.N - 6, 24), spot(K2, 6, 24), spot(V, 5, 75), spot(CR, 6, 24), spot(CR, CR.N - 6, 24), spot(SL, SL.N - 6, 24), spot(NA, 6, 24)]));
 // the links have no rails where they run over the autobahn or into the loop
-twoLane(K1, opens(K1, [spot(D, 3, 12), spot(S, 0, 14), spot(AV, 3, 12), spot(TR, 3, 12), spot(ON, 8, 60), ...sideSpots(K1)]), i => K1.P[i].x > 2170 && awayFrom(K1, K1.P[K1.N], 25)(i));
-twoLane(K2, opens(K2, [spot(AV, AV.N, 24)]), i => K2.P[i].x > 2170 && awayFrom(K2, K2.P[0], 25)(i));
-twoLane(K3, undefined, i => K3.P[i].x < 1830 && awayFrom(K3, K3.P[K3.N], 25)(i));
+twoLane(K1, opens(K1, [spot(BP1, 0, 14), spot(D, 3, 12), spot(S, 0, 14), spot(AV, 3, 12), spot(TR, 3, 12), spot(ON, 8, 60), spot(XK, 14, 60), ...sideSpots(K1)]), i => K1.P[i].x > 2170 && awayFrom(K1, K1.P[K1.N], 25)(i));
+twoLane(K2, opens(K2, [spot(AV, AV.N, 24), spot(BP1, BP1.N, 14), spot(BP2, 0, 14)]), i => K2.P[i].x > 2170 && awayFrom(K2, K2.P[0], 25)(i));
+twoLane(K3, opens(K3, [spot(KS, 12, 50)]), i => K3.P[i].x < 1830 && awayFrom(K3, K3.P[K3.N], 25)(i));
 twoLane(TR, undefined, i => awayFrom(TR, TR.P[0], 15)(i) && awayFrom(TR, TR.P[TR.N], 50)(i));
-strip(D, -3, 0.011, 3, 0.011, 0x77746e); // concrete drive
+for (const d of [D, D2]) strip(d, -3, 0.011, 3, 0.011, 0x77746e); // concrete drives
 strip(S, -9, 0.011, 9, 0.011, 0x77746e); // the mechanic's apron
-twoLane(NA, opens(NA, sideSpots(NA)), i => awayFrom(NA, NA.P[0], 25)(i) && awayFrom(NA, NA.P[NA.N], 45)(i));
-for (const p of SIDE) strip(p.apron, -p.half, 0.012, p.half, 0.012, p.fuel ? 0x4a4a4c : 0x77746e, i => i >= 2); // the roadside aprons, from the road's edge
+twoLane(NA, opens(NA, [...sideSpots(NA), spot(BP2, BP2.N, 14)]), i => awayFrom(NA, NA.P[0], 25)(i) && awayFrom(NA, NA.P[NA.N], 45)(i));
+for (const r of [BP1, BP2]) twoLane(r, undefined, i => awayFrom(r, r.P[0], 20)(i) && awayFrom(r, r.P[r.N], 20)(i)); // (no rails across the junctions' mouths)
+for (const p of SIDE) strip(p.apron, -p.half, 0.012, p.half, 0.012, p.fuel ? 0x4a4a4c : 0x77746e, i => i >= (p.r === W ? 3 : 2)); // (past the west road's shoulder) // the roadside aprons, from the road's edge
 // the viewpoint lay-by: asphalt, a stone wall along its edge, benches, a coin telescope and a sign
 strip(V, -8.5, 0.013, 8.5, 0.013, 0x45454a);
 strip(V, 8.5, 0, 8.5, 0.9, 0x8d8579);
@@ -1036,7 +1127,35 @@ endBatch();
   sculpture.rotation.y = Math.PI / 4; // square to neither street, so it reads as a ring from every way in
   scene.add(island, basin, water, sculpture);
 }
-let streetLamps; // (lit at night by the weather, below)
+// street lamps and floodlights, each [matrix, brightness, white (LED, not sodium)], drawn and lit at night by the weather
+// (below): POLES, a post (its scale the instance's) with its head out the way it shines; POOLS, the light it throws on
+// the ground, 1 m square scaled to its size
+const POLES = [], POOLS = [];
+function lampPost(x, y, z, tx, tz, size = 1, k = 1, white = false) { // standing at (x, y, z), its head towards (tx, tz)
+  POLES.push([new THREE.Matrix4().makeRotationY(Math.atan2(tx - x, tz - z)).scale(new THREE.Vector3(size, size, size)).setPosition(x, y, z), k, white]);
+  solid(x, z, x, z, 0.12 * size, y - 0.1, y + 8 * size);
+}
+function roadPool(r, i, o, w, d, k = 1, white = false) { // w across road r by d along it, o out from sample i, on its slope
+  const along = r.P[Math.min(i + 1, r.N)].clone().sub(r.P[Math.max(i - 1, 0)]).normalize(), up = along.clone().cross(r.L[i]);
+  POOLS.push([new THREE.Matrix4().makeBasis(r.L[i], up, along).scale(new THREE.Vector3(w, 1, d))
+    .setPosition(r.P[i].x + r.L[i].x * o + up.x * 0.15, r.P[i].y + up.y * 0.15, r.P[i].z + r.L[i].z * o + up.z * 0.15), k, white]);
+}
+// floodlights on a site g, in its own axes: posts [x, z, tx, tz] (their heads towards tx, tz) and pools [x, z, w, d]
+function floodlit(g, posts, pools, size = 1.2, k = 1.3, white = true) {
+  g.updateMatrixWorld();
+  for (const [x, z, tx, tz] of posts) {
+    const a = g.localToWorld(new THREE.Vector3(x, 0, z)), b = g.localToWorld(new THREE.Vector3(tx, 0, tz));
+    lampPost(a.x, a.y, a.z, b.x, b.z, size, k, white);
+  }
+  for (const [x, z, w, d] of pools) POOLS.push([g.matrixWorld.clone().multiply(new THREE.Matrix4().makeTranslation(x, 0.15, z).scale(new THREE.Vector3(w, 1, d))), k, white]);
+}
+// what can light the car itself when it's near (nearLights, below), [x, y, z, intensity, reach, white]: each lamp's
+// head, and the ceiling lights over the places it stops, put here in a site's own axes
+const GLOWS = [];
+function glowAt(g, list, white = true) {
+  g.updateMatrixWorld();
+  for (const [x, y, z, I, reach] of list) { const p = g.localToWorld(new THREE.Vector3(x, y, z)); GLOWS.push([p.x, p.y, p.z, I, reach, white]); }
+}
 // the towns' buildings, each the same every drive (its own seeded random): 3-12 storey blocks round the sides of its
 // blocks (none out past the ring's curves), towers in the middle ones, and its landmarks; then the airfield's. Window
 // bays 4 m wide, storeys 3.5 m, all in one mesh. Street lamps along every street's pavements
@@ -1240,6 +1359,7 @@ let streetLamps; // (lit at night by the weather, below)
       return true;
     }
   });
+  town(X4, Z4, 20261031, [10, 22], (k, j) => k === 0 && j === 0); // Westhaven
   // the airfield, between its runway and Midtown: a concrete apron, the terminal with three jet bridges and an airliner
   // parked nose-in at the middle one, and north of the road in, two hangars and the control tower
   piece(new THREE.PlaneGeometry(120, 305).rotateX(-Math.PI / 2).translate(240, 0.011, -897.5), 0x9a9a94); // (out to the road)
@@ -1274,23 +1394,20 @@ let streetLamps; // (lit at night by the weather, below)
     jet(new THREE.CylinderGeometry(0.25, 0.25, 2.6, 8).translate(12, 1.3, 0), 0x3a3d42);
     solid(264, -920, 264, -920, 0.5);
   }
+  const masts = [-1035, -975, -915, -855, -795]; // floodlight masts down the apron's runway side, lighting it out to the terminal
+  floodlit(new THREE.Object3D(), masts.map(z => [186, z, 300, z]), masts.map(z => [236, z, 100, 80]), 2, 1.4);
   scene.add(new THREE.Mesh(mergeGeometries(parts), new THREE.MeshLambertMaterial({ map: windows, vertexColors: true })));
   const pt = new THREE.InstancedMesh(new THREE.ConeGeometry(2.2, 9, 6).translate(0, 4.5, 0), new THREE.MeshLambertMaterial({ color: 0x2f5a2a }), parkTrees.length);
   parkTrees.forEach(([x, z], k) => { pt.setMatrixAt(k, new THREE.Matrix4().makeTranslation(x, 0, z)); solid(x, z, x, z, 2); });
   scene.add(pt);
-  const lamps = [];
-  for (const r of STREETS) {
+  for (const r of STREETS) { // on the pavements every 36 m, clear of the junctions, their heads out over the road
     const gap = gapOf(r);
-    for (let i = 6; i < r.N; i += 12) if (gap(i) > 14.5) for (const s of r === RB ? [1] : [1, -1]) lamps.push([r, i, s]);
+    for (let i = 6; i < r.N; i += 12) if (gap(i) > 14.5) for (const s of r === RB ? [1] : [1, -1]) {
+      const p = r.P[i];
+      lampPost(p.x + r.L[i].x * s * 6.8, p.y, p.z + r.L[i].z * s * 6.8, p.x, p.z);
+      roadPool(r, i, s * 4.3, 16, 16);
+    }
   }
-  const lamp = new THREE.InstancedMesh(mergeGeometries([new THREE.CylinderGeometry(0.09, 0.12, 8, 6).translate(0, 4, 0), new THREE.BoxGeometry(0.35, 0.18, 1.4).translate(0, 8, 0.6)]),
-    new THREE.MeshLambertMaterial({ color: 0x50555b }), lamps.length);
-  lamps.forEach(([r, i, s], k) => { // on the pavement, its head out over the road
-    const p = r.P[i], o = s * 6.8, x = p.x + r.L[i].x * o, z = p.z + r.L[i].z * o;
-    lamp.setMatrixAt(k, new THREE.Matrix4().makeRotationY(Math.atan2(-s * r.L[i].x, -s * r.L[i].z)).setPosition(x, p.y, z));
-    solid(x, z, x, z, 0.12, p.y - 0.1, p.y + 8);
-  });
-  scene.add(streetLamps = lamp);
 }
 // the bridge: parapets along its pavements once it's off the ground, the deck's edges and underside, and piers every
 // ~21 m - two columns under a cap - none on the autobahn's carriageways or the on-ramp, one in the median
@@ -1382,6 +1499,16 @@ for (const [text, z, turn] of [['36', -2850, Math.PI], ['18', -550, 0]]) {
     lights.push(new THREE.BoxGeometry(0.15, 0.06, 1.5).translate(x, k * h - 0.31, z0 + 5 + 7.5 * n));
   for (const r of CP_RAMPS.slice(1)) for (let i = 1; i < r.N; i += 3) lights.push(new THREE.BoxGeometry(0.15, 0.06, 1.5).translate(r.P[i].x, r.P[i].y - 0.31, r.P[i].z));
   scene.add(new THREE.Mesh(mergeGeometries(lights), new THREE.MeshBasicMaterial({ color: 0xfffbe8 })));
+  // at night their light on the floors under them and down every ramp, and lamps on the open roof's side walls
+  for (let k = 0; k < CP.levels - 1; k++) for (let n = 0; n < 9; n++) for (const x of [x0 + 8.75, x1 - 8.75])
+    POOLS.push([new THREE.Matrix4().makeScale(13, 1, 11).setPosition(x, k * h + 0.15, z0 + 5 + 7.5 * n), 0.9, true]), GLOWS.push([x, k * h + h - 0.35, z0 + 5 + 7.5 * n, 120, 16, true]);
+  for (const r of CP_RAMPS.slice(1)) for (let i = 1; i < r.N; i += 3) GLOWS.push([r.P[i].x, r.P[i].y - 0.35, r.P[i].z, 120, 16, true]);
+  for (const r of CP_RAMPS) for (let i = 1; i < r.N; i += 3) roadPool(r, i, 0, 9, 8, 0.9, true);
+  for (let n = 0; n < 4; n++) for (const [x, to] of [[x0, 1], [x1, -1]]) {
+    const z = z0 + 8.75 + 17.5 * n;
+    lampPost(x, top, z, x + to, z, 0.7, 1, true);
+    POOLS.push([new THREE.Matrix4().makeScale(18, 1, 20).setPosition(x + to * 8, top + 0.15, z), 1, true]);
+  }
   const c = document.createElement('canvas'), g = c.getContext('2d');
   c.width = c.height = 128;
   g.fillStyle = '#1c4f8a'; g.fillRect(0, 0, 128, 128);
@@ -1470,6 +1597,9 @@ function pitGarages(g) {
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(12, 1.5), new THREE.MeshBasicMaterial({ map: Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace }) }));
   sign.position.set(0, 5.3, 9.3); // faces the pit lane (+z)
   g.add(sign);
+  const posts = [-91, -63, -35, 21, 49, 77]; // floodlights on the walls between doors (not the team's), over the apron and lane
+  floodlit(g, posts.map(x => [x, 9.6, x, 20]), [...posts.map(x => [x, 15, 28, 13]), [0, 15, 20, 13], [0, 1, 13, 15]]);
+  glowAt(g, [[0, 5.9, 1, 120, 16]]); // the team's ceiling light
 }
 // the racetrack: asphalt with white edge lines, red and white kerbs through the bends, gravel on their outsides, a
 // concrete wall all round 45 m out (open where the track road comes in, and along the pits), the start / finish line
@@ -1538,6 +1668,53 @@ function pitGarages(g) {
   startLine(site(NR.P[RIG].x, NR.P[RIG].y, NR.P[RIG].z, NR_PIT.rot), 9.5);
   pitGarages(site(NR_PIT.x, NR_PIT.y, NR_PIT.z, NR_PIT.rot));
 }
+// the drift park: asphalt, a painted figure of eight, concrete walls round three sides (open to the street), floodlit
+{
+  strip(DP, -60, 0.011, 60, 0.011, 0x38383a);
+  for (const s of [1, -1]) strip(DP, s * 60, 0, s * 60, 0.8, 0xd6d6d0);
+  const end = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.8, 120), new THREE.MeshLambertMaterial({ color: 0xd6d6d0 }));
+  end.position.set(600, 0.4, 600);
+  solid(600, 540, 600, 660, 0.2, -0.1, 0.8);
+  const rings = [880, 720].map(x => new THREE.RingGeometry(24.85, 25.15, 96).rotateX(-Math.PI / 2).translate(x, 0.02, 600));
+  scene.add(end, new THREE.Mesh(mergeGeometries(rings), new THREE.MeshLambertMaterial({ color: 0xeeeeee })));
+  const xs = [650, 760, 870, 960];
+  floodlit(new THREE.Object3D(), xs.flatMap(x => [[x, 538, x, 600], [x, 662, x, 600]]), xs.map(x => [x, 600, 110, 120]), 1.5, 1.2);
+}
+// the drag strip: asphalt, concrete aprons, two lanes, walls down the straight, a gantry at the start and the finish
+{
+  const straight = i => DS.P[i].x > 1240 && DS.P[i].z > 280 && DS.P[i].z < 1120;
+  strip(DS, -6, 0.011, 6, 0.011, 0x333336);
+  paint(DS, 0, 0.15, straight);
+  for (const s of [1, -1]) {
+    strip(DS, s * 6, 0.009, s * 9, 0.009, 0xa9a69e);
+    paint(DS, s * 5.8, 0.2);
+    strip(DS, s * 9, 0, s * 9, 0.8, 0xd6d6d0, straight);
+  }
+  for (const z of [DRAG.z0, DRAG.z1]) startLine(site(DRAG.x, 0, z, -Math.PI / 2), 12);
+}
+// the mall: its car park (bays in double rows, an aisle up the middle), the building, glass along its front, its sign
+{
+  strip(MP, -90, 0.011, 90, 0.011, 0x404042);
+  const lines = [];
+  for (const [z0, z1] of [[1320, 1340], [1375, 1395], [1430, 1440]]) for (let x = 912.5; x <= 1087.5; x += 2.5) if (Math.abs(x - 1000) > 8)
+    lines.push(new THREE.BoxGeometry(0.12, 0.01, z1 - z0).translate(x, 0.02, (z0 + z1) / 2));
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(200, 5, 0.3), new THREE.MeshLambertMaterial({ color: 0x2a3d52 }));
+  glass.position.set(1000, 3, 1464.9);
+  const mall = new THREE.Mesh(new THREE.BoxGeometry(220, 18, 80), new THREE.MeshLambertMaterial({ color: 0xd9d4ca }));
+  mall.position.set(1000, 9, 1505);
+  [[890, 1465, 1110, 1465], [1110, 1465, 1110, 1545], [1110, 1545, 890, 1545], [890, 1545, 890, 1465]].forEach(([ax, az, bx, bz]) => solid(ax, az, bx, bz));
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  c.width = 512; c.height = 128;
+  g.fillStyle = '#7a1f3d'; g.fillRect(0, 0, 512, 128);
+  g.fillStyle = '#fff'; g.font = 'bold 84px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('NORTH MALL', 256, 70);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(32, 8), new THREE.MeshBasicMaterial({ map: Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace }) }));
+  sign.position.set(1000, 12.5, 1464.7);
+  sign.rotation.y = Math.PI; // faces the car park
+  scene.add(new THREE.Mesh(mergeGeometries(lines), new THREE.MeshLambertMaterial({ color: 0xeeeeee })), glass, mall, sign);
+  floodlit(new THREE.Object3D(), [[922, 1360, 1000, 1360], [1078, 1360, 1000, 1360], [922, 1420, 1000, 1420], [1078, 1420, 1000, 1420]],
+    [[1000, 1335, 180, 70], [1000, 1405, 180, 80]], 1.4, 1.2);
+}
 // Road samples in 40 m cells, so any point finds the roads near it: [road, sample index]
 const cells = new Map();
 for (const r of ROADS) for (let i = 0; i < r.N; i++) {
@@ -1575,13 +1752,13 @@ function onRoad(x, z, near) {
 // Near a road it follows the road (a ditch alongside, so the coarse grid never pokes through the asphalt); away from
 // it, the roads' general height plus peaks and valleys that grow with distance; valley floors stop at the plain
 const LAND = { x0: 2100, x1: 9705, z0: -2000, z1: 7405 };
-const coarse = ROADS.filter(r => r !== T && !UTURNS.includes(r) && !STREETS.includes(r) && !CP_ROADS.includes(r)).flatMap(r => r.P.filter((_, i) => i % 50 === 0)), noise = new ImprovedNoise(); // (the flat city and track, and the flyover, don't shape the hills; every 150 m keeps the bigger land quick to build)
+const coarse = ROADS.filter(r => r !== T && r !== W && ![XK, XW, KS, WS, NW].includes(r) && !UTURNS.includes(r) && !STREETS.includes(r) && !CP_ROADS.includes(r)).flatMap(r => r.P.filter((_, i) => i % 50 === 0)), noise = new ImprovedNoise(); // (the flat city and track, and the flyover, don't shape the hills; every 150 m keeps the bigger land quick to build)
 function terrainAt(x, z) {
   const edge = Math.min(x - LAND.x0, LAND.x1 - x, z - LAND.z0, LAND.z1 - z);
   if (edge <= 0) return -0.1; // the plain
   let near = Infinity, sw = 0, sy = 0; // the road's height near here, weighted 1/d^4 (so: the road's own height on it)
   eachNear(x, z, 2, (r, i) => {
-    if (r === BR) return; // (on piers)
+    if (r === BR || r === XK) return; // (on piers)
     const d2 = (r.P[i].x - x) ** 2 + (r.P[i].z - z) ** 2, w = 1 / (d2 * d2 + 1e-6);
     near = Math.min(near, d2); sw += w; sy += w * (r.P[i].y - r.dip);
   });
@@ -1621,16 +1798,17 @@ let terrain;
 // trees: along the autobahn, round the racetrack outside its walls, on gentle grass slopes round the mountains and the
 // village's roads (not in town or the village), and the forest the Nordschleife runs through, thickest by the track -
 // clear of every road (3 m past its edge) and the forecourts; one that runs out of tries by a road isn't planted
-const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(2, 8, 6).translate(0, 4, 0), new THREE.MeshLambertMaterial({ color: 0x2f5a2a }), 16000);
+const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(2, 8, 6).translate(0, 4, 0), new THREE.MeshLambertMaterial({ color: 0x2f5a2a }), 19000);
 const m = new THREE.Matrix4();
 for (let k = 0; k < trees.count; k++) {
-  const hills = k >= 6000 && k < 9200, track = k >= 9200 && k < 10000, ring = k >= 10000, r = ring ? NR : track ? T : hills ? [M, M, K1, K2, CR, SL][k % 6] : A;
+  const hills = k >= 6000 && k < 9200, track = k >= 9200 && k < 10000, ring = k >= 10000 && k < 16000, west = k >= 16000;
+  const r = west ? W : ring ? NR : track ? T : hills ? [M, M, K1, K2, CR, SL][k % 6] : A;
   let x, z, y, i, o, g, tries = 0;
   do {
     i = Math.floor(Math.random() * r.N);
-    o = (track ? 85 + Math.random() * 200 : ring ? 12 + Math.random() ** 2 * 160 : hills ? 14 + Math.random() * 300 : 25 + Math.random() * 120) * (Math.random() < 0.5 ? -1 : 1);
+    o = (west ? 30 + Math.random() * 170 : track ? 85 + Math.random() * 200 : ring ? 12 + Math.random() ** 2 * 160 : hills ? 14 + Math.random() * 300 : 25 + Math.random() * 120) * (Math.random() < 0.5 ? -1 : 1);
     x = r.P[i].x + r.L[i].x * o; z = r.P[i].z + r.L[i].z * o; y = terrainAt(x, z); g = onRoad(x, z);
-  } while (tries++ < 20 && (g.d < (track ? 55 : 14) || g.out < 3 || (r === A && nearStation(i, 30, Math.sign(o))) || inCity(x, z, 20) || Math.hypot(x - VIL.x, z - VIL.z) < VIL.r + 30 ||
+  } while (tries++ < 20 && (g.d < (track ? 55 : 14) || g.out < 3 || (r === A && nearStation(i, 30, Math.sign(o))) || inCity(x, z, 20) || Math.hypot(x - VIL.x, z - VIL.z) < VIL.r + 30 || (west && (x < X4.at(-1) + 80 || Math.abs(i - W.iS - 18) < 70)) ||
     ((hills || ring) && ((hills && y > 200) || Math.abs(terrainAt(x + 4, z) - y) > 3 || Math.abs(terrainAt(x, z + 4) - y) > 3))));
   if (g.d < (track ? 55 : 14) || g.out < 3) { trees.setMatrixAt(k, m.makeScale(0, 0, 0)); continue; }
   trees.setMatrixAt(k, m.makeTranslation(x, y, z));
@@ -1641,10 +1819,10 @@ scene.add(trees);
 // self-checks: the car rests exactly on the mountain and link roads, the drive and the lay-by, the village's roads, the
 // Nordschleife and its roads, the aprons, the runway, the flyovers and the bridge and the autobahn and on-ramp under
 // them, the car park's decks and ramps, and no climb is steeper than 12%
-for (const r of [M, K1, K2, K3, D, V, S, ...STREETS.filter(r => r !== BR), T, TR, CR, SL, VL, NR, NPL, NA, RW, ...SIDE.map(p => p.apron)]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z) - r.P[i].y) < 0.05, 'the car should rest on the road', i);
-for (const r of [...UTURNS, A, BR, ON, ...CP_ROADS]) for (let i = 0; i < r.N; i++) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z, r.P[i].y) - r.P[i].y) < 0.05, 'the car should rest on the road, not the one over or under it', i);
+for (const r of [M, K1, K2, K3, BP1, BP2, D, V, S, ...STREETS.filter(r => r !== BR), T, TR, CR, SL, VL, NR, NPL, NA, RW, ...SIDE.map(p => p.apron)]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z) - r.P[i].y) < 0.05, 'the car should rest on the road', i);
+for (const r of [...UTURNS, A, BR, ON, ...CP_ROADS, XK, XW, KS, WS, NW]) for (let i = 0; i < r.N; i++) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z, r.P[i].y) - r.P[i].y) < 0.05, 'the car should rest on the road, not the one over or under it', i);
 let steepest = 0;
-for (const r of [M, K2, AV, BR, CR, SL, NA]) for (let i = 0; i < r.N; i++) steepest = Math.max(steepest, Math.abs(r.P[i + 1].y - r.P[i].y) / Math.hypot(r.P[i + 1].x - r.P[i].x, r.P[i + 1].z - r.P[i].z));
+for (const r of [M, K2, AV, BR, CR, SL, NA, BP1, BP2]) for (let i = 0; i < r.N; i++) steepest = Math.max(steepest, Math.abs(r.P[i + 1].y - r.P[i].y) / Math.hypot(r.P[i + 1].x - r.P[i].x, r.P[i + 1].z - r.P[i].z));
 console.assert(steepest < 0.12, 'mountain grades should stay under 12%', steepest);
 
 // fuel stations: canopy, two pump islands, a shop and a sign, on a site o m out from road r's sample i on side s
@@ -1664,15 +1842,19 @@ function fuelStation(r, i, s, o) {
   sBox(0.1, 1.6, 8, 0x2a3440, 7.95, 1.7, 0);   // shop window
   sBox(0.3, 9, 0.3, 0xcccccc, -10, 4.5, 16);   // sign
   sBox(0.25, 2.4, 2.4, 0x1f9d55, -10, 8.6, 16);
+  // lit: under the canopy, floodlights by the shop over the pumps' ends, and on the autobahn its ways in and out
+  floodlit(station, [[9, -13, 0, -13], [9, 13, 0, 13], ...(o > 30 ? [[-13, -42, 0, -42], [-13, 42, 0, 42]] : [])],
+    [[0, 0, 22, 32], [2, -14, 16, 12], [2, 14, 16, 12], ...(o > 30 ? [[-6, -42, 18, 26], [-6, 42, 18, 26]] : [])]);
+  glowAt(station, [[-4, 4.7, -7, 120, 18], [4, 4.7, -7, 120, 18], [-4, 4.7, 7, 120, 18], [4, 4.7, 7, 120, 18]]); // under the canopy
   STATIONS.push(station.position);
 }
 for (const [i, s] of A_STATIONS) fuelStation(A, i, s, 31);
 for (const p of SIDE) if (p.fuel) fuelStation(p.r, p.i, 1, 24);
 
 // home: the garage, open to the drive (north), with the house beside it. Local +Z is north, +X east
-{
+for (const H of HOMES) {
   const home = new THREE.Group();
-  home.position.set(HOME.x, 0, HOME.z);
+  home.position.set(H.x, 0, H.z);
   const hBox = (w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
     b.position.set(x, y, z);
@@ -1693,6 +1875,9 @@ for (const p of SIDE) if (p.fuel) fuelStation(p.r, p.i, 1, 24);
   for (const [x, y] of [[4.6, 1.5], [10.9, 1.5], [4.6, 4.2], [7.9, 4.2], [10.9, 4.2]]) hBox(1.4, 1.2, 0.1, 0x2d3b4a, x, y, 4.31); // windows
   hBox(1.1, 2.2, 0.1, 0x6b4a32, 7.9, 1.1, 4.31);                     // front door
   scene.add(home);
+  // garden lamps down the drive and by the front door, and the garage lit
+  floodlit(home, [[-3.8, 44, 0, 44], [-3.8, 22, 0, 22], [13.6, 7, 8, 7]], [[0, 42, 10, 16], [0, 22, 10, 18], [6, 9, 16, 9], [0, 0, 5, 8]], 0.5, 1.1, false);
+  glowAt(home, [[0, 2.9, 0, 20, 7]]);
 }
 
 // workshops: one wide bay open to the road, a lift, a tool chest and a sign, on a site with local +Z away from the
@@ -1721,10 +1906,114 @@ function workshop(x, y, z, rot) {
   sign.position.set(0, 4.5, -6.16);
   sign.rotation.y = Math.PI; // faces the road
   shop.add(sign);
+  floodlit(shop, [[-8.5, -7, -4, -14], [8.5, -7, 4, -14]], [[0, -14, 20, 14], [0, 0, 13, 11]]); // the apron, and the bay
+  glowAt(shop, [[0, 4.9, 0, 100, 14]]);
   SHOPS.push({ x, z, rot });
 }
 workshop(SHOP.x, 0, SHOP.z, 0);
 for (const p of SIDE) if (!p.fuel) workshop(p.r.P[p.i].x + p.r.L[p.i].x * 58, p.r.P[p.i].y, p.r.P[p.i].z + p.r.L[p.i].z * 58, away(p.r, p.i, 1));
+// the crossovers: asphalt, edge lines and parapets (down to the ground at the edges where low), the deck's underside
+// and piers as the U-turns' - each where clear of the roads under and beside - and a pier in the autobahn's median
+// where they cross it; the slip as the on-ramp, gravel shoulders and guardrails; the closed lanes' barriers, a
+// concrete block with a red and white board
+{
+  const foot = (q, j) => q === A ? 17.5 : q === W && W.hw(j) ? 10 : q.half + 0.3; // a road's reach either side, to its rails
+  const bare = (r, i, o, below = 1.5) => { // the point o m left of r's sample i is off every other road from `below` m down to as far up
+    const x = r.P[i].x + r.L[i].x * o, z = r.P[i].z + r.L[i].z * o;
+    let ok = true;
+    eachNear(x, z, 1, (q, j) => { if (q !== r && Math.abs(q.P[j].y - r.P[i].y) < below && Math.hypot(q.P[j].x - x, q.P[j].z - z) < foot(q, j)) ok = false; });
+    return ok;
+  };
+  const piers = [], box = (w, h, d, x, y, z, turn) => piers.push(new THREE.BoxGeometry(w, h, d).rotateY(turn).translate(x, y, z));
+  const pier = (U, i) => { // a column and a cap across the deck
+    const p = U.P[i], h = p.y - 1.5, turn = Math.atan2(-U.L[i].z, U.L[i].x);
+    box(1.2, h + 2, 1.2, p.x, (h - 2) / 2, p.z, turn);
+    box(7.6, 0.7, 1.6, p.x, h - 0.35, p.z, turn);
+  };
+  batch = new Map();
+  for (const U of [XK, XW, NW]) {
+    strip(U, -4.2, 0.016, 4.2, 0.016, 0x3a3a3c);
+    for (const s of [1, -1]) {
+      paint(U, s * 3.4, 0.2, i => bare(U, i, s * 4.2));
+      strip(U, s * 4.2, 0, s * 4.2, 1, 0xd6d4ce, i => bare(U, i, s * 4.2));
+      strip(U, s * 4.2, -1.5, s * 4.2, 0, 0xb8b5ad, i => bare(U, i, s * 4.2));
+    }
+    strip(U, -4.2, -1.5, 4.2, -1.5, 0xb8b5ad, i => U.P[i].y > 1.5);
+    for (let i = 0; i < U.N; i += 7) if (U.P[i].y > 1.8 && bare(U, i, 0, U.P[i].y + 1)) pier(U, i);
+    const across = i => { const j = nearestSample(A, U.P[i].x, U.P[i].z); return Math.abs((U.P[i].x - A.P[j].x) * A.L[j].x + (U.P[i].z - A.P[j].z) * A.L[j].z); };
+    let mid = 0, best = Infinity;
+    for (let i = 0; i < U.N; i++) if (U.P[i].y > 7) { const d = across(i); if (d < best) best = d, mid = i; }
+    pier(U, mid); // (on the median wall)
+  }
+  for (const R of [KS, WS]) {
+    strip(R, -4.2, 0.016, 4.2, 0.016, 0x3a3a3c);
+    for (const s of [1, -1]) {
+      paint(R, s * 3.6, 0.2, i => bare(R, i, s * 5));
+      strip(R, s * 4.2, 0.009, s * 5, 0.009, 0x77706a, i => bare(R, i, s * 5));
+      strip(R, s * 4.8, 0, s * 4.8, 0.75, 0x9aa0a6, i => bare(R, i, s * 5));
+    }
+  }
+  endBatch();
+  const red = [], white = [];
+  for (const [r, b] of CLOSED) {
+    const p = r.P[b], L = r.L[b], w = r === W ? 7.6 : 4.5, turn = Math.atan2(L.x, L.z), at = o => [p.x - L.x * o, p.z - L.z * o];
+    const [mx, mz] = at((w + 0.3) / 2);
+    box(0.5, 0.8, w - 0.3, mx, p.y + 0.4, mz, turn);
+    for (let k = 0; k * 0.5 < w - 0.3; k++) {
+      const [x, z] = at(0.3 + k * 0.5 + 0.25);
+      (k % 2 ? white : red).push(new THREE.BoxGeometry(0.12, 0.45, 0.5).rotateY(turn).translate(x, p.y + 1.03, z));
+    }
+    solid(...at(0.3), ...at(w), 0.3, p.y - 0.1, p.y + 1.25);
+  }
+  scene.add(new THREE.Mesh(mergeGeometries(piers), new THREE.MeshLambertMaterial({ color: 0xc4c1b9 })),
+    new THREE.Mesh(mergeGeometries(red), new THREE.MeshLambertMaterial({ color: 0xc8261e })), new THREE.Mesh(mergeGeometries(white), new THREE.MeshLambertMaterial({ color: 0xf2f2ee })));
+}
+// the west road: the highway's asphalt, double centre line, dashed lane lines, edges, gravel shoulders and rails (open
+// at its roadside stations, and clear of the autobahn and the city at its ends); the autobahn's as the oval's, its
+// rails open along the service area (fuel, then a workshop 120 m on, each side); and between, the asphalt widening and
+// narrowing (lines and rails stop for the 180 m). Before W.iC only the westbound half, the slip out of the autobahn
+{
+  const { iA, iB, iS, auto } = W, open = opens(W, [...sideSpots(W), spot(XW, 14, 60), spot(WS, 14, 60), spot(NW, NW.N - 12, 90)]), hw = i => W.hw(i) && W.P[i].x < -424; // (drawn from the oval's edge on)
+  const half = (i, s) => i >= W.iC ? hw(i) : s > 0; // where each side's drawn: before W.iC the slip's, out of the hard shoulder
+  const ends = (i, s) => i < W.N - 12 && W.P[i].x + W.L[i].x * s * 10 < -418; // rails clear of the oval and the city's ring
+  const taper = (i0, i1, a, b) => { // the asphalt's half-width from a to b over samples i0 to i1
+    const v = [], at = (i, o) => [W.P[i].x + W.L[i].x * o, W.P[i].y + 0.013, W.P[i].z + W.L[i].z * o], h = i => a + (b - a) * (i - i0) / (i1 - i0);
+    for (let i = i0; i < i1; i++) v.push(...at(i, -h(i)), ...at(i, h(i)), ...at(i + 1, -h(i + 1)), ...at(i, h(i)), ...at(i + 1, h(i + 1)), ...at(i + 1, -h(i + 1)));
+    const g = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    g.computeVertexNormals();
+    batch.get(0x3a3a3c).push(g);
+  };
+  const stop = i => Math.abs(i - iS - 18) <= 44; // the service area's forecourt, both sides
+  batch = new Map([[0x3a3a3c, []]]);
+  strip(W, -7.6, 0.013, 0, 0.013, 0x3a3a3c, i => half(i, -1)); // (a hair over the oval's asphalt where it leaves it)
+  strip(W, 0, 0.013, 7.6, 0.013, 0x3a3a3c, i => half(i, 1));
+  paint(W, 0.2, 0.2, i => i < W.iC && W.P[i].x < -414); // (once off the hard shoulder's line)
+  strip(W, -0.3, 0.009, -2.3, 0.009, 0x77706a, i => i < W.iC && hw(i));
+  strip(W, -2.6, 0, -2.6, 0.75, 0x9aa0a6, i => i < W.iC && hw(i));
+  taper(iA, iA + 60, 7.6, 16.75);
+  taper(iB - 60, iB, 16.75, 7.6);
+  strip(W, -16.75, 0.013, 16.75, 0.013, 0x3a3a3c, auto);
+  strip(W, 0, 0, 0, 0.9, 0xb0b0a8, auto);
+  for (const s of [1, -1]) {
+    paint(W, s * 0.2, 0.15, i => i >= W.iC && hw(i));
+    paint(W, s * 3.7, 0.15, i => half(i, s) && dashed(i));
+    paint(W, s * 7.3, 0.2, i => half(i, s) && !open(i, s));
+    strip(W, s * 7.6, 0.009, s * 9.6, 0.009, 0x77706a, i => half(i, s));
+    strip(W, s * 10, 0, s * 10, 0.75, 0x9aa0a6, i => half(i, s) && hw(i) && ends(i, s) && !open(i, s));
+    paint(W, s * 2.5, 0.3, auto);
+    paint(W, s * 6.25, 0.15, i => auto(i) && dashed(i));
+    paint(W, s * 10, 0.15, i => auto(i) && dashed(i));
+    paint(W, s * 13.75, 0.3, auto);
+    strip(W, s * 17.5, 0, s * 17.5, 0.75, 0x9aa0a6, i => auto(i) && !stop(i));
+    strip(W, s * 16.75, 0.012, s * 46, 0.012, 0x4a4a4c, stop); // the forecourt
+  }
+  endBatch();
+  for (const s of [1, -1]) {
+    fuelStation(W, iS, s, 31);
+    const j = iS + 40;
+    workshop(W.P[j].x + W.L[j].x * s * 32, W.P[j].y, W.P[j].z + W.L[j].z * s * 32, away(W, j, s));
+  }
+}
 
 // the village's buildings, the same every drive (a seeded random): stone houses along its lanes, one or two
 // storeys, each turned to face its lane with a door and small windows front and back, a chimney and a gabled roof of
@@ -1825,23 +2114,25 @@ scene.traverse(o => {
 // left (a corner), so the joints along a wall can't tilt its push. Driven in steeper than 30° the car stops dead; a
 // glancing blow turns it along the wall with the part of its speed that was along it
 const CAR_AT = [-1, 0, 1].map(k => k * (CAR.length / 2 - CAR_R));
+const npcNear = [], npcOf = []; // the traffic round the car, as solids, and which car each is (refreshed each frame by trafficTick, below)
 function collide(car) {
-  let nx = 0, nz = 0;
+  let nx = 0, nz = 0, other = null, ox = 0, oz = 0, cx = 0, cz = 0;
   for (const at of CAR_AT) for (let pass = 0; pass < 3; pass++) {
     const px = car.x + Math.sin(car.heading) * at, pz = car.z + Math.cos(car.heading) * at;
-    const s = solids.get(Math.floor(px / CELL) + ',' + Math.floor(pz / CELL)) || [];
-    let pen = 0, ux = 0, uz = 0;
-    for (let k = 0; k < s.length; k += 7) {
+    let pen = 0, ux = 0, uz = 0, by = null;
+    for (const s of [solids.get(Math.floor(px / CELL) + ',' + Math.floor(pz / CELL)) || [], npcNear]) for (let k = 0; k < s.length; k += 7) {
       if (s[k + 5] > (car.y || 0) + 1.5 || s[k + 6] < (car.y || 0) + 0.3) continue; // over or under its body
       const ax = s[k], az = s[k + 1], dx = s[k + 2] - ax, dz = s[k + 3] - az, l2 = dx * dx + dz * dz;
       const t = l2 ? Math.min(1, Math.max(0, ((px - ax) * dx + (pz - az) * dz) / l2)) : 0;
       const ox = px - ax - dx * t, oz = pz - az - dz * t, d = Math.hypot(ox, oz);
-      if (CAR_R + s[k + 4] - d > pen && d > 1e-6) { pen = CAR_R + s[k + 4] - d; ux = ox / d; uz = oz / d; }
+      if (CAR_R + s[k + 4] - d > pen && d > 1e-6) { pen = CAR_R + s[k + 4] - d; ux = ox / d; uz = oz / d; by = s === npcNear ? npcOf[k / 7] : null; }
     }
     if (!pen) break;
     car.x += ux * pen; car.z += uz * pen;
-    nx += ux; nz += uz;
+    if (by) other = by, ox += ux, oz += uz, cx = px - ux * CAR_R, cz = pz - uz * CAR_R; // (where it was struck)
+    else nx += ux, nz += uz;
   }
+  if (other) knock(car, other, ox, oz, cx, cz);
   const n = Math.hypot(nx, nz), dir = Math.sign(car.speed);
   if (!n || !dir) return;
   const mx = Math.sin(car.heading) * dir, mz = Math.cos(car.heading) * dir, into = (mx * nx + mz * nz) / n; // -1: head-on
@@ -1851,6 +2142,24 @@ function collide(car) {
   const tx = mx - nx / n * into, tz = mz - nz / n * into; // along it
   car.heading = Math.atan2(tx * dir, tz * dir);
   car.speed *= Math.hypot(tx, tz);
+}
+// a car of the traffic that you hit: the two part as ~1.6 t and 1.4 t cars would (restitution 0.3) - along its way
+// into its speed, across it into a slide (~0.7 g to a stop), turned by how far off its middle the blow lands - and
+// then it eases back into its lane; yours keeps what's along its heading, never under 40% of its speed
+function knock(car, n, ux, uz, cx, cz) {
+  const l = Math.hypot(ux, uz), hx = Math.sin(car.heading), hz = Math.cos(car.heading), fx = Math.sin(n.heading), fz = Math.cos(n.heading);
+  ux /= l; uz /= l; // from it towards your car
+  const vrel = (car.speed * hx - n.v * fx - n.kvx) * ux + (car.speed * hz - n.v * fz - n.kvz) * uz;
+  if (!(vrel < 0)) return; // already parting
+  const J = -1.3 * vrel / (1 / CH.m + 1 / 1400), kept = car.speed + J / CH.m * (ux * hx + uz * hz);
+  car.speed = kept * car.speed > 0 && Math.abs(kept) > 0.4 * Math.abs(car.speed) ? kept : 0.4 * car.speed;
+  car.hit = Math.max(car.hit || 0, -vrel);
+  const dx = -J / 1400 * ux, dz = -J / 1400 * uz, along = dx * fx + dz * fz, v = n.v + along, rx = cx - n.at.x, rz = cz - n.at.z;
+  n.v = Math.max(0, v);
+  n.kvx += dx - along * fx + Math.min(0, v) * fx;
+  n.kvz += dz - along * fz + Math.min(0, v) * fz;
+  n.kw = THREE.MathUtils.clamp(n.kw + (dx * rz - dz * rx) / 2, -2.5, 2.5); // (its yaw inertia ~ m * 2 m²)
+  n.ease = 0.7;
 }
 // a frame's move, in steps of under 0.4 m so nothing thin is driven clean through at speed
 function move(car, steer, dt) {
@@ -1877,8 +2186,9 @@ function move(car, steer, dt) {
 // flyovers too), the links, the flyovers (at their height) or the village's roads touches nothing
 for (const [r, lanes, name] of [[A, [-11.9, -8.1, -4.4, 4.4, 8.1, 11.9], 'autobahn'], [K1, [-2.25, 2.25], 'valley road'], [K2, [-2.25, 2.25], 'direct road'],
   ...UTURNS.map(u => [u, [0], 'U-turn']), [CR, [-1.6, 1.6], 'country road'], [SL, [-1.6, 1.6], 'south lane'], [VL, [0], 'village loop'],
-  [ON, [0], 'on-ramp'], [K3, [-2.25, 2.25], 'west link'], [BR, [-2.25, 2.25], 'bridge'], [NR, [-2.4, 2.4], 'Nordschleife'], [NPL, [0], 'Ring pit lane'], [NA, [-2.25, 2.25], 'Ring road']]) for (const o of lanes) {
+  [ON, [0], 'on-ramp'], [K3, [-2.25, 2.25], 'west link'], [BR, [-2.25, 2.25], 'bridge'], [NR, [-2.4, 2.4], 'Nordschleife'], [NPL, [0], 'Ring pit lane'], [NA, [-2.25, 2.25], 'Ring road'], [XK, [0], 'valley crossover'], [XW, [0], 'west crossover'], [KS, [0], 'west link slip'], [WS, [0], 'west slip'], [NW, [0], 'west flyover']]) for (const o of lanes) {
   for (let i = 0; i < r.N; i++) {
+    if (o < 0 && CLOSED.some(([q, b]) => q === r && i < b + 2)) continue; // (a closed lane, its barrier)
     const t = r.curve.getTangentAt(i / r.N), x = r.P[i].x + r.L[i].x * o, z = r.P[i].z + r.L[i].z * o, c = { x, z, y: r.P[i].y, heading: Math.atan2(t.x, t.z) };
     collide(c);
     console.assert(c.x === x && c.z === z, 'the lane should be clear', name, o, i);
@@ -2636,14 +2946,15 @@ const startBay = CP_BAYS[/^bay(\d+)$/.exec(query.get('at'))?.[1]];
 let garageClosed = !!startBay; // closed for this visit (and in the bay a swap started in); reopens after driving out and back in
 garageEl.addEventListener('click', e => {
   const b = e.target.closest('button');
-  if (b?.dataset.car && b.dataset.car !== CAR.page) swapCar(b.dataset.car, inBay());
+  if (b?.dataset.car && b.dataset.car !== CAR.page) swapCar(b.dataset.car, inBay() ?? (atHome() > 0 ? 'home2' : undefined));
   else if (b) { garageClosed = true; garageEl.hidden = true; }
 });
 const inBay = () => { // its ?at=, parked (roughly) in a car park bay
   const n = CP_BAYS.findIndex(b => Math.abs(state.x - b.x) < 2 && Math.abs(state.z - b.z) < 1 && Math.abs(state.y - b.y) < 1);
   return n < 0 ? undefined : 'bay' + n;
 };
-const inGarage = () => (Math.abs(state.x - HOME.x) < 2.4 && Math.abs(state.z - HOME.z) < 4) || !!inBay();
+const atHome = () => HOMES.findIndex(h => Math.abs(state.x - h.x) < 2.4 && Math.abs(state.z - h.z) < 4); // which home's garage it's in (-1: none)
+const inGarage = () => atHome() >= 0 || !!inBay();
 // the mechanic: stop in its bay and its menu opens the car menu on the car's own servicing, tuning or dyno tab.
 // Servicing and engine repairs only show in the car menu here - the mechanic is where the car gets fixed
 const shopEl = document.getElementById('shop');
@@ -2805,7 +3116,12 @@ else frame.src = `/car/${CAR.page}/raw${TEST_DRIVE ? '?test_drive=1' : ''}`;
 const credit = ([title, page, licence = 'by-nc-sa', author = 'Ddiaz Design', authorPage = 'https://sketchfab.com/ddiaz-design']) => `<a href="${page}" target="_blank">${title}</a>
   by <a href="${authorPage}" target="_blank">${author}</a>, <a href="http://creativecommons.org/licenses/${licence}/4.0/" target="_blank">CC ${licence.toUpperCase()} 4.0</a>`;
 document.getElementById('credit').innerHTML = `${CAR.name.replace('BMW ', '')} model: ${credit(CAR.credit)}${CAR.steering.from ? ` · steering wheel: ${credit(CARS[CAR.steering.from].credit)}` : ''}${CAR.wheelsCredit ? ` · wheels: ${credit(CAR.wheelsCredit)}` : ''}
-  · Nordschleife: <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>`;
+  · Nordschleife: <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>
+  <br>Traffic: ${[['2008 Audi RS4', 'https://sketchfab.com/3d-models/2008-audi-rs4-14024864a643497497e11163151a0eb2'], ['2013 Audi RS4 Avant', 'https://sketchfab.com/3d-models/2013-audi-rs4-avant-09c0c62808364c1e9381b2363dc76916'],
+    ['2018 Audi RS3 Sportback', 'https://sketchfab.com/3d-models/2018-audi-rs3-sportback-20fdc17a5b2f4afab096337b5822c170'], ['2024 Volkswagen Polo 170 TSI', 'https://sketchfab.com/3d-models/2024-volkswagen-polo-170-tsi-ec0f4dfd1ca84a859725e4002e9cf120']]
+    .map(([t, u]) => `<a href="${u}" target="_blank">${t}</a>`).join(', ')} by <a href="https://sketchfab.com/ddiaz-design" target="_blank">Ddiaz Design</a>, <a href="http://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a>
+  · ${credit(["Cliff's Mercedes V8 Biturbo", 'https://sketchfab.com/3d-models/cliffs-mercedes-v8-biturbo-f8c2e4a26fad4b139aa7b69d44b9b8b1', 'by', 'Libau Media', 'https://sketchfab.com/robinmikart'])}
+  · <a href="https://sketchfab.com/3d-models/2017-volkswagen-polo-sedan-290a03e4dbfc4e5ea351efa4f89b38b7" target="_blank">2017 Volkswagen Polo Sedan</a> by <a href="https://sketchfab.com/koelkastasbers" target="_blank">KOElkastasbers</a>`;
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -2817,10 +3133,10 @@ addEventListener('resize', () => {
 // every drive starts at home, on the drive just out of the garage, facing down it to the valley road - or, after a
 // swap in a pit garage, on the pit lane outside it (16 m along its site's z), pointing to the exit; in the car park, in the
 // bay, facing out
-const HOME_SPOT = { x: HOME.x, y: 0, z: HOME.z + 14, heading: 0 };
+const HOME_SPOT = { x: HOME.x, y: 0, z: HOME.z + 14, heading: 0 }, HOME2_SPOT = { x: HOME2.x, y: 0, z: HOME2.z + 14, heading: 0 };
 const pitSpot = p => ({ x: p.x + 16 * Math.sin(p.rot), y: p.y ?? 0, z: p.z + 16 * Math.cos(p.rot), heading: Math.PI / 2 + p.rot });
 const startPit = PITS.find(p => p.at === query.get('at'));
-const state = { ...(startPit ? pitSpot(startPit) : HOME_SPOT), speed: 0, steer: 0 };
+const state = { ...(startPit ? pitSpot(startPit) : query.get('at') === 'home2' ? HOME2_SPOT : HOME_SPOT), speed: 0, steer: 0 };
 if (startBay) Object.assign(state, { x: startBay.x, y: startBay.y, z: startBay.z, heading: startBay.out });
 
 // mini map, heading-up: the car's arrow always points up and the world turns round it (+X drawn on the left of +Z, as
@@ -2831,16 +3147,17 @@ if (startBay) Object.assign(state, { x: startBay.x, y: startBay.y, z: startBay.z
 const mapEl = document.getElementById('map'), map = mapEl.getContext('2d'), MW = mapEl.clientWidth, MH = mapEl.clientHeight;
 mapEl.width = MW * devicePixelRatio;
 mapEl.height = MH * devicePixelRatio;
-const MAP_ROADS = [A, M, K1, K2, K3, RW, ...STREETS, T, TR, PL, CR, SL, VL, ON, NR, NPL, NA];
+const MAP_ROADS = [A, M, K1, K2, K3, RW, ...STREETS, T, TR, PL, CR, SL, VL, ON, NR, NPL, NA, BP1, BP2, DS, W, XK, XW, KS, WS, NW];
 // its marked spots, by kind (the names are the phone pad map's legend)
-const MARKER_KINDS = [['Fuel', '#2ecc71', STATIONS], ['Home & car park', '#4fa8ff', [HOME, { x: CP.x1, z: (CP.z0 + CP.z1) / 2 }]],
-  ['Mechanic & pits', '#ff8c1a', [...SHOPS, ...PITS]], ['Viewpoint', '#ffd23f', [V.P[Math.round(V.N / 2)]]], ['Start lines', '#ffffff', [T.P[ISF], NR.P[RIG]]], ['Village', '#c08a5a', [VIL]]];
+const MARKER_KINDS = [['Fuel', '#2ecc71', STATIONS], ['Home & car park', '#4fa8ff', [HOME, HOME2, { x: CP.x1, z: (CP.z0 + CP.z1) / 2 }]],
+  ['Mechanic & pits', '#ff8c1a', [...SHOPS, ...PITS]], ['Viewpoint', '#ffd23f', [V.P[Math.round(V.N / 2)]]], ['Start lines', '#ffffff', [T.P[ISF], NR.P[RIG]]], ['Village', '#c08a5a', [VIL]],
+  ['Drift, drag & mall', '#c27bff', [{ x: 800, z: 600 }, { x: DRAG.x, z: DRAG.z0 }, { x: 1000, z: 1505 }]]];
 const MARKERS = MARKER_KINDS.flatMap(([, color, spots]) => spots.map(p => [p, color]));
 { // the mini map's legend, and the lap timer moved down below it
   const legend = document.getElementById('map-legend');
   legend.innerHTML = [['You', '#ff5a3c', 'you'], ...MARKER_KINDS.map(([name, color]) => [name, color, ''])]
     .map(([name, color, cls]) => `<span><i class="${cls}" style="--c:${color}"></i>${name}</span>`).join('');
-  document.getElementById('laptime').style.top = legend.getBoundingClientRect().bottom + 6 + 'px';
+  document.getElementById('laptime').style.top = document.getElementById('drag').style.top = legend.getBoundingClientRect().bottom + 6 + 'px';
 }
 const roadsPath = roads => { // in metres: a point every 18 m, and the last (the loops close on themselves)
   const path = new Path2D();
@@ -2856,6 +3173,7 @@ const corners = (x0, x1, z0, z1) => [{ x: x0, z: z0 }, { x: x1, z: z1 }];
 const PLACES = [['City', corners(CITY.x0, CITY.x1, CITY.z0, CITY.z1)], ['Midtown', corners(X2[0], X2.at(-1), Z2[0], Z2.at(-1))],
   ['Southgate', corners(X3[0], X3.at(-1), Z3[0], Z3.at(-1))], ['Airfield', corners(90, 500, -2980, -420)],
   ['Village', corners(VIL.x - VIL.r, VIL.x + VIL.r, VIL.z - VIL.r, VIL.z + VIL.r)],
+  ['Drift park', corners(600, 992, 540, 660)], ['Drag strip', corners(1007, 1260, 140, 1260)], ['North Mall', corners(890, 1110, 1300, 1545)], ['Westhaven', corners(X4[0], X4.at(-1), Z4[0], Z4.at(-1))],
   ['Circuit', [...T.P, ...PL.P], [T, PL]], ['Nordschleife', [...NR.P, ...NPL.P], [NR, NPL]], ['Mountain', M.P, [M]]].map(([name, P, loop]) => {
   const xs = P.map(p => p.x), zs = P.map(p => p.z), x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
   // r: round its middle, so it fits whichever way the map has turned
@@ -2889,6 +3207,14 @@ const TELEPORTS = [ // name, where, the spot
   ['Southgate', 'its middle', spotOn(STREETS, 1000, -2775, 0, 2.5)],
   ['Village', 'in among the houses', spotOn([CR, SL, VL], VIL.x, VIL.z, 0, 1.5)],
   ['Mechanic', 'in the workshop by home', { ...SHOP, y: 0, heading: 0 }],
+  ['Ring bypass', 'off the valley road, east of home', spotOn([BP1], BP1.P[12].x, BP1.P[12].z, 0, 2.25)],
+  ['Drift park', 'north of Midtown', { x: 960, y: 0, z: 600, heading: -Math.PI / 2 }],
+  ['Drag strip', 'behind the start line', { x: DRAG.x + 3, y: 0, z: DRAG.z0 - 12, heading: 0 }],
+  ['North Mall', 'its car park', { x: 1000, y: 0, z: 1310, heading: 0 }],
+  ['West road', "off the autobahn's west straight", spotOn([W], W.P[300].x, W.P[300].z, -Math.PI / 2, 5.45)],
+  ['West service area', 'on the autobahn, 21 km out', spotOn([W], W.P[W.iS - 70].x, W.P[W.iS - 70].z, -Math.PI / 2, 11.9)],
+  ['Westhaven', 'the city, 50 km west', spotOn(STREETS, -50000, -1850, 0, 2.25)],
+  ['Westhaven home', 'the drive outside the garage', HOME2_SPOT],
 ];
 const teleportEl = document.getElementById('teleport');
 document.getElementById('teleport-places').innerHTML = TELEPORTS.map(([name, where], n) => `<button data-to="${n}">${name}<small>${where}</small></button>`).join('');
@@ -2975,6 +3301,29 @@ function setLapTimer(on) {
   lapReset();
   try { localStorage.setItem('drive-laptimer', on ? 'on' : 'off'); } catch {}
   document.getElementById('lap-on').textContent = on ? 'on' : 'off';
+}
+// the drag strip's timer: from crossing its start line northbound in either lane to crossing the finish, each crossing
+// timed between frames; the time and the speed at the line, the best per car (this browser)
+const drag = { t: -1, z: 0, shown: 0 }, dragEl = document.getElementById('drag'), dragNow = document.getElementById('drag-now');
+let dragBest = {};
+try { dragBest = JSON.parse(localStorage.getItem('drive-drag-best')) || {}; } catch {}
+document.getElementById('drag-best').textContent = dragBest[CAR.page]?.toFixed(3) ?? '-';
+function dragTimer(dt) {
+  const lane = Math.abs(state.x - DRAG.x) < 7, z = state.z, past = line => (z - line) / (z - drag.z); // the share of this frame past the line
+  if (drag.t >= 0) drag.t += dt;
+  if (lane && drag.z < DRAG.z0 && z >= DRAG.z0) drag.t = dt * past(DRAG.z0);
+  else if (drag.t >= 0 && lane && drag.z < DRAG.z1 && z >= DRAG.z1) {
+    const t = drag.t - dt * past(DRAG.z1), best = Math.min(t, dragBest[CAR.page] ?? Infinity);
+    document.getElementById('drag-last').textContent = `${t.toFixed(3)} s · ${Math.round(state.speed * 3.6)} km/h`;
+    document.getElementById('drag-best').textContent = best.toFixed(3);
+    try { localStorage.setItem('drive-drag-best', JSON.stringify(dragBest = { ...dragBest, [CAR.page]: best })); } catch {}
+    dragNow.textContent = t.toFixed(3);
+    drag.t = -1;
+    drag.shown = 10;
+  } else if (drag.t >= 0 && (!lane || z < drag.z || drag.t > 60)) drag.t = -1, dragNow.textContent = '-.---'; // off the strip, backing up, or given up
+  drag.z = z;
+  if (drag.t >= 0) dragNow.textContent = drag.t.toFixed(3), drag.shown = 10;
+  dragEl.hidden = (drag.shown -= dt) <= 0;
 }
 function lapTimer(dt) {
   lap.clock += dt;
@@ -3422,12 +3771,14 @@ function setBeam(level) {
   beam.level = level;
   try { localStorage.setItem('drive-beam', JSON.stringify({ ...JSON.parse(localStorage.getItem('drive-beam')), [CAR.page]: level })); } catch {}
 }
+let flashing = false; // your high beam on (the traffic ahead moves over for it)
 function headlightsTick(dt = 0) {
   const doc = frame.contentWindow.document, on = carPage.ignition && !!doc?.getElementById('lights-btn')?.classList.contains('active');
   // pop-up headlamps rise with the lights (~0.8 s, as their motors take) and fold away with them or the key
   popK = Math.min(1, Math.max(0, popK + (on ? dt : -dt) / 0.8));
   if (CAR.popups) popup.rotation.x = -THREE.MathUtils.degToRad(CAR.popups.angle) * THREE.MathUtils.smoothstep(popK, 0, 1);
   const b = on && doc.getElementById('highbeam-btn')?.classList.contains('active') ? BEAMS.high : BEAMS.low;
+  flashing = b === BEAMS.high;
   for (const l of headlights) {
     l.intensity = on ? b.power * beam.level / 100 : 0;
     l.angle = b.angle;
@@ -3443,13 +3794,437 @@ function headlightsTick(dt = 0) {
   return on;
 }
 
-// the street lamps at night: each head lit, and a pool of its light on the road below it
-const lampHeads = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.3, 1.2).rotateX(Math.PI / 2).translate(0, 7.9, 0.6),
-  new THREE.MeshBasicMaterial({ color: 0xffe0a0 }), streetLamps.count);
-const lampPools = new THREE.InstancedMesh(new THREE.PlaneGeometry(16, 16).rotateX(-Math.PI / 2).translate(0, 0.15, 2.5),
-  new THREE.MeshBasicMaterial({ map: blob('rgba(255,205,140,0.6)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), streetLamps.count);
-for (let k = 0, at = new THREE.Matrix4(); k < streetLamps.count; k++) streetLamps.getMatrixAt(k, at), lampHeads.setMatrixAt(k, at), lampPools.setMatrixAt(k, at);
-scene.add(lampHeads, lampPools);
+// every other road's lamps, [roads, every (samples), first, sides, out (m from the centre line; 0: in the middle, a head
+// over each side), pool [its middle's m in from the post, across, along], size, brightness, white, m]: the autobahn a
+// tall mast in the median every 48 m; the links, ramps, flyovers and pit lanes one side every 36 m; the circuit
+// floodlights outside its walls; the mountain, village and Ring roads, the lay-by and the Nordschleife smaller, dimmer
+// lamps behind their rails. None where another road comes within m of its edge (a junction, a flyover overhead), or
+// another stretch of the same road nearer than its own centre line (the inside of a hairpin)
+const clearOf = (x, z, r, o, m = 1) => {
+  let ok = true;
+  eachNear(x, z, Math.abs(o) > 20 ? 2 : 1, (q, j) => { const d = Math.hypot(q.P[j].x - x, q.P[j].z - z); if (q === r ? d < Math.abs(o) - 1.5 : d < q.half + m) ok = false; });
+  return ok;
+};
+for (const [roads, every, first, sides, out, [reach, w, d], size = 1, k = 1, white = false, m = 1, on = () => true] of [
+  [[A], 16, 8, [1, -1], 0, [7.5, 14, 48], 1.4, 1.1, false, 3],
+  [[W], 16, 8, [1, -1], 0, [7.5, 14, 48], 1.4, 1.1, false, 3, W.auto], // the west road: masts down the autobahn's median,
+  [[W], 20, 6, [1], 10.4, [4.5, 12, 20], 1, 1, false, 1, W.hw], [[W], 20, 16, [-1], 10.4, [4.5, 12, 20], 1, 1, false, 1, i => W.hw(i) && i >= W.iC], // the highway's either side
+  [[K1, K2, K3, TR, ON, BP1, BP2, KS, WS], 12, 6, [1], 5.4, [3, 12, 16]],
+  [[DS], 12, 6, [1, -1], 9.6, [4, 12, 16]],
+  [[...UTURNS, XK, XW, NW], 10, 4, [1, -1], 4.05, [2.5, 10, 14]],
+  [[PL], 12, 6, [-1], 7.3, [3, 12, 16]],
+  [[NPL], 10, 4, [-1], 7.5, [3, 12, 14]],
+  [[T], 26, 6, [1], 46, [46, 26, 64], 1.8, 1.2, true], [[T], 26, 20, [-1], 46, [46, 26, 64], 1.8, 1.2, true],
+  [[M, NA], 14, 6, [1], 5.4, [2.6, 9, 12], 0.6, 0.55],
+  [[CR, SL], 14, 6, [1], 3.9, [1.6, 8, 11], 0.6, 0.55],
+  [[VL], 12, 4, [1], 2.9, [1.2, 7, 10], 0.6, 0.55],
+  [[V], 8, 4, [1], 8.1, [3, 10, 12], 0.6, 0.55],
+  [[NR], 26, 6, [1], 8.25, [3.5, 10, 12], 0.6, 0.5], [[NR], 26, 20, [-1], 8.25, [3.5, 10, 12], 0.6, 0.5], // (even samples: the posts below take the odd)
+]) for (const r of roads) for (let i = first; i < r.N; i += every) for (const s of sides) {
+  const p = r.P[i], o = s * out, x = p.x + r.L[i].x * o, z = p.z + r.L[i].z * o, toward = out ? -s : s; // the way its head reaches across
+  if (!on(i) || !clearOf(x, z, r, o, m)) continue;
+  lampPost(x, p.y, z, x + r.L[i].x * toward, z + r.L[i].z * toward, size, k, white);
+  roadPool(r, i, o + toward * reach, w, d, k, white);
+}
+// reflector posts just over the rails, a black band round each reflector: Lambert, so only the car's own headlights
+// light them, where its beams reach. The Nordschleife's white, facing its one way; elsewhere, as on left-hand-traffic
+// roads, red where the post is on the driver's left and white on the right - both ways on two-lane roads, each
+// carriageway's own way on the autobahn. [roads, every (samples, from the 3rd), out, the ways each side's faces, white]
+const REFLECTOR_POSTS = [], REFLECTOR_PLATES = [], RED_LENS = new THREE.Color(0xd01005), WHITE_LENS = new THREE.Color(0xffffff);
+for (const [roads, every, out, ways, white, on = () => true] of [
+  [[NR], 12, 8.2, () => [1], true], [[M, K1, K2, K3, TR, NA, BP1, BP2], 16, 5.45, () => [1, -1]], [[CR, SL], 16, 3.95, () => [1, -1]],
+  [[ON, KS, WS], 12, 4.95, () => [1]], [[A], 16, 17.7, s => [s]], [[W], 16, 17.7, s => [s], false, W.auto], [[W], 16, 10.2, () => [1, -1], false, (i, s) => W.hw(i) && (s > 0 || i >= W.iC)],
+]) for (const r of roads) for (let i = 3; i < r.N; i += every) for (const s of [1, -1]) {
+  const p = r.P[i], x = p.x + r.L[i].x * s * out, z = p.z + r.L[i].z * s * out, yaw = Math.atan2(r.L[i].z, -r.L[i].x); // local +z back down the road
+  if (!on(i, s) || !clearOf(x, z, r, s * out, 0.5)) continue;
+  REFLECTOR_POSTS.push(new THREE.Matrix4().makeRotationY(yaw).setPosition(x, p.y, z));
+  for (const d of ways(s)) REFLECTOR_PLATES.push([new THREE.Matrix4().makeRotationY(d > 0 ? yaw : yaw + Math.PI).setPosition(x, p.y, z), white || s !== d ? WHITE_LENS : RED_LENS]);
+}
+{
+  const col = new THREE.Color(), tint = (geo, hex) => {
+    col.setHex(hex);
+    return geo.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: geo.attributes.position.count }, () => [col.r, col.g, col.b]).flat(), 3));
+  };
+  const posts = new THREE.InstancedMesh(mergeGeometries([tint(new THREE.BoxGeometry(0.1, 1.05, 0.12).translate(0, 0.525, 0), 0xe8e8e2), tint(new THREE.BoxGeometry(0.104, 0.26, 0.124).translate(0, 0.89, 0), 0x1d1d1f)]),
+    new THREE.MeshLambertMaterial({ vertexColors: true }), REFLECTOR_POSTS.length);
+  REFLECTOR_POSTS.forEach((at, n) => posts.setMatrixAt(n, at));
+  const plates = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.07, 0.18).translate(0, 0.89, 0.063), new THREE.MeshLambertMaterial(), REFLECTOR_PLATES.length);
+  REFLECTOR_PLATES.forEach(([at, c], n) => { plates.setMatrixAt(n, at); plates.setColorAt(n, c); });
+  scene.add(posts, plates);
+}
+// a lit diffuse plate can't outshine the white post round it, so each reflector also has a glint over its lens, as
+// bright as the headlights' beam on it (inside the cone, within reach, the lens turned towards the car), each frame
+const glints = new THREE.Points(new THREE.BufferGeometry()
+  .setAttribute('position', new THREE.Float32BufferAttribute(REFLECTOR_PLATES.flatMap(([at]) => new THREE.Vector3(0, 0.89, 0.07).applyMatrix4(at).toArray()), 3))
+  .setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(REFLECTOR_PLATES.length * 3), 3)),
+  new THREE.PointsMaterial({ size: 0.8, map: blob('rgba(255,255,255,1)', 0.15), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+glints.frustumCulled = false;
+scene.add(glints);
+const glintFace = REFLECTOR_PLATES.map(([at]) => new THREE.Vector3(0, 0, 1).transformDirection(at)), glintFrom = new THREE.Vector3(), glintAim = new THREE.Vector3();
+let glintsOn = true; // (cleared once when the lights go off)
+function glintTick() {
+  const l = headlights[0], k0 = 1.5 * l.intensity / BEAMS.low.power, at = glints.geometry.attributes.position.array, col = glints.geometry.attributes.color;
+  if (!k0 && !glintsOn) return;
+  glintsOn = k0 > 0;
+  l.getWorldPosition(glintFrom);
+  l.target.getWorldPosition(glintAim).sub(glintFrom).normalize();
+  const outer = Math.cos(l.angle), inner = Math.cos(l.angle * (1 - l.penumbra));
+  for (let n = 0; n < glintFace.length; n++) {
+    const dx = at[n * 3] - glintFrom.x, dy = at[n * 3 + 1] - glintFrom.y, dz = at[n * 3 + 2] - glintFrom.z, d = Math.hypot(dx, dy, dz), c = REFLECTOR_PLATES[n][1];
+    const k = !k0 || d > l.distance ? 0 : k0 * (1 - (d / l.distance) ** 2) * THREE.MathUtils.smoothstep((dx * glintAim.x + dy * glintAim.y + dz * glintAim.z) / d, outer, inner)
+      * THREE.MathUtils.smoothstep(-(dx * glintFace[n].x + dz * glintFace[n].z) / d, 0.2, 0.6);
+    col.setXYZ(n, c.r * k, c.g * k, c.b * k);
+  }
+  col.needsUpdate = true;
+}
+// the street lamps: their posts, and at night each head lit (warm sodium, or LED white) and the pools of their light
+const streetLamps = new THREE.InstancedMesh(mergeGeometries([new THREE.CylinderGeometry(0.09, 0.12, 8, 6).translate(0, 4, 0), new THREE.BoxGeometry(0.35, 0.18, 1.4).translate(0, 8, 0.6)]),
+  new THREE.MeshLambertMaterial({ color: 0x50555b }), POLES.length);
+const lampHeads = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.3, 1.2).rotateX(Math.PI / 2).translate(0, 7.9, 0.6), new THREE.MeshBasicMaterial(), POLES.length);
+const lampPools = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ map: blob('rgba(255,205,140,0.6)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), POOLS.length);
+{
+  const c = new THREE.Color();
+  POLES.forEach(([at, k, white], n) => { streetLamps.setMatrixAt(n, at); lampHeads.setMatrixAt(n, at); lampHeads.setColorAt(n, c.setHex(white ? 0xf4f8ff : 0xffe0a0).multiplyScalar(Math.sqrt(k))); });
+  POOLS.forEach(([at, k, white], n) => { lampPools.setMatrixAt(n, at); lampPools.setColorAt(n, c.setRGB(...(white ? [0.9, 1.1, 1.6] : [1, 1, 1])).multiplyScalar(k)); }); // (the map's warm: LEDs cool it)
+  for (const [at, k, white] of POLES) {
+    const head = new THREE.Vector3(0, 7.9, 0.95).applyMatrix4(at), size = new THREE.Vector3().setFromMatrixScale(at).x;
+    GLOWS.push([head.x, head.y, head.z, 300 * size * size * k, 30 * size, white]);
+  }
+}
+// the pools only light the ground, so the glows nearest the car light it (and what's round it) for real: four point
+// lights, always in the scene (a change in the light count recompiles every material), moved each night frame to the
+// nearest glows above the car - not the deck under it - each faded out as it gets as far as the next one in line, so
+// none pops on or off
+const nearLights = Array.from({ length: 4 }, () => { const l = new THREE.PointLight(0xffffff, 0, 30, 2); scene.add(l); return l; });
+const nearBest = []; // [distance, glow], nearest first, one more than the lights
+function nearLightsTick(lit) {
+  const c = car.position;
+  nearBest.length = 0;
+  if (lit > 0.01) for (const g of GLOWS) {
+    const dy = g[1] - c.y;
+    if (dy < 0.5 || dy > 20) continue;
+    const d = Math.hypot(g[0] - c.x, dy, g[2] - c.z);
+    if (d > g[4]) continue;
+    let n = nearBest.length;
+    while (n > 0 && nearBest[n - 1][0] > d) n--;
+    if (n > nearLights.length) continue;
+    nearBest.splice(n, 0, [d, g]);
+    if (nearBest.length > nearLights.length + 1) nearBest.pop();
+  }
+  const edge = nearBest[nearLights.length]?.[0] ?? Infinity;
+  nearLights.forEach((l, n) => {
+    if (!nearBest[n]) { l.intensity = 0; return; }
+    const [d, [x, y, z, I, reach, white]] = nearBest[n];
+    l.position.set(x, y, z);
+    l.distance = reach;
+    l.color.setHex(white ? 0xf4f8ff : 0xffd9a0);
+    l.intensity = I * lit * THREE.MathUtils.smoothstep(edge - d, 0, 5);
+  });
+}
+// the runway's edge lights every 60 m, and green across its ends
+const runwayLights = (() => {
+  const at = [], col = [], light = (i, o, ...rgb) => { at.push(RW.P[i].x + RW.L[i].x * o, 0.3, RW.P[i].z + RW.L[i].z * o); col.push(...rgb); };
+  for (let i = 0; i <= RW.N; i += 20) for (const s of [1, -1]) light(i, s * 23, 1, 0.92, 0.75);
+  for (const i of [0, RW.N]) for (let o = -21; o <= 21; o += 3) light(i, o, 0.2, 1, 0.35);
+  return new THREE.Points(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(at, 3)).setAttribute('color', new THREE.Float32BufferAttribute(col, 3)),
+    new THREE.PointsMaterial({ size: 1.2, map: blob('rgba(255,255,255,1)', 0.3), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+})();
+scene.add(streetLamps, lampHeads, lampPools, runwayLights);
+
+// Traffic on every road: cars in lane - keeping left - at each road's pace, slowing for bends and for what's ahead in
+// their lane (the next car, or yours: an IDM car-follower), moving out to pass on the multi-lane roads and back in,
+// turning onto side roads where one ends on theirs and off them at the far end (a dead end: they turn round). All of
+// them move every frame; the nearest 10 of each model are drawn as it (instanced, a mesh per material: the models cut
+// down for it, npc-prep.mjs), the rest as boxes out to the fog, their lamps lit at night. They stand in your car's way
+// (npcNear), though not each other's at crossings
+const TRAFFIC = [ // [roads, lanes fast to slow (m left of the centre line, for the road's way; or by sample), both ways,
+  // km/h, cars per km each way, grip in bends (m/s² sideways)]
+  [[A], [4.4, 8.1, 11.9], true, 130, 4, 2.5],
+  [[W], i => i < W.iA + 30 || i >= W.iB - 30 ? [1.95, 5.45] : [4.4, 8.1, 11.9], true, 120, 2.5, 2.5],
+  [[NR], [-2.4, 2.4], false, 110, 2, 6],
+  [[T], [-3.5, 3.5], false, 140, 0.8, 8],
+  [[K1, K2, K3, TR, BP1, BP2], [2.25], true, 80, 2.5, 3],
+  [[M, NA, CR, SL], [2.25], true, 65, 1.2, 3],
+  [[ON, ...UTURNS, XK, XW, KS, WS, NW], [0], false, 70, 1, 3],
+  [STREETS.filter(r => r !== RB), [2.25], true, 45, 4, 3],
+  [[RB], [0], false, 30, 3, 3], // (its way: the island on the right)
+];
+const NPC_MODELS = [['audi-rs4-b7', 4.589], ['audi-rs4-avant', 4.719], ['audi-rs3', 4.335], ['vw-polo-gti', 4.074], ['vw-polo-sedan', 4.39], ['mercedes-v8', 4.8]];
+const NPC_PAINT = [0xf2f2f0, 0xf2f2f0, 0xe8e8e6, 0x111214, 0x1a1b1e, 0xb6bac0, 0x8c9096, 0x5c6066, 0x8e1b1b, 0x1d3b6e, 0x24467a, 0x2f4a33, 0xcfc4ae];
+const trafficOf = new Map(TRAFFIC.flatMap(row => row[0].map(r => [r, row])));
+const laneSet = (row, r, i) => typeof row[1] === 'function' ? row[1](i) : row[1];
+const dirOf = (r, i, d) => { // the way along road r at sample i, travelling d (unit, x and z)
+  const a = r.P[Math.min(Math.max(i, 0), r.N - 1)], b = r.P[Math.min(Math.max(i, 0), r.N - 1) + 1], l = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+  return [(b.x - a.x) * d / l, (b.z - a.z) * d / l];
+};
+// each road's top speed at each sample for each way: what its bends allow, braking (2.5 m/s²) for the next ones
+const vmaxOf = (r, d) => {
+  const key = d > 0 ? 'vUp' : 'vDown';
+  if (r[key]) return r[key];
+  const N = r.N, v = new Float32Array(N + 1), grip = trafficOf.get(r)[5], closed = r.curve.closed;
+  for (let i = 0; i <= N; i++) {
+    const a = r.P[Math.max(i - 1, 0)], b = r.P[i], c = r.P[Math.min(i + 1, N)];
+    let turn = Math.abs(Math.atan2(c.x - b.x, c.z - b.z) - Math.atan2(b.x - a.x, b.z - a.z));
+    if (turn > Math.PI) turn = 2 * Math.PI - turn;
+    v[i] = Math.min(80, Math.sqrt(grip * 3 / Math.max(turn, 1e-5)));
+  }
+  if (!closed && r.dead[d > 0 ? N : 0]) v[d > 0 ? N : 0] = 4; // (a dead end: slowing to turn round)
+  for (let pass = 0; pass < (closed ? 2 : 1); pass++) {
+    if (d > 0) for (let i = N - 1; i >= 0; i--) v[i] = Math.min(v[i], Math.sqrt(v[i + 1] ** 2 + 15));
+    else for (let i = 1; i <= N; i++) v[i] = Math.min(v[i], Math.sqrt(v[i - 1] ** 2 + 15));
+    if (closed) d > 0 ? (v[N] = v[0]) : (v[0] = v[N]);
+  }
+  return (r[key] = v);
+};
+// where the roads meet: each open road's ends, the roads (and their samples) it can carry on onto (r.ends), and on
+// those roads, at that sample, the way into it (r.branch: [road, its end's sample, way in])
+for (const q of trafficOf.keys()) if (!q.curve.closed) for (const [j, way] of [[0, 1], [q.N, -1]]) {
+  const e = q.P[j], near = new Map();
+  eachNear(e.x, e.z, 1, (r, i) => {
+    if (r === q || !trafficOf.has(r) || Math.abs(r.P[i].y - e.y) > 2) return;
+    const d = Math.hypot(r.P[i].x - e.x, r.P[i].z - e.z), was = near.get(r);
+    if (d < 14 && (!was || d < was[1])) near.set(r, [i, d]);
+  });
+  (q.ends ||= {})[j] = [...near].map(([r, [i]]) => [r, i]);
+  for (const [r, [i]] of near) {
+    r.branch ||= new Map();
+    if (!r.branch.has(i)) r.branch.set(i, []);
+    r.branch.get(i).push([q, j, way]);
+  }
+}
+// where a car may go on, keeping left: at road r's end (going d) onto a road it meets, any of that one's own ways but
+// back; on r at sample i onto a side road that ends there, its own way in - each only from a lane of the car's within
+// 6.5 m of the one it takes (never across the other carriageway, or the other side of a two-way road)
+const waysOf = q => trafficOf.get(q)[2] ? [1, -1] : [1];
+const lanePos = (r, i, o) => [r.P[i].x + r.L[i].x * o, r.P[i].z + r.L[i].z * o];
+const nearLane = (q, i, w, x, z) => laneSet(trafficOf.get(q), q, i).reduce((b, l, k) => { // [how far, which] of q's lanes its way w at i, from (x, z)
+  const [lx, lz] = lanePos(q, i, w * l), d = Math.hypot(lx - x, lz - z);
+  return d < b[0] ? [d, k] : b;
+}, [Infinity, 0]);
+const onward = (dir, t) => t[0] * dir[0] + t[1] * dir[1] > -0.3;
+const exitsAt = (r, end, d, x, z) => (r.ends?.[end] || []).flatMap(([q, i]) =>
+  waysOf(q).filter(w => onward(dirOf(r, end ? r.N - 1 : 0, d), dirOf(q, i, w)) && nearLane(q, i, w, x, z)[0] < 6.5).map(w => [q, i, w]));
+const exitsNear = (r, end, d, o) => { // from its lane, else the nearest of its way's lanes with a way on
+  for (const l of [o, ...laneSet(trafficOf.get(r), r, end).map(l => d * l).sort((a, b) => Math.abs(a - o) - Math.abs(b - o))]) {
+    const e = exitsAt(r, end, d, ...lanePos(r, end, l));
+    if (e.length) return e;
+  }
+  return [];
+};
+const turnsAt = (r, i, d, x, z) => (r.branch?.get(i) || []).filter(([q, j, w]) =>
+  waysOf(q).includes(w) && onward(dirOf(r, i, d), dirOf(q, j ? q.N - 1 : 0, w)) && nearLane(q, j, w, x, z)[0] < 6.5);
+// heading for a dead end - no way on there, no side road to take before it: it takes the last side road it can, and
+// one placed there at the start goes the other way. Each open road's dead ends (r.dead), where cars slow to turn round
+const deadAhead = n => {
+  const r = n.r, end = n.d > 0 ? r.N : 0;
+  if (r.curve.closed || exitsNear(r, end, n.d, n.o).length) return false;
+  for (const i of r.branch?.keys() || []) if ((i - Math.floor(n.s)) * n.d > 0 && turnsAt(r, i, n.d, ...lanePos(r, i, n.o)).length) return false;
+  return true;
+};
+for (const q of trafficOf.keys()) if (!q.curve.closed) {
+  q.dead = {};
+  for (const [j, d] of [[0, -1], [q.N, 1]]) q.dead[j] = waysOf(q).includes(d) && !laneSet(trafficOf.get(q), q, j).some(l => exitsAt(q, j, d, ...lanePos(q, j, d * l)).length);
+}
+const headOn = n => { // car n's place is in another road's lane (same level) the other way
+  const i = Math.floor(n.s), [x, z] = lanePos(n.r, i, n.o), h = dirOf(n.r, i, n.d);
+  let hit = false;
+  eachNear(x, z, 1, (q, j) => {
+    const row = q !== n.r && trafficOf.get(q);
+    if (row && !hit && Math.abs(q.P[j].y - n.r.P[i].y) < 2) for (const w of waysOf(q)) for (const l of laneSet(row, q, j)) {
+      const [lx, lz] = lanePos(q, j, w * l), t = dirOf(q, j, w);
+      if (Math.hypot(lx - x, lz - z) < 2 && t[0] * h[0] + t[1] * h[1] < -0.5) hit = true;
+    }
+  });
+  return hit;
+};
+const npcs = [];
+for (const row of TRAFFIC) for (const r of row[0]) for (const d of row[2] ? [1, -1] : [1]) {
+  vmaxOf(r, d);
+  const n = Math.round(r.N * 3 / 1000 * row[4]);
+  for (let c = 0; c < n; c++) {
+    const at = Math.min(r.N - 1, (c + Math.random() * 0.6) * r.N / n), lanes = laneSet(row, r, Math.floor(at)), k = Math.floor(Math.random() * lanes.length);
+    const p = r.P[Math.floor(at)], model = Math.floor(Math.random() * NPC_MODELS.length), rand = 0.9 + Math.random() * 0.2;
+    if (Math.hypot(p.x - state.x, p.z - state.z) < 40) continue; // (not on top of the car)
+    const npc = { r, row, s: at, d, k, k0: k, o: d * lanes[k], rand, v0: row[3] / 3.6 * [1.1, 1, 0.9][k] * rand, v: row[3] / 3.6 * 0.7, model, len: NPC_MODELS[model][1],
+      paint: new THREE.Color(NPC_PAINT[Math.floor(Math.random() * NPC_PAINT.length)]), at: new THREE.Vector3(), heading: 0, pitch: 0, look: Math.random(), cd: 0, detail: false,
+      bx: 0, bz: 0, bh: 0, kvx: 0, kvz: 0, kw: 0, ease: 3, jump: false, hold: 0, next: null, yieldT: 0 }; // (drawn off its place by b*, knocked by kv*/kw)
+    if (row[2] && deadAhead(npc)) Object.assign(npc, { d: -d, o: -npc.o }); // (on a closed lane: the other way)
+    if (!headOn(npc)) npcs.push(npc);
+  }
+}
+function onto(n, q, at, d) { // carrying on along road q from sample at, way d, in its lane nearest the car's (drawn easing over)
+  const row = trafficOf.get(q), lanes = laneSet(row, q, Math.floor(at)), [, k] = nearLane(q, Math.round(at), d, ...lanePos(n.r, Math.min(Math.round(n.s), n.r.N), n.o));
+  Object.assign(n, { r: q, row, s: Math.min(Math.max(at, 0.5), q.N - 0.5), d, k, k0: k, jump: true, hold: 0, next: null });
+  n.v0 = row[3] / 3.6 * [1.1, 1, 0.9][k] * n.rand;
+  n.o = d * lanes[k];
+}
+let trafficOn = new Map(); // each road's cars, in order along it (this frame's, trafficTick's)
+// room to come onto road q at sample s, way d, o m out: none of that way's cars within 2 m across, from 12 m ahead back
+// to as far as one takes to close in
+const roomAt = (q, s, d, o) => !(trafficOn.get(q) || []).some(m => m.d === d && Math.abs(m.o - o) < 2 && (m.s - s) * d * 3 < 12 && (m.s - s) * d * 3 > -(8 + m.v * 1.5));
+function roadEnd(n, dt) { // at an open road's end: onto a road it meets once there's room (or after 4 s), or round if none
+  const r = n.r, end = n.s > r.N / 2 ? r.N : 0, ways = exitsNear(r, end, n.d, n.o);
+  if (ways.length) {
+    const [q, i, w] = n.next ||= ways[Math.floor(Math.random() * ways.length)], lane = laneSet(trafficOf.get(q), q, i)[nearLane(q, i, w, ...lanePos(r, end, n.o))[1]];
+    if ((n.hold += dt) < 4 && !roomAt(q, i, w, w * lane)) { n.s = end ? r.N - 0.5 : 0.5; n.v = 0; return; } // (waiting its turn)
+    return onto(n, q, i, w);
+  }
+  Object.assign(n, { d: -n.d, o: -n.o, v: Math.min(n.v, 3), jump: true }); // a dead end: round, into the lane back
+  n.s = Math.min(Math.max(n.s, 0.5), r.N - 0.5);
+}
+// drawing them: each model's parts (once loaded), a box for the rest, and their lamps at night
+const NPC_DETAIL = 10, npcParts = NPC_MODELS.map(() => null), npcM = new THREE.Matrix4(), npcE = new THREE.Euler(0, 0, 0, 'YXZ');
+NPC_MODELS.forEach(([name], m) => new GLTFLoader().loadAsync(`/models/npc/${name}.glb`).then(({ scene: g }) => {
+  const parts = [];
+  g.traverse(o => {
+    if (!o.isMesh) return;
+    const im = new THREE.InstancedMesh(o.geometry, o.material, NPC_DETAIL);
+    if (o.material.name === 'npc_paint') im.setColorAt(0, new THREE.Color(1, 1, 1)); // (tinted per car)
+    Object.assign(im, { count: 0, frustumCulled: false, visible: false });
+    scene.add(im);
+    parts.push(im);
+  });
+  npcParts[m] = parts;
+}));
+const npcBox = new THREE.InstancedMesh(mergeGeometries([new THREE.BoxGeometry(1.8, 0.7, 4.4).translate(0, 0.6, 0), new THREE.BoxGeometry(1.5, 0.55, 2.2).translate(0, 1.2, -0.2)]),
+  new THREE.MeshLambertMaterial(), npcs.length);
+npcBox.setColorAt(0, new THREE.Color(1, 1, 1));
+npcBox.frustumCulled = false;
+const NPC_LIT = 250, npcLamps = new THREE.Points(new THREE.BufferGeometry()
+  .setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(NPC_LIT * 12), 3)).setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(NPC_LIT * 12), 3)),
+  new THREE.PointsMaterial({ size: 0.5, map: blob('rgba(255,255,255,1)', 0.25), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+npcLamps.frustumCulled = false;
+scene.add(npcBox, npcLamps);
+function trafficTick(dt) {
+  const on = trafficOn = new Map(); // each road's cars, in order along it
+  for (const n of npcs) { if (!on.has(n.r)) on.set(n.r, []); on.get(n.r).push(n); }
+  for (const list of on.values()) { list.sort((a, b) => a.s - b.s); list.forEach((n, p) => n.p = p); }
+  const along = (n, m) => { let ds = (m.s - n.s) * n.d; if (n.r.curve.closed) { ds = ((ds % n.r.N) + n.r.N) % n.r.N; if (ds > n.r.N / 2) ds -= n.r.N; } return ds * 3; }; // m ahead of n (- behind), m
+  const free = (n, o, back, ahead) => { // a lane clear to move into: of its way's cars, and of yours (from further back as you close in)
+    const i = Math.min(Math.floor(n.s), n.r.N - 1), p = n.r.P[i], L = n.r.L[i], f = (state.x - n.at.x) * Math.sin(n.heading) + (state.z - n.at.z) * Math.cos(n.heading);
+    if (Math.abs((state.x - p.x) * L.x + (state.z - p.z) * L.z - o) < 2.2 && Math.abs((state.y || 0) - n.at.y) < 2 && f > -Math.max(back, (state.speed - n.v) * 3) && f < ahead) return false;
+    return on.get(n.r).every(m => m === n || m.d !== n.d || Math.abs(m.o - o) > 1.7 || along(n, m) < -back || along(n, m) > ahead);
+  };
+  for (const n of npcs) {
+    const r = n.r, N = r.N, i = Math.min(Math.floor(n.s), N - 1), lanes = laneSet(n.row, r, i);
+    let gap = Infinity, lv = 0; // the next car in its lane, or yours: how far to its back (m), how fast it goes
+    const list = on.get(r), Lc = list.length; // (from just behind it, the way it goes, until 150 m on)
+    for (let c = -2; c < Lc; c++) {
+      const m = list[r.curve.closed ? ((n.p + n.d * c) % Lc + Lc) % Lc : n.p + n.d * c];
+      if (!m) { if (c > 0) break; continue; }
+      if (m === n) continue;
+      const ahead = along(n, m);
+      if (c > 0 && ahead > 150) break;
+      if (m.d !== n.d || Math.abs(m.o - n.o) > 1.7) continue;
+      const g = ahead - (n.len + m.len) / 2;
+      if (g > -n.len && g < gap) gap = g, lv = m.v;
+    }
+    const fx = Math.sin(n.heading), fz = Math.cos(n.heading), rx = state.x - n.at.x, rz = state.z - n.at.z, f = rx * fx + rz * fz;
+    if (f > 0 && f < 90 && Math.abs(rx * fz - rz * fx) < 1.9 && Math.abs((state.y || 0) - n.at.y) < 2) {
+      const g = f - (n.len + CAR.length) / 2;
+      if (g < gap) gap = g, lv = Math.max(0, state.speed * Math.cos(state.heading - n.heading));
+    }
+    const v0 = Math.max(0.1, Math.min(n.v0, vmaxOf(r, n.d)[i])), want = 3 + n.v * 1.4 + n.v * (n.v - lv) / 4.4;
+    n.v = Math.max(0, n.v + Math.max(-9, 1.6 * (1 - (n.v / v0) ** 4 - (gap < Infinity ? (Math.max(want, 0) / Math.max(gap, 0.5)) ** 2 : 0))) * dt);
+    // flashed by a faster car close behind in its lane, on a road of lanes: it moves over - left if it can, never into
+    // your lane - and stays there a while
+    if ((n.yieldT -= dt) < 0 && flashing && lanes.length > 1 && f < -4 && f > -160 && Math.abs(rx * fz - rz * fx) < 1.9 && Math.abs((state.y || 0) - n.at.y) < 2
+      && Math.cos(state.heading - n.heading) > 0.9 && state.speed > Math.max(n.v + 2, 60 / 3.6)) {
+      const po = (state.x - r.P[i].x) * r.L[i].x + (state.z - r.P[i].z) * r.L[i].z, k = [n.k + 1, n.k - 1].find(k => k >= 0 && k < lanes.length && Math.abs(n.d * lanes[k] - po) > 2.2 && free(n, n.d * lanes[k], 15, 30));
+      if (k !== undefined) n.k = k, n.look = n.yieldT = 8;
+    }
+    if (lanes.length > 1 && (n.look -= dt) < 0) { // out into the faster lane past a slower car, back in once clear
+      n.look = 1;
+      if (gap < 45 && lv < n.v0 - 3 && n.k > 0 && free(n, n.d * lanes[n.k - 1], 15, 35)) n.k--;
+      else if (n.k < Math.min(n.k0, lanes.length - 1) && gap > 60 && free(n, n.d * lanes[n.k + 1], 25, 50)) n.k++;
+    }
+    n.o += THREE.MathUtils.clamp(n.d * lanes[Math.min(n.k, lanes.length - 1)] - n.o, -1.5 * dt, 1.5 * dt);
+    const was = Math.floor(n.s);
+    n.s += n.d * n.v * dt / 3;
+    if (r.curve.closed) n.s = (n.s + N) % N;
+    else if (n.s > N - 0.5 || n.s < 0.5) roadEnd(n, dt);
+    const now = Math.floor(n.s), turns = n.r === r && now !== was && r.branch?.has(now) && turnsAt(r, now, n.d, ...lanePos(r, now, n.o));
+    if (turns?.length) { // a side road ending here: maybe onto it, if there's room (the last before a dead end: surely)
+      const [q, j, w] = turns[Math.floor(Math.random() * turns.length)], lane = laneSet(trafficOf.get(q), q, j)[nearLane(q, j, w, ...lanePos(r, now, n.o))[1]];
+      if ((Math.random() < 0.35 && roomAt(q, j, w, w * lane)) || deadAhead(n)) onto(n, q, j, w);
+    }
+    // where it is: between its samples, its lane out from the centre line, turned along the road's tangent there; drawn
+    // easing over from where it was after a jump in that (onto another road, round at a dead end), sliding where knocked
+    const q = n.r, j = Math.min(Math.floor(n.s), q.N - 1), t = n.s - j, a = q.P[j], b = q.P[j + 1], L = q.L[j];
+    const tan = k => { const p0 = q.P[Math.max(k - 1, 0)], p1 = q.P[Math.min(k + 1, q.N)]; return Math.atan2(p1.x - p0.x, p1.z - p0.z); };
+    let h0 = tan(j), dh = tan(j + 1) - h0;
+    if (dh > Math.PI) dh -= 2 * Math.PI; else if (dh < -Math.PI) dh += 2 * Math.PI;
+    const x = a.x + (b.x - a.x) * t + L.x * n.o, z = a.z + (b.z - a.z) * t + L.z * n.o, h = h0 + dh * t + (n.d < 0 ? Math.PI : 0);
+    if (n.jump && n.cd) { // (held where it was, running on - once it's been anywhere: cd is set from its first tick on)
+      n.bx = n.at.x + Math.sin(n.heading) * n.v * dt - x; n.bz = n.at.z + Math.cos(n.heading) * n.v * dt - z;
+      n.bh = Math.atan2(Math.sin(n.heading - h), Math.cos(n.heading - h));
+      n.ease = 3;
+    }
+    n.jump = false;
+    if (n.kvx || n.kvz || n.kw) {
+      n.bx += n.kvx * dt; n.bz += n.kvz * dt; n.bh += n.kw * dt;
+      const sp = Math.hypot(n.kvx, n.kvz), slow = sp > 7 * dt ? 1 - 7 * dt / sp : 0;
+      n.kvx *= slow; n.kvz *= slow; n.kw = Math.abs(n.kw) < 0.1 ? 0 : n.kw * Math.exp(-3 * dt);
+    } else if (n.bx || n.bz || n.bh) {
+      const e = Math.abs(n.bx) + Math.abs(n.bz) + Math.abs(n.bh) < 0.02 ? 0 : Math.exp(-n.ease * dt);
+      n.bx *= e; n.bz *= e; n.bh *= e;
+    }
+    if (Math.abs(n.bh) > 0.15) n.v = Math.max(0, n.v - 6 * Math.min(1, Math.abs(n.bh)) * dt); // (turned off its way: scrubbing speed)
+    n.at.set(x + n.bx, a.y + (b.y - a.y) * t, z + n.bz);
+    n.heading = h + n.bh;
+    n.pitch = -Math.atan2((b.y - a.y) * n.d, 3);
+  }
+  // drawn: the nearest of each model as itself, the rest as boxes out to the fog; in your way: those round your car
+  const cam = camera.position, near = [], used = NPC_MODELS.map(() => 0), place = n => npcM.makeRotationFromEuler(npcE.set(n.pitch, n.heading, 0)).setPosition(n.at);
+  npcNear.length = npcOf.length = 0;
+  for (const n of npcs) {
+    n.cd = (n.at.x - cam.x) ** 2 + (n.at.z - cam.z) ** 2;
+    n.detail = false;
+    if (n.cd < 120 ** 2 && npcParts[n.model]) near.push(n);
+    if (Math.abs(n.at.x - state.x) < 30 && Math.abs(n.at.z - state.z) < 30) {
+      const h = n.len / 2 - 0.9, sx = Math.sin(n.heading) * h, sz = Math.cos(n.heading) * h;
+      npcNear.push(n.at.x - sx, n.at.z - sz, n.at.x + sx, n.at.z + sz, 0.9, n.at.y, n.at.y + 1.4);
+      npcOf.push(n);
+    }
+  }
+  near.sort((a, b) => a.cd - b.cd);
+  for (const n of near) if (used[n.model] < NPC_DETAIL) {
+    const c = used[n.model]++;
+    n.detail = true;
+    place(n);
+    for (const im of npcParts[n.model]) { im.setMatrixAt(c, npcM); if (im.instanceColor) im.setColorAt(c, n.paint); }
+  }
+  npcParts.forEach((parts, m) => parts?.forEach(im => {
+    Object.assign(im, { count: used[m], visible: used[m] > 0 });
+    im.instanceMatrix.needsUpdate = true;
+    if (im.instanceColor) im.instanceColor.needsUpdate = true;
+  }));
+  let boxes = 0, lamps = 0;
+  const lp = npcLamps.geometry.attributes.position, lc = npcLamps.geometry.attributes.color, lit = lampHeads.visible;
+  for (const n of npcs) {
+    if (!n.detail && n.cd < 1700 ** 2) { place(n); npcBox.setMatrixAt(boxes, npcM); npcBox.setColorAt(boxes++, n.paint); }
+    if (lit && n.cd < 900 ** 2 && lamps < NPC_LIT * 4) for (const [x, y, z, c] of [[0.7, 0.68, 0.5, 1], [-0.7, 0.68, 0.5, 1], [0.68, 0.8, -0.5, 0], [-0.68, 0.8, -0.5, 0]]) {
+      const zz = z * n.len - Math.sign(z) * 0.1, cs = Math.cos(n.heading), sn = Math.sin(n.heading);
+      lp.setXYZ(lamps, n.at.x + x * cs + zz * sn, n.at.y + y, n.at.z - x * sn + zz * cs);
+      lc.setXYZ(lamps++, ...(c ? [1, 0.93, 0.8] : [0.9, 0.05, 0.02]));
+    }
+  }
+  npcBox.count = boxes;
+  npcBox.instanceMatrix.needsUpdate = npcBox.instanceColor.needsUpdate = true;
+  npcLamps.visible = lit;
+  npcLamps.geometry.setDrawRange(0, lamps);
+  lp.needsUpdate = lc.needsUpdate = true;
+}
+// self-check: into the back of a slower car at 30 m/s, a little off its middle, your car carries on (over 40% of its
+// speed) and the other is knocked on, turning
+{
+  const n = { v: 10, heading: 0, at: new THREE.Vector3(2008.1, 0, 20), kvx: 0, kvz: 0, kw: 0 }, c = { x: 2008.6, z: 14, y: 0, heading: 0, speed: 30, steer: 0 };
+  npcNear.push(n.at.x, n.at.z - 1.3, n.at.x, n.at.z + 1.3, 0.9, 0, 1.4); npcOf.push(n);
+  for (let i = 0; i < 20; i++) move(c, 0, 1 / 60);
+  npcNear.length = npcOf.length = 0;
+  console.assert(c.speed > 12 && n.v > 15 && n.kw !== 0, 'a car hit from behind should be knocked on and turned, yours carry on', c.speed, n.v, n.kw);
+}
 
 // rain (streaks) and snow (flakes): DROPS of them in a BOX x TALL m box that wraps round the camera, each fixed in the
 // world as it falls, so they stream past a moving car
@@ -3554,8 +4329,9 @@ function skyTick(dt) {
   scene.environmentIntensity = 0.05 + 0.95 * d * (1 - 0.5 * sk.k); // no daylight in the paint at night
   for (const [m, k] of envLit) m.envMapIntensity = k * scene.environmentIntensity;
   const lit = 1 - THREE.MathUtils.smoothstep(el, -4, 4); // the street lamps come on round sunset
-  lampHeads.visible = lampPools.visible = lit > 0.01;
+  lampHeads.visible = lampPools.visible = runwayLights.visible = lit > 0.01;
   lampPools.material.opacity = lit;
+  nearLightsTick(lit);
   rain.material.opacity = 0.25 + 0.3 * d;
   wet = sk.grip;
   roadMu = sk.mu;
@@ -3736,7 +4512,10 @@ renderer.setAnimationLoop(() => {
   cssCam.projectionMatrix.copy(camera.projectionMatrix);
 
   skyTick(dt);
+  glintTick();
+  trafficTick(dt);
   lapTimer(dt);
+  dragTimer(dt);
   drawMap(dt);
   drawTele(frame.contentWindow, dt);
   renderer.render(scene, camera);
