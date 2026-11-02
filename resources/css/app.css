@@ -26,9 +26,11 @@ html, body {
 
 .navbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 32px;
+    gap: 10px 22px;
+    padding: 18px clamp(16px, 4vw, 32px);
     border-bottom: 1px solid #1c1c1c;
 }
 
@@ -175,6 +177,7 @@ html, body {
 
 .manage-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
@@ -186,7 +189,7 @@ html, body {
 }
 
 .manage-info {
-    flex: 1;
+    flex: 1 1 140px; /* on phones the actions drop to their own line instead of crushing the name */
     min-width: 0;
 }
 
@@ -1147,6 +1150,22 @@ html, body {
 
 .igniting .garage-streaks i {
     animation-duration: .9s;
+}
+
+@media (max-width: 480px) {
+    .garage-dock {
+        gap: 12px;
+        padding-left: 18px;
+    }
+
+    .ignition {
+        width: 64px;
+        height: 64px;
+    }
+
+    .garage-specs-btn {
+        white-space: nowrap;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
