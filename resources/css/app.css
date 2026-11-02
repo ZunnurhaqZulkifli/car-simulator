@@ -399,7 +399,17 @@ html, body {
     height: 70vh;
     pointer-events: none;
     background: radial-gradient(45% 60% at 50% 0%, rgba(25, 181, 133, .16), transparent 70%);
-    animation: garage-breathe 7s ease-in-out infinite;
+}
+
+/* the cards scroll under the dock: fade them out where it floats instead of a hard edge */
+.page-garage::after {
+    content: "";
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 4;
+    height: 130px;
+    pointer-events: none;
+    background: linear-gradient(transparent, rgba(0, 0, 0, .85));
 }
 
 .garage-streaks {
@@ -416,7 +426,6 @@ html, body {
     height: 1px;
     opacity: 0;
     background: linear-gradient(90deg, transparent, var(--c, rgba(129, 196, 255, .55)), transparent);
-    animation: garage-streak var(--d, 7s) linear var(--delay, 0s) infinite;
 }
 
 .garage-streaks i:nth-child(1) { top: 16%; --d: 6s; }
@@ -461,7 +470,7 @@ html, body {
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: garage-rise .7s .08s var(--ease) backwards, garage-shine 7s 1.2s ease-in-out infinite;
+    animation: garage-rise .7s .08s var(--ease) backwards, garage-shine 7s 1.2s ease-in-out;
 }
 
 .garage-sub {
@@ -524,8 +533,13 @@ html, body {
     border-radius: 18px;
     box-shadow: 0 24px 50px -30px #000;
     transform: rotateX(calc((var(--py) - .5) * -7deg)) rotateY(calc((var(--px) - .5) * 9deg));
-    transition: transform .25s ease-out, translate .35s var(--ease), border-color .25s, box-shadow .25s;
-    animation: garage-rise .7s calc(.25s + var(--i) * 70ms) var(--ease) backwards;
+    transition: transform .25s ease-out, translate .35s var(--ease), scale .15s ease-out, border-color .25s, box-shadow .25s;
+    /* stagger capped so the last cards don't wait behind the first ones */
+    animation: garage-rise .6s calc(.2s + min(var(--i), 8) * 45ms) var(--ease) backwards;
+}
+
+.garage-card:active {
+    scale: .98;
 }
 
 /* glass sheen + a glare spot that follows the pointer */
@@ -595,13 +609,15 @@ html, body {
     scale: 1.06;
 }
 
+/* studio-white photos: a vignette turns the glare into a lit backdrop that sits in the dark page */
 .garage-photo::after {
     content: "";
     position: absolute;
-    inset: auto 0 0;
-    height: 40%;
+    inset: 0;
     pointer-events: none;
-    background: linear-gradient(transparent, rgba(7, 9, 8, .85));
+    background:
+        linear-gradient(transparent 60%, rgba(7, 9, 8, .85)),
+        radial-gradient(120% 95% at 50% 40%, transparent 50%, rgba(7, 9, 8, .5));
 }
 
 .garage-photo-empty {
@@ -745,10 +761,10 @@ html, body {
 }
 
 .garage-stat-label {
-    font: 700 .55rem var(--cond);
-    letter-spacing: .22em;
+    font: 700 .6rem var(--cond);
+    letter-spacing: .2em;
     text-transform: uppercase;
-    color: #5d6a66;
+    color: #7d8a86;
 }
 
 .garage-stat-val {
@@ -1083,10 +1099,10 @@ html, body {
 }
 
 .garage-spec-grid dt {
-    font: 700 .55rem var(--cond);
-    letter-spacing: .22em;
+    font: 700 .6rem var(--cond);
+    letter-spacing: .2em;
     text-transform: uppercase;
-    color: #5d6a66;
+    color: #7d8a86;
 }
 
 .garage-spec-grid dd {
@@ -1148,8 +1164,9 @@ html, body {
     animation: garage-out .5s .4s ease-in forwards;
 }
 
+/* the streaks only fly on Start - a warp tied to the press, not idle noise */
 .igniting .garage-streaks i {
-    animation-duration: .9s;
+    animation: garage-streak .9s linear calc(var(--delay, 0s) / 10) infinite;
 }
 
 @media (max-width: 480px) {
@@ -1165,6 +1182,14 @@ html, body {
 
     .garage-specs-btn {
         white-space: nowrap;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .garage-dock {
+        background: #080b0a;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
 }
 
@@ -1200,10 +1225,6 @@ html, body {
 @keyframes garage-scan {
     0% { translate: -100% 0; }
     60%, 100% { translate: 260% 0; }
-}
-
-@keyframes garage-breathe {
-    50% { opacity: .55; }
 }
 
 @keyframes garage-streak {

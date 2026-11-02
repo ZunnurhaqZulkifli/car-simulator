@@ -186,6 +186,9 @@
       specs.hidden = !specs.hidden;
       specsBtn.setAttribute('aria-expanded', !specs.hidden);
     });
+    addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !specs.hidden) { specsBtn.click(); specsBtn.focus(); }
+    });
 
     const go = (href) => {
       document.body.classList.add('igniting');
