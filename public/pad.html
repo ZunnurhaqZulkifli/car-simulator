@@ -6,105 +6,192 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#121417">
+<meta name="theme-color" content="#07080a">
 <title>Drive Pad</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600&family=Electrolize&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Electrolize&display=swap" rel="stylesheet">
 <style>
-  /* served by scripts/pad-relay.mjs, not the app. An M wheel at night: graphite switchgear, the M colours only where
-     something is live - the shift lights, the selected gear, the red M1 / M2 */
+  /* served by scripts/pad-relay.mjs, not the app. A BMW cockpit at night: piano-black switchgear with an LED on each
+     switch that has a state, a Live Cockpit cluster with the M shift lights, carbon paddles over studded M pedals.
+     The accent follows the drive mode as the car's own displays do - Comfort BMW blue, Sport red, Eco Pro teal */
+  @property --accent { syntax: '<color>'; inherits: true; initial-value: #2f80ff; }
   :root {
-    --base: #121417; --panel: #1b1e22; --raised: #262a2f; --line: #353a41; --text: #eef1f5; --dim: #8c95a0;
+    --base: #07080a; --panel: #0e1013; --key: #16191d; --key-hi: #1e2227; --line: #262a31; --line-hi: #363b44;
+    --text: #f2f4f7; --dim: #8a929c; --faint: #5a626c;
     --m-light: #4fa8ff; --m-dark: #5a52d6; --m-red: #e1262d;
+    --accent: #2f80ff; --amber: #ffad1f; --green: #35d07f; --beam: #4d8bff;
     --num: 'Electrolize', system-ui, sans-serif; --ui: 'Barlow', system-ui, sans-serif;
+    transition: --accent .4s;
   }
+  :root.m-car { --accent: var(--m-light); }
+  :root[data-mode=sport] { --accent: #ff4a2e; }
+  :root[data-mode=eco] { --accent: #19c3b0; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--base); color: var(--text); font: 500 15px/1.2 var(--ui);
                -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; overscroll-behavior: none;
                -webkit-tap-highlight-color: transparent; }
   body { display: grid; grid-template-columns: minmax(96px, 128px) minmax(0, 1fr) minmax(96px, 128px); gap: 12px; box-sizing: border-box;
-         padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
-  button { font: inherit; color: inherit; border: 1px solid var(--line); background: var(--raised); border-radius: 12px; padding: 0; }
-  button.down { background: #343a42; transform: scale(.97); }
-  button:focus-visible { outline: 2px solid var(--m-light); outline-offset: 2px; }
+         padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+         background: radial-gradient(70% 60% at 50% 0%, #10141b 0%, transparent 70%), var(--base); }
+  button { font: inherit; color: inherit; border: 1px solid var(--line); background: linear-gradient(var(--key-hi), var(--key)); border-radius: 12px; padding: 0;
+           box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05); }
+  button.down { background: #2a2f37; border-color: var(--line-hi); transform: scale(.97); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  svg { flex: none; }
 
   /* the sides: a paddle over each pedal, as the wheel's paddles sit over your thumbs */
   .side { display: grid; grid-template-rows: clamp(58px, 21vh, 84px) minmax(0, 1fr); gap: 10px; min-height: 0; }
-  /* the handbrake: the Drive tab's whole bottom row in drift mode, held like the lever */
-  #hb { font-weight: 600; letter-spacing: .02em; background: linear-gradient(#262a2f, #1d2024); }
-  #hb.down { background: #2a1517; border-color: var(--m-red); box-shadow: inset 0 0 0 1px var(--m-red); }
-  .paddle { font: 400 40px/1 var(--num); border-radius: 22px 22px 12px 12px; background: linear-gradient(#30353c, #22262b);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08); }
-  .pedal { position: relative; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); overflow: hidden; }
+  /* carbon shift paddles */
+  .paddle { font: 400 40px/1 var(--num); color: #e6e9ee; border-radius: 22px 22px 12px 12px; border-color: #2c3037;
+            background: linear-gradient(165deg, rgba(255, 255, 255, .11), transparent 45%),
+                        repeating-linear-gradient(45deg, rgba(255, 255, 255, .035) 0 2px, transparent 2px 4px),
+                        repeating-linear-gradient(-45deg, rgba(0, 0, 0, .35) 0 2px, transparent 2px 4px), #17191d;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 6px 14px -8px #000; }
+  .paddle.down { background: linear-gradient(165deg, color-mix(in srgb, var(--accent) 30%, transparent), transparent 60%), #1d2025;
+                 border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+  /* the pedals: the M pedals' rubber studs, a scale up each edge, the fill topped with a bright line where it stands */
+  .pedal { position: relative; border-radius: 14px; border: 1px solid var(--line); overflow: hidden;
+           background: radial-gradient(circle, rgba(255, 255, 255, .045) 1.3px, transparent 1.8px) 0 0 / 12px 12px, linear-gradient(#121419, #0b0c0f);
+           box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
   .pedal::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-                   background: repeating-linear-gradient(to top, transparent 0 calc(25% - 1px), rgba(255, 255, 255, .06) calc(25% - 1px) 25%); }
+                   --tick: repeating-linear-gradient(to top, transparent 0 calc(10% - 1px), rgba(255, 255, 255, .14) calc(10% - 1px) 10%);
+                   background: var(--tick) left / 7px 100% no-repeat, var(--tick) right / 7px 100% no-repeat; }
   .pedal > * { pointer-events: none; } /* so a touch's offsetY is always the pedal's own, turned round or not */
-  .pedal i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(to top, var(--c), color-mix(in srgb, var(--c) 45%, transparent)); }
-  .pedal span { position: absolute; z-index: 2; top: 10px; left: 0; right: 0; text-align: center; color: var(--dim); font-weight: 600; }
-  .pedal b { position: absolute; z-index: 2; top: 30px; left: 0; right: 0; text-align: center; font: 400 24px var(--num); }
+  .pedal i { position: absolute; left: 0; right: 0; bottom: 0; height: 0;
+             background: linear-gradient(to top, color-mix(in srgb, var(--c) 14%, transparent), color-mix(in srgb, var(--c) 55%, transparent));
+             box-shadow: inset 0 2px 0 var(--c); }
+  .pedal span { position: absolute; z-index: 2; top: 12px; left: 0; right: 0; text-align: center; color: var(--dim);
+                font: 700 11px var(--ui); letter-spacing: .16em; text-transform: uppercase; }
+  .pedal b { position: absolute; z-index: 2; top: 30px; left: 0; right: 0; text-align: center; font: 400 26px var(--num); }
   [data-k=b] { --c: var(--m-red); }
   [data-k=t] { --c: var(--m-light); }
 
   main { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
-  header { display: flex; align-items: center; gap: 8px; height: 30px; flex: none; }
-  #dot { width: 8px; height: 8px; border-radius: 50%; background: var(--m-red); flex: none; }
-  #dot.wait { background: #e8a33a; }
-  #dot.live { background: var(--m-light); }
-  #car { flex: 1; min-width: 0; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  header > button { height: 30px; padding: 0 14px; border-radius: 15px; font-weight: 600; flex: none; }
-  #menu.on { border-color: var(--m-light); box-shadow: inset 0 0 0 1px var(--m-light); }
-  #ign.on { border-color: var(--m-red); box-shadow: 0 0 12px rgba(225, 38, 45, .45), inset 0 0 0 1px var(--m-red); }
+  header { display: flex; align-items: center; gap: 8px; height: 32px; flex: none; }
+  #dot { width: 8px; height: 8px; border-radius: 50%; background: var(--m-red); flex: none; box-shadow: 0 0 8px var(--m-red); }
+  #dot.wait { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  #dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  #car { flex: 1; min-width: 0; color: var(--dim); font-weight: 600; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #dot.live ~ #car { color: var(--text); }
+  /* the M tricolour, by an M car's name */
+  .stripes { display: none; gap: 2px; flex: none; transform: skewX(-20deg); }
+  .stripes i { width: 4px; height: 13px; }
+  .stripes i:nth-child(1) { background: var(--m-light); }
+  .stripes i:nth-child(2) { background: var(--m-dark); }
+  .stripes i:nth-child(3) { background: var(--m-red); }
+  .m-car header .stripes { display: flex; }
+  header > button { height: 32px; padding: 0 13px; border-radius: 16px; flex: none; display: inline-flex; align-items: center; gap: 7px;
+                    font: 700 11px var(--ui); letter-spacing: .12em; text-transform: uppercase; }
+  header > button svg { width: 14px; height: 14px; fill: currentColor; }
+  main > header { container-type: inline-size; }
+  @container (max-width: 420px) { #extras-open { padding: 0 11px; } #extras-open span { display: none; } } /* a small phone: the car's name keeps its room */
+  #menu.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  /* engine start / stop: its LED red while the engine runs */
+  #ign::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #3a3f47; }
+  #ign.on { border-color: color-mix(in srgb, var(--m-red) 70%, transparent); }
+  #ign.on::before { background: var(--m-red); box-shadow: 0 0 8px var(--m-red); }
 
-  /* the cluster: the one loud thing */
-  .cluster { position: relative; flex: none; display: grid; grid-template-columns: auto 1fr; align-items: end; column-gap: 12px;
-             padding: 8px 14px 10px; border-radius: 14px; border: 1px solid var(--line); overflow: hidden;
-             background: radial-gradient(130% 150% at 0% 0%, #1d2838 0%, var(--panel) 62%); }
-  #gear { font: 400 clamp(40px, 15vh, 64px)/.9 var(--num); min-width: 2ch; }
-  .speed { justify-self: end; font: 400 clamp(28px, 10vh, 40px)/1 var(--num); }
-  .speed small { margin-left: 4px; font: 500 13px var(--ui); color: var(--dim); }
-  #revs { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; height: 7px; margin-top: 8px; }
-  #revs b { border-radius: 2px; background: #2a2f36; }
-  #revs b.lit { background: var(--m-light); }
-  #revs b.lit:nth-child(n+10) { background: var(--m-dark); }
-  #revs b.lit:nth-child(n+13) { background: var(--m-red); }
+  /* the cluster, the one loud thing: M shift lights over gear | speed | telltales, the steering under them */
+  .cluster { position: relative; flex: none; display: grid; grid-template-columns: auto minmax(max-content, 1fr) minmax(0, auto); align-items: center; column-gap: 10px;
+             padding: 8px 14px 9px; border-radius: 16px; border: 1px solid var(--line); overflow: hidden;
+             background: radial-gradient(70% 130% at 50% 130%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%), linear-gradient(#121419, #0b0c0f);
+             box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05); }
+  #revs { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; height: 5px; margin-bottom: 6px; }
+  #revs b { border-radius: 2px; background: #1d2026; }
+  #revs b.lit { background: var(--m-light); box-shadow: 0 0 6px var(--m-light); }
+  #revs b.lit:nth-child(n+10) { background: var(--m-dark); box-shadow: 0 0 6px var(--m-dark); }
+  #revs b.lit:nth-child(n+13) { background: var(--m-red); box-shadow: 0 0 6px var(--m-red); }
   #revs.flash b { animation: flash .12s steps(1) infinite alternate; }
-  @keyframes flash { to { background: #2a2f36; } }
+  @keyframes flash { to { background: #1d2026; box-shadow: none; } }
   @media (prefers-reduced-motion: reduce) { #revs.flash b { animation: none; } }
-  #toast { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-           padding: 0 14px; text-align: center; background: var(--panel); opacity: 0; transition: opacity .15s; pointer-events: none; }
+  #gear { justify-self: start; font: 400 clamp(36px, 13vh, 58px)/.9 var(--num); min-width: 2ch; }
+  .speed { justify-self: center; font: 400 clamp(32px, 12vh, 50px)/1 var(--num); white-space: nowrap; }
+  .speed small { margin-left: 5px; font: 700 11px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+  .cluster.off #gear, .cluster.off .speed { opacity: .3; }
+  .cluster.off #revs b { background: #15171b; box-shadow: none; }
+  /* telltales: only what's on, as on the car's cluster */
+  .tt { justify-self: end; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 0; }
+  #tt-mode { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 11px var(--ui); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+  .tt-icons { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 5px 7px; min-height: 18px; }
+  .tt-icons svg { display: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tt-lo { color: var(--green); }
+  .tt-hi { color: var(--beam); }
+  .tt-mute { color: var(--dim); }
+  .cluster.lo:not(.hi) .tt-lo, .cluster.hi .tt-hi, .cluster.muted .tt-mute { display: block; }
+  .tag { padding: 2px 5px; border: 1px solid currentColor; border-radius: 4px; color: var(--amber); font: 700 10px/1 var(--ui); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; }
+  .tag:empty, .cluster:not(.drift) .tt-drift { display: none; }
+  #steer { grid-column: 1 / -1; position: relative; height: 4px; margin-top: 8px; border-radius: 2px; background: #1d2026; overflow: hidden; }
+  #steer::after { content: ''; position: absolute; left: calc(50% - 1px); top: 0; bottom: 0; width: 2px; background: var(--faint); }
+  #steer i { position: absolute; top: 0; bottom: 0; background: var(--accent); }
+  #toast { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+           padding: 0 14px; text-align: center; background: color-mix(in srgb, #0b0c0f 95%, transparent); opacity: 0; transition: opacity .15s; pointer-events: none; }
   #toast.show { opacity: 1; }
-  #toast b { color: var(--dim); font-weight: 600; font-size: 13px; }
-  #toast span { font: 400 22px/1.15 var(--num); }
+  #toast b { color: var(--accent); font: 700 11px var(--ui); letter-spacing: .16em; text-transform: uppercase; }
+  #toast span { font: 400 20px/1.15 var(--num); }
 
-  #steer { position: relative; flex: none; height: 6px; border-radius: 3px; background: var(--raised); overflow: hidden; }
-  #steer::after { content: ''; position: absolute; left: calc(50% - 1px); top: 0; bottom: 0; width: 2px; background: var(--dim); }
-  #steer i { position: absolute; top: 0; bottom: 0; background: var(--m-light); }
-
-  nav { display: flex; gap: 4px; flex: none; padding: 3px; border-radius: 11px; background: var(--panel); }
-  nav button { flex: 1; height: 30px; border: 0; background: none; color: var(--dim); font-weight: 600; }
-  nav button[aria-selected=true] { background: var(--raised); color: var(--text); box-shadow: inset 0 -2px 0 var(--m-light); }
+  /* the tabs: an iDrive bar, the one you're on underlined in the accent */
+  nav { display: flex; gap: 2px; flex: none; padding: 3px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+  nav button { flex: 1; min-width: 0; height: 30px; border: 0; border-radius: 9px; background: none; box-shadow: none; color: var(--dim);
+               font: 700 11px var(--ui); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  nav button[aria-selected=true] { background: var(--key-hi); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
   .tab { flex: 1; min-height: 0; display: grid; gap: 8px; grid-auto-rows: minmax(0, 1fr); }
-  .tab[hidden] { display: none; }
-  /* rows: the signals at the ends, by the thumbs, the gears between; the driving row; the handbrake (drift mode) */
-  #tab-drive:not([hidden]) { display: flex; flex-direction: column; }
-  #tab-drive .row { flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
-  #tab-drive .row[hidden] { display: none; }
-  #tab-drive .row .key:not(.sel):not(.m) { font-size: 13px; line-height: 1.05; overflow: hidden; overflow-wrap: break-word; padding: 0 4px; } /* a tune's own name can be long */
-  #tab-setup { grid-template-columns: repeat(4, 1fr); }
-  #tab-car { grid-template-columns: repeat(6, 1fr); grid-auto-rows: minmax(0, 64px); }
-  #tab-car > :nth-child(-n+2) { grid-column: span 3; } /* Lights, High beam; under them Beam - / level / + */
-  #tab-car > :nth-child(n+3) { grid-column: span 2; }
-  #tab-view { grid-template-columns: 2fr 1fr; }
+  /* the driving tabs are rows of keys: Drive's selector with the signals at its ends, by the thumbs; its modes; the
+     handbrake (drift mode) last, nearest the pedals */
+  .rows { display: flex; flex-direction: column; }
+  .row { flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(min-content, 1fr); gap: 8px; } /* even, till a word wouldn't fit */
+  .row > .key:not(.m) { padding-inline: 4px; overflow: hidden; overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto; font: 700 11px/1.15 var(--ui); letter-spacing: .07em; text-transform: uppercase; } /* a tune's own name can be long */
+  .row.top { display: flex; }
+  .row.top > .sig { flex: 1; }
+
+  .key { position: relative; min-height: 0; font-weight: 600; line-height: 1.1; }
+  .key.ico { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .key svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .key.on:not(.led) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .key.warn { color: #ffc46b; }
+  .key.warn:not(.led) { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+  /* a switch with a state carries an LED under its label, as the console's do */
+  .key.led { padding-bottom: 8px; }
+  .key.led::after { content: ''; position: absolute; left: calc(50% - 9px); bottom: 7px; width: 18px; height: 3px; border-radius: 2px; background: #2b3038; }
+  .key.led.on::after { background: var(--led, var(--accent)); box-shadow: 0 0 8px var(--led, var(--accent)); }
+  .key.led.warn::after { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  .key[data-mode=comfort], .key[data-mode=normal] { --led: #2f80ff; }
+  .key[data-mode=sport] { --led: #ff4a2e; }
+  .key[data-mode=eco] { --led: #19c3b0; }
+  #lights { --led: var(--green); }
+  #high { --led: var(--beam); }
+  #lights.on svg { color: var(--green); }
+  #high.on svg { color: var(--beam); }
+  /* the selector: R N D (M) as one gate, the gear it's in lit */
+  .gate { flex: var(--n, 4); display: flex; min-width: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: linear-gradient(#121419, #0c0e11); }
+  .gate .key { flex: 1; min-width: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--faint); font: 400 26px var(--num); }
+  .gate .key + .key { border-left: 1px solid var(--line); }
+  .gate .key.on { color: var(--text); background: linear-gradient(to top, color-mix(in srgb, var(--accent) 32%, transparent), transparent 85%); box-shadow: inset 0 -3px 0 var(--accent); }
+  .gate .key.down { background: var(--key-hi); transform: none; }
   /* D with its sport program beside it: the one it's in lit */
   .key.ds b, .key.ds i { font-style: normal; font-weight: 400; }
   .key.ds i { margin-left: 6px; font-size: .62em; opacity: .4; }
   .key.ds.sport b { opacity: .4; }
-  .key.ds.sport i { opacity: 1; color: var(--m-light); }
+  .key.ds.sport i { opacity: 1; color: var(--accent); }
+  /* the signals: the cluster's green arrows, lit while pressed */
+  .key.sig svg { width: 30px; height: 30px; fill: var(--green); stroke: none; opacity: .5; }
+  .key.sig.down svg { opacity: 1; filter: drop-shadow(0 0 6px var(--green)); }
+  /* M1 / M2: the wheel's red buttons */
+  .key.m { font: 400 22px var(--num); color: #fff; border-color: #ff3b44; background: linear-gradient(#c9161f, #8c0e15); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2); }
+  .key.m.down { background: #e1262d; }
+  /* the handbrake: the Drive tab's whole bottom row in drift mode, held like the lever */
+  #hb.down { background: linear-gradient(#3a1216, #2a0d10); border-color: var(--m-red); box-shadow: inset 0 0 0 1px var(--m-red), 0 0 16px -4px var(--m-red); }
+  .readout { align-self: center; text-align: center; color: var(--text); font: 400 20px var(--num); }
+  .readout::before { content: 'Beam'; display: block; margin-bottom: 4px; color: var(--dim); font: 700 10px var(--ui); letter-spacing: .16em; text-transform: uppercase; }
+  #tab-view { grid-template-columns: 2fr 1fr; }
+  #tab-view .key { font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; }
   /* the look-around touchpad */
-  #look { grid-row: span 2; display: flex; align-items: center; justify-content: center; border-radius: 14px; border: 1px dashed var(--line); color: var(--dim);
+  #look { grid-row: span 2; border-radius: 14px; border: 1px solid var(--line); color: var(--dim);
           background: radial-gradient(circle, rgba(255, 255, 255, .07) 1px, transparent 1.5px) 0 0 / 18px 18px, var(--panel); }
   #look > * { pointer-events: none; } /* offsets stay the pad's own, turned round or not */
-  #look.down { border-color: var(--m-light); }
+  #look.down { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .empty { grid-column: 1 / -1; margin: auto; align-self: center; text-align: center; color: var(--dim); }
+
   /* the map: the whole of it, north up, with the car on it; the places to teleport to beside it (scrolls) */
   #tab-map { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
   .mapcol { display: flex; flex-direction: column; gap: 5px; min-height: 0; }
@@ -117,22 +204,21 @@
   #places .key { font-size: 13px; line-height: 1.1; padding: 0 6px; overflow: hidden; }
   /* the extras page, over the whole pad (the pedals and paddles too): its own header, tabs and room */
   #extras { position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; padding: inherit; background: var(--base); }
-  #extras[hidden] { display: none; }
   #extras header { height: 36px; }
   #extras nav { flex: 1; }
-  #extras-close { color: var(--m-light); }
+  #extras-close { color: var(--accent); }
   /* time & weather: the drive page's menu, row by row - times and the clock, seasons, skies, Live */
-  #tab-weather:not([hidden]) { display: flex; flex-direction: column; gap: 6px; }
+  #tab-weather { display: flex; flex-direction: column; gap: 6px; }
   #tab-weather .wx-now { flex: none; margin: 0; color: var(--dim); font-size: 13px; }
   #tab-weather .wx-row { flex: 1; min-height: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
   #tab-weather .key { font-size: 14px; line-height: 1.15; padding: 0 4px; overflow: hidden; }
   #tab-weather .key small { display: block; font-size: 11px; font-weight: 500; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* the sound mixer: every layer's slider at once */
-  #tab-sound { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); grid-auto-rows: minmax(24px, 1fr); gap: 6px; }
+  #tab-sound { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); grid-auto-rows: minmax(24px, 56px); align-content: start; gap: 6px; }
   .mix { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px; min-height: 0; overflow: hidden;
          border-radius: 10px; border: 1px solid var(--line); background: var(--panel); font-size: 12px; font-weight: 600; touch-action: none; }
   .mix > * { pointer-events: none; } /* so offsetX is always the bar's own */
-  .mix i { position: absolute; inset: 0 auto 0 0; width: var(--v, 0%); background: color-mix(in srgb, var(--m-light) 38%, transparent); }
+  .mix i { position: absolute; inset: 0 auto 0 0; width: var(--v, 0%); background: color-mix(in srgb, var(--accent) 34%, transparent); box-shadow: inset -2px 0 0 var(--accent); }
   .mix span, .mix b { position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mix b { flex: none; font: 400 13px var(--num); }
   /* the Mac's pointer: the touchpad, and its switch and buttons beside it */
@@ -140,32 +226,26 @@
   #mpad { grid-row: span 5; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; border-radius: 14px; border: 1px dashed var(--line);
           color: var(--dim); line-height: 1.5; touch-action: none; background: var(--panel); }
   #mpad > * { pointer-events: none; } /* offsets stay the pad's own, turned round or not */
-  #mpad.live { border-style: solid; border-color: var(--m-light); background: radial-gradient(circle, rgba(79, 168, 255, .1) 1px, transparent 1.5px) 0 0 / 18px 18px, var(--panel); }
+  #mpad.live { border-style: solid; border-color: var(--accent); background: radial-gradient(circle, color-mix(in srgb, var(--accent) 16%, transparent) 1px, transparent 1.5px) 0 0 / 18px 18px, var(--panel); }
   /* the keyboard, in the touchpad's place: five rows, ⌫ and the arrows repeating while held, ⇧ ⌃ ⌥ ⌘ for the next key */
   #tab-mouse:not(.kb) #kbd, #tab-mouse.kb > :not(#kbd) { display: none; }
-  #tab-mouse.kb:not([hidden]) { display: flex; }
+  #tab-mouse.kb { display: flex; }
   #kbd { flex: 1; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
   #kbd .kr { flex: 1; min-height: 0; display: flex; gap: 5px; }
   #kbd .key { flex: 1; min-width: 0; padding: 0; font: 400 19px var(--num); }
   #kbd .key.w { flex: 1.5; font: 600 14px var(--ui); }
   #kbd .key[data-k=space] { flex: 4.5; }
-  #kbd .key[data-k=pad] { flex: 2; font: 600 13px var(--ui); color: var(--m-light); }
+  #kbd .key[data-k=pad] { flex: 2; font: 600 13px var(--ui); color: var(--accent); }
   #m-on small { display: block; margin-top: 2px; font-size: 11px; font-weight: 500; color: var(--dim); }
-  #mute.warn { border-color: var(--m-red); box-shadow: inset 0 0 0 1px var(--m-red); color: #ff8a8f; }
-  .key { min-height: 0; font-weight: 600; line-height: 1.1; }
-  .key.sel { font: 400 24px var(--num); }
-  .key.on { border-color: var(--m-light); box-shadow: inset 0 0 0 1px var(--m-light); }
-  .key.warn { border-color: #e8a33a; box-shadow: inset 0 0 0 1px #e8a33a; color: #ffc46b; } /* stability control eased or off */
-  .readout { align-self: center; text-align: center; color: var(--dim); font: 400 18px var(--num); }
-  .key.m { font: 400 22px var(--num); background: #2a1517; border-color: var(--m-red); }
-  .empty { grid-column: 1 / -1; align-self: center; text-align: center; color: var(--dim); }
 
   .cover { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center;
-           gap: 12px; padding: 24px; text-align: center; background: var(--base); }
-  .cover[hidden] { display: none; }
+           gap: 12px; padding: 24px; text-align: center; background: radial-gradient(70% 70% at 50% 0%, #121823 0%, transparent 70%), var(--base); }
+  .cover .stripes { display: flex; margin-bottom: 6px; }
+  .cover .stripes i { width: 7px; height: 22px; }
   .cover h1 { margin: 0; font-size: 24px; font-weight: 600; }
-  .cover p { margin: 0; max-width: 34ch; color: var(--dim); line-height: 1.4; }
-  #go { margin-top: 8px; height: 48px; padding: 0 28px; border: 0; border-radius: 24px; background: var(--m-light); color: #08111c; font-weight: 600; font-size: 17px; }
+  .cover p { margin: 0; max-width: 36ch; color: var(--dim); line-height: 1.4; }
+  #go { margin-top: 10px; height: 48px; padding: 0 30px; border: 0; border-radius: 24px; background: var(--accent); color: #fff;
+        font: 700 14px var(--ui); letter-spacing: .14em; text-transform: uppercase; box-shadow: 0 10px 28px -10px var(--accent); }
   /* iOS won't let a page lock landscape, so if turning the wheel too far flips it to portrait, turn the pad back to
      stay put in your hands: towards whichever side was up (onTilt), with the safe areas moved round to match */
   @media (orientation: portrait) {
@@ -183,26 +263,37 @@
 </section>
 <main>
   <header>
-    <span id="dot"></span><span id="car">Connecting to the Mac</span>
-    <button id="extras-open" aria-label="Extras: Tab, Esc, map, sound, mouse">Extras</button>
+    <span id="dot"></span><span class="stripes" aria-hidden="true"><i></i><i></i><i></i></span><span id="car">Connecting to the Mac</span>
+    <button id="extras-open" aria-label="Extras: Tab, Esc, map, sound, mouse"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z"/></svg><span>Extras</span></button>
     <button id="ign">Start / stop</button>
   </header>
-  <div class="cluster">
+  <div class="cluster" id="cluster">
+    <div id="revs"></div>
     <div id="gear">–</div>
     <div class="speed"><span id="speed">0</span><small>km/h</small></div>
-    <div id="revs"></div>
+    <div class="tt">
+      <span id="tt-mode"></span>
+      <span class="tt-icons">
+        <span class="tag" id="tt-dsc"></span><span class="tag tt-drift">Drift</span>
+        <svg class="tt-lo" viewBox="0 0 24 24" aria-label="Lights on"><path d="M13 6h1.5a6 6 0 0 1 0 12H13zM3 7.5l6.5 1.8M3 11.5l6.5 1.8M3 15.5l6.5 1.8"/></svg>
+        <svg class="tt-hi" viewBox="0 0 24 24" aria-label="High beam on"><path d="M13 6h1.5a6 6 0 0 1 0 12H13zM3 8h6.5M3 12h6.5M3 16h6.5"/></svg>
+        <svg class="tt-mute" viewBox="0 0 24 24" aria-label="Muted"><path d="M4 9h3.5L12 5v14l-4.5-4H4zM16 9.5l5 5M21 9.5l-5 5"/></svg>
+      </span>
+    </div>
+    <div id="steer" role="img" aria-label="Steering"><i></i></div>
     <div id="toast" role="status"><b></b><span></span></div>
   </div>
-  <div id="steer" role="img" aria-label="Steering"><i></i></div>
   <nav role="tablist">
     <button role="tab" data-tab="drive" aria-selected="true">Drive</button>
-    <button role="tab" data-tab="setup" aria-selected="false">Setup</button>
-    <button role="tab" data-tab="car" aria-selected="false">Car</button>
+    <button role="tab" data-tab="assist" aria-selected="false">Assist</button>
+    <button role="tab" data-tab="setup" aria-selected="false" hidden>Setup</button>
+    <button role="tab" data-tab="lights" aria-selected="false">Lights</button>
     <button role="tab" data-tab="view" aria-selected="false">View</button>
   </nav>
-  <div class="tab" id="tab-drive" role="tabpanel"><p class="empty">Open the drive page on the Mac to get this car's controls</p></div>
-  <div class="tab" id="tab-setup" role="tabpanel" hidden></div>
-  <div class="tab" id="tab-car" role="tabpanel" hidden></div>
+  <div class="tab rows" id="tab-drive" role="tabpanel"><p class="empty">Open the drive page on the Mac to get this car's controls</p></div>
+  <div class="tab rows" id="tab-assist" role="tabpanel" hidden></div>
+  <div class="tab rows" id="tab-setup" role="tabpanel" hidden></div>
+  <div class="tab rows" id="tab-lights" role="tabpanel" hidden></div>
   <div class="tab" id="tab-view" role="tabpanel" hidden>
     <div id="look" role="application" aria-label="Look around: drag to turn the camera"></div>
     <button class="key" id="cam" aria-label="Switch between the chase and in-car view">Chase / in-car</button>
@@ -247,6 +338,7 @@
   </div>
 </div>
 <div class="cover" id="intro">
+  <span class="stripes" aria-hidden="true"><i></i><i></i><i></i></span>
   <h1>Hold your phone sideways, like a wheel</h1>
   <p>Tilt to steer. Brake on the left, throttle on the right, with the shift paddles above them.</p>
   <button id="go">Start driving</button>
@@ -361,65 +453,89 @@ hook($('esc'), { drive: { key: 'Escape', code: 'Escape' } }); // closes what's o
 hook($('cam'), { drive: { key: 'c', code: 'KeyC' } });
 hook($('cam-reset'), { msg: { look: 'reset' } });
 
+const ICON = {
+  left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4.5 2.5 12l7.5 7.5V15h11.5V9H10z"/></svg>',
+  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4.5l7.5 7.5-7.5 7.5V15H2.5V9H14z"/></svg>',
+  cruise: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 1 1 16 0M12 17l4.5-5"/></svg>',
+  lo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 6h1.5a6 6 0 0 1 0 12H13zM3 7.5l6.5 1.8M3 11.5l6.5 1.8M3 15.5l6.5 1.8"/></svg>',
+  hi: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 6h1.5a6 6 0 0 1 0 12H13zM3 8h6.5M3 12h6.5M3 16h6.5"/></svg>',
+};
 // this car's controls, from its own key hints: the drive keys in their places, then whatever set-up keys it has
 const KNOWN = new Set(['i', 'w', 's', 'space', 'shift', 'q', 'e', 'm', 'k', 'g', 'n', 'r', '1', '2', '3', 'f', ',', '.', 'l', 'h', 't']); // (T: the traction button)
 // the gear keys: D's sport program - S or DS on G, or the E60's D / S on M - and a manual gate on M (the rest of
-// G - the M cars' Drivelogic, the GT3's drive mode - goes to Setup)
+// G - the M cars' Drivelogic, the GT3's drive mode - goes to the driving row)
 const SPORT_G = /s gearbox|^ds$|^s$/i, SPORT_M = /d \/ s/i, FEEL = /^(engine|chassis|drivelogic|power|edc|drive mode|edrive mode)$/i;
 const nice = s => s.replace(/ gate$/, '').replace(/^./, c => c.toUpperCase());
+const div = (className, kids, id) => { const el = Object.assign(document.createElement('div'), { className }); if (id) el.id = id; el.append(...kids); return el; };
+const keys = list => list.filter(Boolean).map(key);
+// rows of up to n keys, as even as they go
+const rowsOf = (list, n) => { const per = Math.ceil(list.length / Math.ceil(list.length / n)); return list.length ? Array.from({ length: Math.ceil(list.length / per) }, (_, i) => div('row', list.slice(i * per, (i + 1) * per))) : []; };
+console.assert(rowsOf([1, 2, 3, 4], 3).map(r => r.childNodes.length).join() === '2,2' && rowsOf([], 3).length === 0, 'rowsOf should split evenly');
 function build() {
-  const h = car.hints, isM = /M1/.test(h['1'] || ''), fill = (id, list) => $(id).replaceChildren(...list.filter(Boolean).map(key));
+  const h = car.hints, isM = /M1/.test(h['1'] || '');
+  document.documentElement.classList.toggle('m-car', isM);
   const sport = SPORT_G.test(h.g || '') ? 'g' : SPORT_M.test(h.m || '') ? 'm' : '', sportName = /^ds$/i.test(h.g || '') ? 'DS' : 'S';
-  const top = [
-    { label: '◀', drive: { key: 'ArrowLeft', code: 'ArrowLeft' }, aria: 'Indicate left' },
+  // Drive: the selector - R N D (M) as one gate, D pressed again in D for its sport program (and back) - with the
+  // signals at its ends; the driving row - its drive modes, its maps (named by the stage on them) or M1 / M2, and what
+  // sets how it drives on a track: the M cars' engine, chassis and Drivelogic, the E60's POWER and EDC, the GT3's
+  // drive mode; the handbrake, in drift mode
+  const gears = keys([
     { label: 'R', key: 'r', gear: 'R', cls: 'sel', aria: 'Reverse' },
     { label: 'N', key: 'n', gear: 'N', cls: 'sel', aria: 'Neutral' },
-    // D, and pressed again in D its sport program (and back)
     sport ? { html: `<b>D</b><i>${sportName}</i>`, keyOf: () => gearMode === 'D' ? sport : 'k', gear: 'D', id: 'ds', cls: 'sel ds', aria: `Drive - again for ${sportName}` }
           : { label: 'D', key: 'k', gear: 'D', cls: 'sel', aria: 'Drive' },
     h.m && !SPORT_M.test(h.m) && { label: 'M', key: 'm', gear: 'M', cls: 'sel', aria: 'Manual' },
-    { label: '▶', drive: { key: 'ArrowRight', code: 'ArrowRight' }, aria: 'Indicate right' },
-  ].filter(Boolean);
-  // the driving row: its drive modes, its maps (named by the stage on them) or M1 / M2 / MDrive, and what sets how it
-  // drives on a track - the M cars' engine, chassis and Drivelogic, the E60's POWER and EDC, the GT3's drive mode
-  const store = /store/.test(h['1'] || ''), feel = Object.keys(h).filter(k => k !== sport && FEEL.test(nice(h[k])));
-  const drive = [
-    ...(car.modes || []).map(([mode, label]) => ({ label, mode })), // Comfort / Sport / Eco Pro
+  ]);
+  const gate = div('gate', gears);
+  gate.style.setProperty('--n', gears.length);
+  const store = /store/.test(h['1'] || ''), feel = Object.keys(h).filter(k => k !== sport && k !== 'shift' && FEEL.test(nice(h[k]))); // (shift: the same thing, shifted)
+  const modes = (car.modes || []).map(([mode, label]) => ({ label, mode, cls: 'led' })); // Comfort / Sport / Eco Pro
+  const more = [
     ...(isM ? [{ label: 'M1', key: '1', cls: 'm', store }, { label: 'M2', key: '2', cls: 'm', store }]
-            : ['1', '2', '3'].filter(k => h[k] && !(/map/i.test(h[k]) && car.maps?.some(Boolean) && !car.maps[k - 1])).map(k => /map/i.test(h[k]) ? { label: car.maps?.[k - 1] || `Map ${k}`, key: k, map: k } : { label: nice(h[k]), key: k })),
+            : ['1', '2', '3'].filter(k => h[k] && !(/map/i.test(h[k]) && car.maps?.some(Boolean) && !car.maps[k - 1])).map(k => /map/i.test(h[k]) ? { label: car.maps?.[k - 1] || `Map ${k}`, key: k, map: k, cls: 'led' } : { label: nice(h[k]), key: k })),
     ...feel.map(k => ({ label: nice(h[k]), key: k })),
   ]; // (a car on tune slots shows only the two maps it has - the X1's hints list a third)
-  const row = (id = '') => Object.assign(document.createElement('div'), { className: 'row', id });
-  const rows = [row(), drive.length && row(), row('hb-row')].filter(Boolean);
-  rows[0].append(...top.map(key));
-  if (drive.length) rows[1].append(...drive.map(key));
-  rows.at(-1).append(key({ label: 'Handbrake', id: 'hb', hold: 'h' }));
-  rows.at(-1).hidden = !driftOn; // the handbrake: only in drift mode
-  $('tab-drive').replaceChildren(...rows);
-  fill('tab-setup', [
-    { label: 'DSC', id: 'tc', msg: { traction: 1 }, aria: 'Traction control: next setting' }, // labelled with the car's own setting (showTele)
-    h.f && { label: 'Cruise', key: 'f' },
+  const driving = modes.length + more.length > 5 ? [keys(modes), keys(more)] : [keys([...modes, ...more])]; // (a long row splits: modes, then maps)
+  const hb = div('row', [key({ label: 'Handbrake', id: 'hb', hold: 'h' })], 'hb-row');
+  hb.hidden = !driftOn; // the handbrake: only in drift mode
+  $('tab-drive').replaceChildren(
+    div('row top', [key({ html: ICON.left, drive: { key: 'ArrowLeft', code: 'ArrowLeft' }, cls: 'sig ico', aria: 'Indicate left' }), gate,
+                    key({ html: ICON.right, drive: { key: 'ArrowRight', code: 'ArrowRight' }, cls: 'sig ico', aria: 'Indicate right' })]),
+    ...driving.filter(r => r.length).map(r => div('row', r)), hb);
+  // Assist: cruise as the wheel's rocker, slower / on-off / faster; then stability control (labelled with the car's own
+  // setting, showTele) and drift mode, lit while on
+  const cruise = keys([
     h[','] && { label: '−5', key: ',', aria: 'Cruise 5 km/h slower' },
+    h.f && { html: ICON.cruise + 'Cruise', key: 'f', cls: 'ico', aria: 'Cruise control' },
     h['.'] && { label: '+5', key: '.', aria: 'Cruise 5 km/h faster' },
-    ...Object.entries(h).filter(([k]) => !KNOWN.has(k) && !feel.includes(k)).map(([k, label]) => ({ label: nice(label), key: k })),
-    { label: 'Drift mode', id: 'drift', msg: { drift: 1 }, aria: 'Drift mode on / off' }, // last, out of the way; lit while on (showTele)
   ]);
-  fill('tab-car', [
-    h.l && { label: 'Lights', key: 'l', id: 'lights' },
-    h.h && { label: 'High beam', key: 'h', id: 'high' },
-    { label: 'Beam −', msg: { beam: -1 }, aria: 'Headlights dimmer' },
-    { label: 'Beam +', msg: { beam: 1 }, aria: 'Headlights brighter' },
-  ]);
+  $('tab-assist').replaceChildren(...(cruise.length ? [div('row', cruise)] : []), div('row', keys([
+    { label: 'DSC', id: 'tc', msg: { traction: 1 }, cls: 'led', aria: 'Traction control: next setting' },
+    { label: 'Drift mode', id: 'drift', msg: { drift: 1 }, cls: 'led', aria: 'Drift mode on / off' },
+  ])));
+  // Setup (M Setup on an M car): the rest of its keys - steering, brakes, xDrive, M Mode, bootmod3... - or no tab at all
+  const extra = keys(Object.entries(h).filter(([k]) => !KNOWN.has(k) && !feel.includes(k)).map(([k, label]) => ({ label: nice(label), key: k })));
+  $('tab-setup').replaceChildren(...rowsOf(extra, 3));
+  const setupTab = document.querySelector('[data-tab=setup]');
+  setupTab.textContent = isM ? 'M Setup' : 'Setup';
+  setupTab.hidden = !extra.length;
+  if (setupTab.hidden && setupTab.getAttribute('aria-selected') === 'true') pick(document.querySelector('[data-tab=drive]'));
+  // Lights: the switch and high beam, the beam's reach under them
   const level = Object.assign(document.createElement('div'), { id: 'beam', className: 'readout' });
   level.setAttribute('aria-live', 'polite');
-  $('tab-car').lastElementChild.before(level); // between Beam - and +
-  document.querySelector('[data-tab=setup]').textContent = isM ? 'M setup' : 'Setup';
+  const lights = keys([
+    h.l && { html: ICON.lo + 'Lights', key: 'l', id: 'lights', cls: 'led ico' },
+    h.h && { html: ICON.hi + 'High beam', key: 'h', id: 'high', cls: 'led ico' },
+  ]);
+  $('tab-lights').replaceChildren(...(lights.length ? [div('row', lights)] : []), div('row', [
+    key({ label: 'Beam −', msg: { beam: -1 }, aria: 'Headlights dimmer' }), level, key({ label: 'Beam +', msg: { beam: 1 }, aria: 'Headlights brighter' }),
+  ]));
 }
 
 const SEGS = 15;
 $('revs').append(...Array.from({ length: SEGS }, () => document.createElement('b')));
 function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift, pos: p, muted: mu, slot }) {
-  const redline = car?.redline || 7000;
+  const redline = car?.redline || 7000, cl = $('cluster'), tcWarn = /off|dtc|mdm|sport/i.test(tc || '');
   $('gear').textContent = g || '–';
   $('speed').textContent = v;
   const lit = Math.round(Math.min(1, r / redline) * SEGS);
@@ -447,11 +563,20 @@ function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift, pos: p, muted: m
   if (tcBtn) {
     tcBtn.hidden = !tc; // (a car with no switch)
     if (tc && tcBtn.textContent !== tc) tcBtn.textContent = tc;
-    tcBtn.classList.toggle('warn', /off|dtc|mdm|sport/i.test(tc || ''));
+    tcBtn.classList.toggle('warn', tcWarn);
   }
   $('lights')?.classList.toggle('on', hl >= 1);
   $('high')?.classList.toggle('on', hl === 2);
   if ($('beam') && beam) $('beam').textContent = beam + '%';
+  // the cluster's telltales, and the drive mode recolouring the pad as it does the car's displays
+  cl.classList.toggle('off', !on);
+  cl.classList.toggle('lo', hl >= 1);
+  cl.classList.toggle('hi', hl === 2);
+  cl.classList.toggle('drift', !!drift);
+  cl.classList.toggle('muted', !!mu);
+  $('tt-dsc').textContent = tcWarn ? tc : '';
+  $('tt-mode').textContent = car?.modes?.find(([m]) => m === dm)?.[1] || (slot && car?.maps?.[slot - 1]) || '';
+  document.documentElement.dataset.mode = dm || '';
 }
 let toastT;
 function toast(title, text, ms = 1800) {
@@ -463,13 +588,14 @@ function toast(title, text, ms = 1800) {
   toastT = setTimeout(() => el.classList.remove('show'), ms);
 }
 
-for (const t of document.querySelectorAll('[role=tab]')) t.onpointerdown = () => {
+function pick(t) {
   for (const o of t.parentNode.querySelectorAll('[role=tab]')) { // (the driving tabs and the extras' each switch their own)
     o.setAttribute('aria-selected', o === t);
     $('tab-' + o.dataset.tab).hidden = o !== t;
   }
   if (t.dataset.tab === 'map') askWorld(), drawWorld();
-};
+}
+for (const t of document.querySelectorAll('[role=tab]')) t.onpointerdown = () => pick(t);
 const extrasOpen = () => !$('extras').hidden;
 hook($('extras-open'), { do: () => { $('extras').hidden = false; if (!$('tab-map').hidden) askWorld(), drawWorld(); } });
 hook($('extras-close'), { do: () => { $('extras').hidden = true; } });
