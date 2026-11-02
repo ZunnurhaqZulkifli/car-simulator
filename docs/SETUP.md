@@ -216,15 +216,16 @@ The relay log is `storage/logs/pad-relay.log`. Useful commands:
 - **Steering, pedals, paddles:**
   - Tilt to steer. The brake is on the left, the throttle on the right, the shift paddles above them.
   - **Start / stop** starts the engine.
-  - The cluster shows gear, speed, revs and shift lights.
+  - The cluster shows gear, speed, revs and shift lights, and telltales for the drive mode, lights, high beam, DSC
+    off, drift and mute. The pad's accent follows the drive mode.
 - **Drive tab:**
-  - ◀ R N D M ▶. Pressing D again takes the sport program (S / DS).
+  - The signals either side of R N D M. Pressing D again takes the sport program (S / DS).
   - The car's driving setup: drive modes, maps named by their tune, M1 / M2 and the M cars' engine / chassis /
     Drivelogic.
   - In drift mode, a full-width **Handbrake**.
-- **Setup tab:** DSC, which steps through the car's own traction settings; cruise; the car's other keys; **Drift
-  mode**.
-- **Car tab:** lights, high beam, headlight brightness.
+- **Assist tab:** cruise −5 / on-off / +5; DSC, which steps through the car's own traction settings; **Drift mode**.
+- **Setup tab** (**M Setup** on M cars): the car's other keys. Hidden on a car that has none.
+- **Lights tab:** lights, high beam, headlight brightness.
 - **View tab:** drag to look around, chase / in-car, Reset view.
 - **Extras:**
   - Tab and Esc.
