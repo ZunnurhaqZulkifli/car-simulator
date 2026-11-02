@@ -127,16 +127,19 @@ Clusters are matched to reference photos of the real cars, down to the numeral f
 
 ### 📱 Your phone as the wheel (`public/pad.html`)
 
-Tilt to steer, slide the pedals, tap the shift paddles. The phone shows gear, speed, revs and shift lights. A small
+Tilt to steer, slide the pedals, tap the shift paddles. The phone looks like a BMW cockpit at night: a cluster with
+gear, speed, M shift lights and telltales (drive mode, lights, high beam, DSC off, drift, muted), an LED on every switch
+that has a state, and an accent that follows the drive mode (Comfort blue, Sport red, Eco Pro teal). A small
 relay (`scripts/pad-relay.mjs`) passes messages between the phone and the drive page; the phone reaches it over
 Tailscale (https, which iOS needs before it allows tilt), and its link is put on the clipboard each time the drive
 page opens.
 
 | Tab | |
 |---|---|
-| **Drive** | ◀ R N D M ▶ - D pressed again takes the car's sport program (S, DS, the E60's SMG S) - then the car's driving setup: Comfort / Sport / Eco Pro, its maps named by the tune on them, M1 / M2, engine / chassis / Drivelogic (M cars), MDrive / POWER / EDC (E60), drive mode (GT3). In drift mode, a full-width handbrake |
-| **Setup** | DSC (steps through the car's own TC / DSC / DTC / MDM / PSM setting), cruise and ±5, the car's other keys (xDrive, M Sound, bootmod3…), Drift mode |
-| **Car** | Lights, high beam, headlight brightness |
+| **Drive** | Signals either side of the R N D M selector - D pressed again takes the car's sport program (S, DS, the E60's SMG S) - then the car's driving setup: Comfort / Sport / Eco Pro, its maps named by the tune on them, M1 / M2, engine / chassis / Drivelogic (M cars), MDrive / POWER / EDC (E60), drive mode (GT3). In drift mode, a full-width handbrake |
+| **Assist** | Cruise −5 / on-off / +5, DSC (steps through the car's own TC / DSC / DTC / MDM / PSM setting), Drift mode |
+| **Setup** (**M Setup**) | The car's other keys (steering, xDrive, M Mode, M Sound, bootmod3…); hidden on a car with none |
+| **Lights** | Lights, high beam, headlight brightness |
 | **View** | A touchpad to look around, chase / in-car, Reset view |
 | **Extras** | Tab and Esc, and: **Map** (the whole world with your car on it, a legend, and every teleport spot - tap to go), **Weather** (the time & weather menu), **Sound** (Mute and every sound layer's slider), **Mouse** (below) |
 
