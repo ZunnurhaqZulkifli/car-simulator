@@ -107,7 +107,7 @@ class CarSimController extends Controller
         }
 
         // the car's own HTML is served raw (not a Blade view), so saved state is handed to its
-        // JS via a global instead of Blade interpolation
+        // JS via a global instead of Blade interpolation (< and > escaped: a name can't open a tag or comment in there)
         $state = json_encode([
             'slug' => $car->slug,
             'name' => $car->name,
@@ -126,7 +126,7 @@ class CarSimController extends Controller
             'handling' => $car->handling,
             'csrfToken' => csrf_token(),
             'page' => $page,
-        ]);
+        ], JSON_HEX_TAG);
 
         // mtime query busts the browser cache whenever a shared script changes
         $js = fn ($f) => '<script src="'.asset("js/$f").'?v='.filemtime(public_path("js/$f")).'"></script>';
