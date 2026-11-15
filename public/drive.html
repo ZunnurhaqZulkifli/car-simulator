@@ -55,7 +55,7 @@
   #panel-close { position: fixed; z-index: 4; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px;
                  border: 1px solid #3a3d42; background: rgba(15, 16, 18, .9); color: #fff; font: 13px system-ui, sans-serif; cursor: pointer; }
   #panel-close:hover, #panel-close:focus-visible { border-color: #4fa8ff; }
-  .panel-open #hud, .panel-open #map, .panel-open #tele, .panel-open #credit, .panel-open #teleport, .panel-open #weather, .panel-open #laptime, .panel-open #drag, .panel-open #overview { visibility: hidden; }
+  .panel-open #hud, .panel-open #map, .panel-open #tele, .panel-open #credit, .panel-open #teleport, .panel-open #weather, .panel-open #laptime, .panel-open #drag, .panel-open #overview, .panel-open #settings, .panel-open #set-btn { visibility: hidden; }
   #laptime, #drag { position: fixed; z-index: 2; right: 12px; top: 310px; width: 200px; box-sizing: border-box; padding: 8px 12px; border-radius: 8px;
              background: rgba(0, 0, 0, .5); color: #fff; font: 12px system-ui, sans-serif; }
   #laptime span, #drag span { color: #aab0b8; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
@@ -71,9 +71,31 @@
   #lap-board .me em, #lap-board .me i { color: #4fa8ff; }
   #lap-board .none { opacity: .45; }
   #teleport-places { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; }
+  #teleport { max-height: calc(100vh - 32px); overflow-y: auto; }
+  @media (min-width: 900px) { #teleport-places { grid-template-columns: 1fr 1fr 1fr; } }
   #weather { width: min(520px, calc(100vw - 72px)); }
   #weather .wx-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); column-gap: 8px; margin-bottom: 10px; }
   #wx-now, #drift-on { cursor: pointer; }
+  /* Settings (] or the gear at the bottom right): graphics, camera, the phone pad's link and its log */
+  #settings { width: min(560px, calc(100vw - 72px)); min-width: 0; max-height: calc(100vh - 32px); overflow-y: auto; }
+  #set-tabs { display: flex; gap: 6px; margin: 10px 0 2px; }
+  #set-tabs button { margin: 0; text-align: center; }
+  #settings h3 { margin: 12px 0 0; color: #aab0b8; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+  #settings .set-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); column-gap: 8px; }
+  #settings label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, 1.4fr) 4.2em; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }
+  #settings label b { text-align: right; font-variant-numeric: tabular-nums; }
+  #set-status { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; margin-top: 10px; font: 12px ui-monospace, monospace; }
+  #set-status span { color: #aab0b8; }
+  #set-log { max-height: 42vh; overflow: auto; margin: 8px 0 0; padding: 6px 8px; border-radius: 6px; background: #0a0b0d; color: #c9ced6;
+             font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #set-btn { position: fixed; z-index: 2; right: 12px; bottom: 44px; width: 34px; height: 34px; padding: 7px; border: 0; border-radius: 8px; background: rgba(0, 0, 0, .5); color: #fff; cursor: pointer; }
+  #set-btn:hover, #set-btn:focus-visible { outline: 1px solid #4fa8ff; }
+  #fps { position: fixed; z-index: 2; left: 50%; top: 8px; transform: translateX(-50%); padding: 3px 8px; border-radius: 6px; background: rgba(0, 0, 0, .55);
+         color: #9dff9d; font: 12px ui-monospace, monospace; pointer-events: none; white-space: nowrap; }
+  #notice { position: fixed; z-index: 3; left: 50%; top: 48px; transform: translateX(-50%); padding: 8px 14px; border-radius: 8px; background: rgba(15, 16, 18, .9);
+            color: #fff; font: 600 14px system-ui, sans-serif; pointer-events: none; }
+  /* the engine letting go: an orange flash over the view, fading */
+  #flash { position: fixed; z-index: 1; inset: 0; opacity: 0; pointer-events: none; background: radial-gradient(circle at 50% 75%, rgba(255, 196, 110, .85), rgba(255, 90, 20, .45) 45%, rgba(120, 30, 0, 0) 80%); }
   kbd { padding: 0 5px; border: 1px solid #555; border-radius: 4px; font: 12px ui-monospace, monospace; }
   #credit { position: fixed; z-index: 2; right: 12px; bottom: 8px; font-size: 11px; color: rgba(255, 255, 255, .75); text-shadow: 0 1px 2px #000; }
   #credit a { color: inherit; }
@@ -103,7 +125,7 @@
 <body>
 <div id="hud">I ignition, again or hold to start · W gas · S brake · Space handbrake · A/D steer · R reverse · ←/→ signal · L lights, H high beam · C in-car view · two-finger swipe to look around · Tab car menu · Esc close
   <div><kbd>F</kbd> cruise control, <kbd>,</kbd><kbd>.</kbd> set speed -5 / +5 km/h · <kbd>↑</kbd><kbd>↓</kbd> throttle limit <b id="lim-throttle">100%</b> · <kbd>O</kbd><kbd>P</kbd> brake limit <b id="lim-brake">100%</b></div>
-  <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <kbd>`</kbd> or click the map: teleport · <kbd>'</kbd> overview map · <kbd>/</kbd> Nordschleife lap timer <b id="lap-on">on</b> · <kbd>;</kbd> drift mode <b id="drift-on">off</b> · <kbd>\</kbd> time &amp; weather <b id="wx-now"></b> · <a href="/" style="color:inherit">main menu</a></div>
+  <div><kbd>Tab</kbd> car menu: every control, live data, setup, tuning, dyno · <kbd>`</kbd> or click the map: teleport · <kbd>'</kbd> overview map · <kbd>/</kbd> Nordschleife lap timer <b id="lap-on">on</b> · <kbd>;</kbd> drift mode <b id="drift-on">off</b> · <kbd>\</kbd> time &amp; weather <b id="wx-now"></b> · <kbd>]</kbd> settings · <a href="/" style="color:inherit">main menu</a></div>
   <div id="pump" hidden></div>
   <div id="rollers" hidden>On the dyno rollers - Dyno mode is on (<kbd>Tab</kbd> car menu, Dyno) - switch it off to drive</div>
   <div id="padlink" hidden></div>
@@ -144,6 +166,16 @@
   <div id="weather-opts"></div>
   <button class="menu-leave" data-leave>Keep driving</button>
 </div>
+<div id="settings" class="menu" hidden>
+  <h2>Settings</h2>
+  <div id="set-tabs"><button data-tab="gfx">Graphics</button><button data-tab="cam">Camera</button><button data-tab="audio">Audio</button><button data-tab="pad">Pad</button></div>
+  <div id="set-body"></div>
+  <button class="menu-leave" data-leave>Keep driving</button>
+</div>
+<button id="set-btn" title="Settings (])" aria-label="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
+<div id="fps" hidden></div>
+<div id="notice" hidden></div>
+<div id="flash"></div>
 <div id="overview" hidden aria-label="Overview map">
   <canvas id="ov-map"></canvas>
   <div id="ov-legend"></div>
@@ -302,7 +334,7 @@ const CARS = {
   e60: {
     name: 'BMW M5 E60', page: 'bmw-m5-e60', model: '/models/bmw-m5-e60.glb?v=2', length: 4.855, wheelbase: 2.889, redline: 8250,
     credit: ['BMW M5 (E60)', 'https://sketchfab.com/3d-models/bmw-m5-e60-02b103c91e0947cb940a769851e69dd6', 'by', 'GT Cars: Hyperspeed', 'https://sketchfab.com/Car2022'],
-    grip: 2.0, stiff: 1.7,
+    grip: 2.0, stiff: 1.7, wind: 8,
     chassis: { m: 1830, front: 0.52, rear: 1 },
     paint: /\|paint_\d+\|/, paintColor: 0xf2f2ee, glass: /\|glass_1\|/, glassPlain: true, // Alpine White
     wheels: /\|wheel_/, tyre: /\|wheel_tyre_1\|/,
@@ -332,7 +364,7 @@ const CARS = {
   e90: {
     name: 'BMW 335i', page: 'bmw-335i-e90', model: '/models/bmw-335i-e90.glb', length: 4.549, wheelbase: 2.76, redline: 7000,
     credit: ['BMW 3 Series (E90) 2004-2012', 'https://sketchfab.com/3d-models/bmw-3-series-e90-2004-2012-1d3485a460a84fe6bde59bd8ee8f7334', 'by', 'DEMON_SCARY1235', 'https://sketchfab.com/szymonpasterczyk734'],
-    grip: 1.9, stiff: 1.3,
+    grip: 1.9, stiff: 1.3, wind: 10,
     chassis: { m: 1600, front: 0.51, rear: 1 },
     paint: /^e90_paint\|/, paintColor: 0xb4b8bc, glass: /^e90_glass\|/, glassPlain: true, // Titanium Silver
     wheels: /\|wheel_/, tyre: /^e90_tyre\|/,
@@ -366,7 +398,7 @@ const CARS = {
   gtr: {
     name: 'Nissan GT-R NISMO', page: 'nissan-gt-r-nismo', model: '/models/nissan-gt-r-nismo.glb', length: 4.69, wheelbase: 2.78, redline: 7100,
     credit: ['2017 Nissan GT-R Nismo (R35) N-Attack Package', 'https://sketchfab.com/3d-models/2017-nissan-gt-r-nismo-r35-n-attack-package-7cd3306866984e44979cb9b12e340c12'],
-    grip: 2.4, stiff: 2.4, // the Nismo's sticky Dunlops, stiff springs and bars
+    grip: 2.4, stiff: 2.4, wind: 6, // the Nismo's sticky Dunlops, stiff springs and bars
     chassis: { m: 1720, front: 0.54, rear: 0.7, h: 0.48 }, // ATTESA E-TS: rear-biased, up to 50:50 when the rears slip
     glass: /Window_Material1\|/, glassPlain: true,
     wheels: /Wheel1A_3D/, tyre: /Wheel1A_3D/, // the calipers stay put
@@ -636,14 +668,36 @@ function slide(car, steer, dt) {
   driftMode = was;
 }
 
+// Settings (] or the gear at the bottom right), kept by this browser. Graphics: an FPS cap (0: none - the display's own rate),
+// the render scale (x the screen's pixel ratio), texture quality, view distance (x the weather's fog, the far plane and
+// the run's streamed tiles), antialiasing (read at load) and an FPS meter. Camera: the field of view from the seat and
+// behind the car (vertical degrees; speed still widens them), the chase camera's distance and height (m) and the
+// driver's head moved forward / up from where the seat puts it (m)
+const GFX0 = { fps: 0, scale: 1, tex: 'high', view: 1, aa: true, meter: false }, CAM0 = { fovIn: 70, fovOut: 65, dist: 8.4, height: 3.5, headZ: 0, headY: 0 };
+const GFX_OPTS = {
+  fps: [[30, '30'], [60, '60'], [120, '120'], [0, 'Unlimited', 'vsync']],
+  scale: [[0.5, '50%'], [0.67, '67%'], [0.75, '75%'], [1, '100%']],
+  tex: [['low', 'Low', '512 px, 1x'], ['medium', 'Medium', '1024 px, 4x'], ['high', 'High', 'full size, 16x']],
+  view: [[0.6, 'Near'], [1, 'Normal'], [1.5, 'Far']],
+  aa: [[true, 'On'], [false, 'Off']],
+  meter: [[false, 'Off'], [true, 'On']],
+};
+const CAM_RANGE = { fovIn: [40, 100, 1], fovOut: [40, 100, 1], dist: [4, 16, 0.1], height: [1.5, 8, 0.1], headZ: [-0.1, 0.1, 0.01], headY: [-0.08, 0.08, 0.01] };
+const stored = (key, d) => { try { return { ...d, ...JSON.parse(localStorage.getItem(key)) }; } catch { return { ...d }; } };
+const AUDIO0 = { wind: 1, crash: 1, tick: 1 }; // this page's own sounds' volumes, 0-2 (the engine's is the car page's mix)
+const gfx = stored('drive-gfx', GFX0), camSet = stored('drive-cam', CAM0), vol = stored('drive-audio', AUDIO0);
+for (const k in GFX0) if (!GFX_OPTS[k].some(([v]) => v === gfx[k])) gfx[k] = GFX0[k]; // (a value from an older page, or none)
+for (const k in CAM0) camSet[k] = Number.isFinite(camSet[k]) ? Math.min(CAM_RANGE[k][1], Math.max(CAM_RANGE[k][0], camSet[k])) : CAM0[k];
+for (const k in AUDIO0) vol[k] = Number.isFinite(vol[k]) ? Math.min(2, Math.max(0, vol[k])) : AUDIO0[k];
+
 // reversed depth: no flicker between road and paint far away, and unlike log depth no depth written per pixel (that
 // made the GPU shade everything hidden behind the cabin; three r182: r183 on lights Lambert from scene.environment,
 // washing out the world); alpha: the cluster's "hole" lets the CSS3D layer below show
-const renderer = new THREE.WebGLRenderer({ antialias: true, reversedDepthBuffer: true, alpha: true });
+const renderer = new THREE.WebGLRenderer({ antialias: gfx.aa, reversedDepthBuffer: true, alpha: true });
 // r182 sorts see-through things by clip z, which reversed depth turns round (nearest first): the nearest faded smoke
 // puff's depth then blanked every denser one behind it. Sorted back to front again here
 renderer.setTransparentSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || a.z - b.z || a.id - b.id);
-renderer.setPixelRatio(devicePixelRatio);
+renderer.setPixelRatio(devicePixelRatio * gfx.scale);
 renderer.setSize(innerWidth, innerHeight);
 Object.assign(renderer.domElement.style, { position: 'fixed', inset: '0', zIndex: 1 });
 document.body.appendChild(renderer.domElement);
@@ -651,7 +705,7 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87a9c9);
 scene.fog = new THREE.Fog(0x87a9c9, 150, 1600); // far enough to see the mountains
-const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 3000);
+const camera = new THREE.PerspectiveCamera(camSet.fovOut, innerWidth / innerHeight, 0.1, 3000 * gfx.view);
 // reflections of the outdoors - blue overhead, pale at the horizon, grass below, a small sun for highlights - so glossy
 // paint, glass and chrome read as glossy without mirroring a white studio (Standard/Physical materials only)
 const env = (() => {
@@ -2724,13 +2778,16 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
   for (const c of [...root.children]) if (!pivots.includes(c)) shell.add(c);
   body.add(shell);
   car.add(root);
+  texQuality(car);
   usingModel = true;
 }).catch(e => console.warn(`${CAR.name} model not loaded - keeping the built car:`, e));
 
 const keys = new Set();
 // camera orbit: two-finger trackpad swipe arrives as wheel events (and the phone pad's touchpad as the same deltas);
 // W, or the pad's Reset view, swings it back behind the car
-const PITCH = 0.3, CAM_DIST = 8.4; // default chase: ~8 m behind, ~3.5 m up
+// the chase camera's resting pitch and distance (Settings, Camera: 8.4 m behind, 3.5 m up)
+const pitchOf = () => Math.asin(Math.min(0.98, Math.max(0.05, (camSet.height - 1) / camSet.dist)));
+let PITCH = pitchOf(), CAM_DIST = camSet.dist;
 // and the car framed as high above the cluster panel as the M3 sits over its own (the shortest cluster), whatever this
 // car's cluster height: its middle this far (tan of the angle) above the panel's top
 const CHASE_GAP = 0.3;
@@ -2751,8 +2808,7 @@ function onKey(e) {
     return keys.delete(e.code);
   }
   keys.add(e.code);
-  actx ??= new AudioContext(); // (a key is a gesture: the wind can play)
-  if (actx.state === 'suspended') actx.resume();
+  audioOn();
   if (e.code === 'Tab' || e.code === 'Slash' || e.code === 'ArrowUp' || e.code === 'ArrowDown' || (e.code === 'Space' && own(e))) e.preventDefault(); // this page's keys, not focus or scrolling
   if (e.repeat) return;
   if (e.code === 'Tab') setPanel(!panelOpen);
@@ -2762,6 +2818,7 @@ function onKey(e) {
   if (e.code === 'Backquote') toggleTeleport();
   if (e.code === 'Quote') toggleOverview();
   if (e.code === 'Backslash') toggleWeather();
+  if (e.code === 'BracketRight') toggleSettings();
   if (e.code === 'Slash') setLapTimer(!lap.on);
   if (e.code === 'Semicolon') setDriftMode(!driftMode);
   if (LIMIT_KEYS[e.code]) setLimit(...LIMIT_KEYS[e.code]);
@@ -2773,6 +2830,14 @@ function onKey(e) {
 const FLASH = 0.66; // s per on + off
 const signal = { side: 0, t: 0 }; // side: 1 = left, -1 = right
 let lit = 0, arrows = {}, actx;
+// the wind's (and the relay's tick's) sound: made at load - playing at once if the page may (opened by a click on the
+// main menu) - and resumed by any key or click, or by the phone pad once this page has had one (it can't unlock it)
+function audioOn() {
+  actx ??= new AudioContext();
+  if (actx.state === 'suspended' && navigator.userActivation?.hasBeenActive !== false) actx.resume();
+}
+audioOn();
+addEventListener('pointerdown', audioOn);
 function showSignal(side) {
   if (side === lit) return;
   lit = side;
@@ -2789,7 +2854,7 @@ function relayTick(on) { // a short blip: a higher tick as it lights, a lower to
   const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
   o.type = 'square';
   o.frequency.value = on ? 2400 : 1600;
-  g.gain.setValueAtTime(0.06, t);
+  g.gain.setValueAtTime(0.06 * vol.tick, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
   o.connect(g).connect(actx.destination);
   o.start(t);
@@ -2806,7 +2871,7 @@ function crash(hit) {
   if (t - crashAt < 0.2 && hit <= crashHit) return;
   crashAt = t; crashHit = hit;
   const out = actx.createGain();
-  out.gain.value = 0.1 + 0.8 * k;
+  out.gain.value = (0.1 + 0.8 * k) * vol.crash;
   out.connect(actx.destination);
   const thud = actx.createOscillator(), tg = actx.createGain();
   thud.frequency.setValueAtTime(110, t);
@@ -2834,45 +2899,66 @@ function crash(hit) {
 function setView(seat) {
   inCar = seat;
   tintGlass();
-  camera.fov = fovNow = inCar ? 50 : 65;
+  camera.fov = fovNow = inCar ? camSet.fovIn : camSet.fovOut;
   camera.updateProjectionMatrix();
+  hudAnchor.position.z = -FOV_T0 / Math.tan(fovNow * Math.PI / 360);
   if (usingModel) return; // the model's own cabin is the in-car view
   for (const m of [bodyMesh, ...trims]) m.visible = !inCar;
   hood.visible = inCar;
 }
 
-// The sense of speed: the view widens with speed (65° to ~82° behind the car, 50° to ~60° from the seat) and a little
-// under hard acceleration, the chase camera hangs back as the car pulls away and drops lower at speed, and the wind
-// roars up with speed² (quieter from the sealed cabin, silent with the car muted) - no streaks or shake, the road's
-// short dashes and the roadside sell the speed. The chase cluster panel keeps its size on screen
-let fovNow = 65, camLag = 0, wind = null;
+// The sense of speed: the view widens with speed (the Settings' field of view, ~17° more behind the car at 300 km/h,
+// ~10° from the seat) and a little under hard acceleration, the chase camera hangs back as the car pulls away and drops
+// lower at speed, and the wind roars up (windTick: quieter and duller from the cabin, silent with the car muted) - no
+// streaks or shake, the road's short dashes and the roadside sell the speed. The chase cluster panel keeps its size on screen
+let fovNow = camSet.fovOut, camLag = 0, wind = null;
 const FOV_T0 = Math.tan(65 * Math.PI / 360);
 function speedFeel(dt, w) {
   const kmh = Math.abs(state.speed) * 3.6, rush = THREE.MathUtils.smoothstep(kmh, 40, 300);
   camLag += (THREE.MathUtils.clamp(pull / 9.81, -1, 1) - camLag) * (1 - Math.exp(-dt * 2.5));
-  const fov = (inCar ? 50 + 10 * rush : 65 + 17 * rush) + Math.max(-1, camLag) * (inCar ? 2 : 4);
+  const fov = (inCar ? camSet.fovIn + 10 * rush : camSet.fovOut + 17 * rush) + Math.max(-1, camLag) * (inCar ? 2 : 4);
   fovNow += (fov - fovNow) * (1 - Math.exp(-dt * 3));
   if (Math.abs(camera.fov - fovNow) > 0.01) {
     camera.fov = fovNow;
     camera.updateProjectionMatrix();
     hudAnchor.position.z = -FOV_T0 / Math.tan(fovNow * Math.PI / 360);
   }
-  if (actx?.state === 'running') {
-    if (!wind) { // a looped burst of noise through a band-pass that opens with speed
-      const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate), d = buf.getChannelData(0);
-      for (let i = 0, b = 0; i < d.length; i++) d[i] = b = 0.97 * b + 0.03 * (Math.random() * 2 - 1) * 6; // (reddened: a rush, not a hiss)
-      const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
-      Object.assign(src, { buffer: buf, loop: true });
-      f.type = 'bandpass'; f.Q.value = 0.6; g.gain.value = 0;
-      src.connect(f).connect(g).connect(actx.destination);
-      src.start();
-      wind = { f, g };
-    }
-    const k = Math.min(1, kmh / 300), muted = w.document?.querySelector('.mute-fab.muted');
-    wind.g.gain.setTargetAtTime(muted || panelOpen ? 0 : (inCar ? 0.05 : 0.11) * k * k, actx.currentTime, 0.25);
-    wind.f.frequency.setTargetAtTime(250 + 1500 * k, actx.currentTime, 0.25);
-  }
+  if (actx?.state === 'running') windTick(kmh, !w.document?.querySelector('.mute-fab.muted') && !panelOpen);
   return rush;
+}
+// the wind, from one looped noise: a broadband roar (a wide band-pass sweeping up with speed), buffeting (a rumble
+// under ~150 Hz that gusts) and a faint whistle off the A-pillars past ~120 km/h, all through one low-pass - the
+// cabin's from the seat. Its level grows with v² (12 dB a doubling; a real car's is steeper, squeezed here so the engine
+// still comes through): a hush at 50 km/h, about as loud as a cruising engine (its page plays that) at 100, a few dB
+// quieter and duller from the seat, a roar at 200+
+function windTick(kmh, on) {
+  const t = actx.currentTime, v = kmh / 100, set = (p, x) => p.setTargetAtTime(x, t, 0.25);
+  if (!wind) {
+    const n = actx.sampleRate * 3, buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = Object.assign(actx.createBufferSource(), { buffer: buf, loop: true }), out = actx.createBiquadFilter(), lfo = actx.createGain();
+    out.Q.value = 0.7;
+    out.connect(actx.destination);
+    const layer = (type, hz, q, wobble) => { // a filtered share of the noise, its level gusting by wobble
+      const f = Object.assign(actx.createBiquadFilter(), { type }), g = actx.createGain(), depth = actx.createGain();
+      f.frequency.value = hz; f.Q.value = q; g.gain.value = depth.gain.value = 0;
+      src.connect(f).connect(g).connect(out);
+      lfo.connect(depth).connect(g.gain);
+      return { f, g, depth, wobble };
+    };
+    lfo.gain.value = 0.5; // two slow sines, 0.37 and 1.13 Hz: the gusts (-1 to 1)
+    for (const hz of [0.37, 1.13]) { const o = actx.createOscillator(); o.frequency.value = hz; o.connect(lfo); o.start(); }
+    wind = { out, roar: layer('bandpass', 400, 0.45, 0.15), rumble: layer('lowpass', 120, 0.7, 0.6), whistle: layer('bandpass', 2200, 16, 0.7) };
+    src.start();
+  }
+  const a = on ? 0.0127 * vol.wind * 10 ** ((CAR.wind ?? 0) / 20) * Math.min(v, 3.2) ** 2 * (inCar ? 0.85 : 1) : 0, level = (l, x) => { set(l.g.gain, x); set(l.depth.gain, x * l.wobble); };
+  level(wind.roar, a);
+  level(wind.rumble, a * 1.6);
+  level(wind.whistle, a * 0.05 * THREE.MathUtils.smoothstep(v, 1.2, 2.2));
+  set(wind.roar.f.frequency, 300 + 500 * Math.min(v, 3));
+  set(wind.rumble.f.frequency, 90 + 25 * Math.min(v, 3));
+  set(wind.whistle.f.frequency, 1900 + 250 * Math.min(v, 3));
+  set(wind.out.frequency, inCar ? 2800 : 9000);
 }
 
 // The car page drives: its own I/W/S/R keys run the engine, gearbox and brakes, and every frame it hands its speed
@@ -3019,7 +3105,7 @@ function nudgeBeam(by) { // the phone's Beam - / +: 10% a tap, mirrored on the c
 }
 setInterval(() => {
   const doc = frame.contentDocument, dm = doc?.querySelector('.mode-btn.active')?.dataset.mode, lit = id => !!doc?.getElementById(id)?.classList.contains('active');
-  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen, drift: driftMode, pos: [Math.round(state.x), Math.round(state.z), +state.heading.toFixed(2)], muted: !!doc?.querySelector('.mute-fab.muted'), slot: tuneSlot() } };
+  const m = { tele: { g: carPage.gear, v: Math.round(carPage.speed), r: Math.round(carPage.rpm), on: carPage.ignition, dm, tc: traction(doc)[1], hl: lit('lights-btn') + lit('highbeam-btn'), beam: beam.level, menu: panelOpen, set: !document.getElementById('settings').hidden, drift: driftMode, pos: [Math.round(state.x), Math.round(state.z), +state.heading.toFixed(2)], muted: !!doc?.querySelector('.mute-fab.muted'), slot: tuneSlot() } };
   if (padTicks++ % 15 === 0) m.car = { name: CAR.name, redline: CAR.redline, hints: padHints, modes: padModes, maps: tuneMaps() }, m.mix = mixRows(doc), m.wx = wxMenu(); // once a second, for a phone that joins late
   padSend(m);
 }, 66);
@@ -3195,14 +3281,15 @@ function topOpen() {
   if (!ovEl.hidden) return () => ovEl.hidden = true;
   if (!teleportEl.hidden) return () => teleportEl.hidden = true;
   if (!weatherEl.hidden) return () => weatherEl.hidden = true;
+  if (!settingsEl.hidden) return () => settingsEl.hidden = true;
   if (!garageEl.hidden) return () => { garageClosed = true; garageEl.hidden = true; };
   if (!shopEl.hidden) return () => { shopClosed = true; shopEl.hidden = true; };
   if (!pitEl.hidden) return () => { pitClosed = true; pitEl.hidden = true; };
 }
-// C (view), Tab (car menu), ` (teleport), ' (overview map), / (lap timer), \ (time & weather), the arrows (signals, throttle limit), O/P (brake limit) and Space (handbrake) are this
+// C (view), Tab (car menu), ` (teleport), ' (overview map), / (lap timer), \ (time & weather), ] (settings), the arrows (signals, throttle limit), O/P (brake limit) and Space (handbrake) are this
 // page's; the car page never sees them - the M3's uses C itself, and Space is its footbrake. Space still reaches it in
 // Dyno mode (where it runs a pull) and in the car menu
-const OWN = new Set(['KeyC', 'Tab', 'Backquote', 'Quote', 'Backslash', 'Slash', 'Semicolon', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyO', 'KeyP']);
+const OWN = new Set(['KeyC', 'Tab', 'Backquote', 'Quote', 'Backslash', 'BracketRight', 'Slash', 'Semicolon', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyO', 'KeyP']);
 // Esc is this page's while it has something open to close; otherwise the car page's (it folds its dyno panel)
 const own = e => OWN.has(e.code) || (e.code === 'Space' && !panelOpen && !frame.contentWindow.CarDyno?.on) || (e.code === 'Escape' && !!topOpen());
 for (const type of ['keydown', 'keyup']) addEventListener(type, e => {
@@ -4443,6 +4530,7 @@ function roadEnd(n, dt) { // at an open road's end: onto a road it meets once th
 // drawing them: each model's parts (once loaded), a box for the rest, and their lamps at night
 const NPC_DETAIL = 10, npcParts = NPC_MODELS.map(() => null), npcM = new THREE.Matrix4(), npcE = new THREE.Euler(0, 0, 0, 'YXZ');
 NPC_MODELS.forEach(([name], m) => new GLTFLoader().loadAsync(`/models/npc/${name}.glb`).then(({ scene: g }) => {
+  texQuality(g);
   const parts = [];
   g.traverse(o => {
     if (!o.isMesh) return;
@@ -4692,7 +4780,8 @@ function skyTick(dt) {
   hemi.color.copy(MOON).lerp(WHITE, d);
   scene.background.copy(NIGHT).lerp(DAY, d).lerp(DUSK, glow * 0.45).lerp(overcast.setHex(sk.tint).multiplyScalar(0.12 + 0.88 * d), sk.k);
   scene.fog.color.copy(scene.background);
-  [scene.fog.near, scene.fog.far] = sk.fog;
+  scene.fog.near = sk.fog[0] * gfx.view; // (Settings: view distance)
+  scene.fog.far = sk.fog[1] * gfx.view;
   scene.environmentIntensity = 0.05 + 0.95 * d * (1 - 0.5 * sk.k); // no daylight in the paint at night
   for (const [m, k] of envLit) m.envMapIntensity = k * scene.environmentIntensity;
   const lit = 1 - THREE.MathUtils.smoothstep(el, -4, 4); // the street lamps come on round sunset
@@ -4749,7 +4838,125 @@ weatherEl.addEventListener('click', e => {
   pickWeather(b.dataset.set, b.dataset.v);
 });
 
+// the Settings menu (]): Graphics, Camera, Audio and the phone pad's link and log - each choice applied at once and kept
+const settingsEl = document.getElementById('settings'), setBody = document.getElementById('set-body'), fpsEl = document.getElementById('fps');
+let setTab = 'gfx';
+const keep = () => { try { localStorage.setItem('drive-gfx', JSON.stringify(gfx)); localStorage.setItem('drive-cam', JSON.stringify(camSet)); localStorage.setItem('drive-audio', JSON.stringify(vol)); } catch {} };
+// texture quality: each texture's size capped (a smaller copy; the full image kept to go back to) and its anisotropic
+// filtering - the car's, the traffic's (as they load) and the world's
+const TEX_Q = { low: [512, 1], medium: [1024, 4], high: [Infinity, 16] };
+function texQuality(root = scene) {
+  const [max, an] = TEX_Q[gfx.tex], aniso = Math.max(1, Math.min(an, renderer.capabilities.getMaxAnisotropy()));
+  root.traverse(o => {
+    for (const m of [o.material].flat()) for (const t of Object.values(m ?? {})) {
+      if (!t?.isTexture || t.isRenderTargetTexture || t.isDataTexture || t.isCompressedTexture) continue;
+      const full = t.userData.full ??= t.image, k = Math.min(1, max / Math.max(full?.width, full?.height));
+      if (!(k > 0)) continue; // (no image yet)
+      const w = Math.max(1, Math.round(full.width * k)), h = Math.max(1, Math.round(full.height * k));
+      if (t.image.width === w && t.anisotropy === aniso) continue;
+      let img = full;
+      if (k < 1) Object.assign(img = document.createElement('canvas'), { width: w, height: h }).getContext('2d').drawImage(full, 0, 0, w, h);
+      Object.assign(t, { image: img, anisotropy: aniso, needsUpdate: true });
+    }
+  });
+}
+function setGfx(k, v) {
+  gfx[k] = v;
+  keep();
+  if (k === 'scale') renderer.setPixelRatio(devicePixelRatio * gfx.scale);
+  if (k === 'tex') texQuality();
+  if (k === 'view') camera.far = 3000 * gfx.view, camera.updateProjectionMatrix();
+  fpsEl.hidden = !gfx.meter;
+}
+function setCam(k, v) {
+  camSet[k] = v;
+  keep();
+  const was = PITCH;
+  PITCH = pitchOf(); CAM_DIST = camSet.dist;
+  orbitPitch += PITCH - was; // (a look round kept)
+}
+const fmtCam = { fovIn: v => `${v}°`, fovOut: v => `${v}°`, dist: v => `${v.toFixed(1)} m`, height: v => `${v.toFixed(1)} m`, headZ: v => `${Math.round(v * 100)} cm`, headY: v => `${Math.round(v * 100)} cm` };
+const logLine = e => `${new Date(e.t).toLocaleString('sv-SE')}.${String(e.t % 1000).padStart(3, '0')}  ${e.src.padEnd(5)}  ${e.ev}  ${Object.entries(e)
+  .filter(([k]) => !['t', 'src', 'ev'].includes(k)).map(([k, v]) => `${k}=${v !== null && typeof v === 'object' ? JSON.stringify(v) : v}`).join(' ')}`;
+function padStatus() { // the link now, for the Pad tab
+  const now = performance.now(), ago = t => t ? `${((now - t) / 1000).toFixed(1)} s ago` : 'never', r = padLink.rtts;
+  return [['Relay', ['connecting', `open ${padLink.openAt ? Math.round((now - padLink.openAt) / 1000) : 0} s`, 'closing', 'closed - retrying every 3 s'][padWs?.readyState ?? 3]],
+    ['Phone', padLink.pingAt && now - padLink.pingAt < 2500 ? `connected (ping ${ago(padLink.pingAt)})` : `not connected (last ping ${ago(padLink.pingAt)})`],
+    ['RTT', r.length ? `${padLink.rtt ?? '-'} ms now · ${Math.round(r.reduce((a, b) => a + b) / r.length)} avg · ${Math.max(...r)} max (last ${r.length} pings)` : 'no pings yet'],
+    ['Input', pad.at ? `${Math.round(now - padLink.inAt)} ms ago` : padLink.inAt ? `none for ${ago(padLink.inAt).replace(' ago', '')}` : 'none yet']];
+}
+function drawSettings() {
+  for (const b of document.querySelectorAll('#set-tabs button')) b.classList.toggle('on', b.dataset.tab === setTab);
+  const row = (k, title, note = '') => `<h3>${title}</h3><div class="set-row">${GFX_OPTS[k].map(([v, name, small]) =>
+    `<button data-gfx="${k}" data-v="${v}"${gfx[k] === v ? ' class="on"' : ''}>${name}${small ? `<small>${small}</small>` : ''}</button>`).join('')}</div>${note}`;
+  const slider = (k, name) => `<label>${name}<input type="range" data-cam="${k}" min="${CAM_RANGE[k][0]}" max="${CAM_RANGE[k][1]}" step="${CAM_RANGE[k][2]}" value="${camSet[k]}"><b>${fmtCam[k](camSet[k])}</b></label>`;
+  const px = s => `${Math.round(innerWidth * devicePixelRatio * s)}×${Math.round(innerHeight * devicePixelRatio * s)}`;
+  if (setTab === 'gfx') setBody.innerHTML = row('fps', 'FPS cap') + row('scale', `Resolution <small>${px(gfx.scale)} px</small>`) + row('tex', 'Texture quality')
+    + row('view', 'View distance', '<p>Fog, the far plane and the scenery built round you, by the weather\'s own distances</p>')
+    + row('aa', 'Antialiasing', renderer.getContext().getContextAttributes().antialias === gfx.aa ? '' : '<p>Applies when the drive page reloads <button data-reload>Reload now</button></p>') + row('meter', 'FPS meter');
+  else if (setTab === 'cam') setBody.innerHTML = '<h3>Field of view</h3>' + slider('fovIn', 'In car') + slider('fovOut', 'Chase')
+    + '<h3>Chase camera</h3>' + slider('dist', 'Distance') + slider('height', 'Height') + '<h3>Seat</h3>' + slider('headZ', 'Head forward') + slider('headY', 'Head up')
+    + '<button data-reset>Reset the camera</button>';
+  else if (setTab === 'audio') setBody.innerHTML = '<h3>Volume</h3>' + [['wind', 'Wind'], ['crash', 'Crashes'], ['tick', 'Indicator tick']].map(([k, name]) =>
+    `<label>${name}<input type="range" data-vol="${k}" min="0" max="2" step="0.05" value="${vol[k]}"><b>${Math.round(vol[k] * 100)} %</b></label>`).join('')
+    + '<p>The engine, pops and the rest of the car are its own page\'s mix (the pad\'s Sound tab)</p><button data-vreset>Reset the volumes</button>';
+  else {
+    setBody.innerHTML = '<div id="set-status"></div><div class="set-row" style="margin-top:4px"><button data-copy>Copy the log</button><button data-clear>Clear it</button></div><pre id="set-log"></pre>';
+    document.getElementById('set-log').textContent = padLog.length ? padLog.toReversed().map(logLine).join('\n') : 'Nothing logged yet';
+    drawPadStatus();
+  }
+}
+function drawPadStatus() {
+  const el = document.getElementById('set-status');
+  if (!el) return;
+  el.replaceChildren(...padStatus().flatMap(([k, v]) => [Object.assign(document.createElement('span'), { textContent: k }), Object.assign(document.createElement('b'), { textContent: v })]));
+}
+function toggleSettings() {
+  settingsEl.hidden = !settingsEl.hidden || panelOpen;
+  if (!settingsEl.hidden) drawSettings();
+}
+document.getElementById('set-btn').addEventListener('click', toggleSettings);
+document.getElementById('set-tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setTab = b.dataset.tab, drawSettings(); });
+settingsEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.parentElement.id === 'set-tabs') return;
+  if ('leave' in b.dataset) { settingsEl.hidden = true; frame.contentWindow.focus(); return; } // its keys work natively again
+  if ('reload' in b.dataset) return location.reload();
+  if (b.dataset.gfx) setGfx(b.dataset.gfx, GFX_OPTS[b.dataset.gfx].find(([v]) => String(v) === b.dataset.v)[0]);
+  if ('reset' in b.dataset) for (const k in CAM0) setCam(k, CAM0[k]);
+  if ('vreset' in b.dataset) Object.assign(vol, AUDIO0), keep();
+  if ('clear' in b.dataset) {
+    padLog.length = 0;
+    padCleared = Date.now();
+    try { localStorage.setItem('drive.padLog', '[]'); localStorage.setItem('drive.padLogCleared', padCleared); } catch {}
+  }
+  if ('copy' in b.dataset) { // (the app is served over plain http, where there's no navigator.clipboard)
+    const text = padLog.toReversed().map(logLine).join('\n'), area = Object.assign(document.createElement('textarea'), { value: text });
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    b.textContent = ok ? `Copied ${padLog.length} lines` : 'Copy failed - select the log instead';
+    return;
+  }
+  drawSettings();
+});
+settingsEl.addEventListener('input', e => {
+  const v = e.target.dataset.vol;
+  if (v) return vol[v] = +e.target.value, keep(), e.target.nextElementSibling.textContent = `${Math.round(vol[v] * 100)} %`; // (the wind's on its next tick)
+  const k = e.target.dataset.cam;
+  if (!k) return;
+  setCam(k, +e.target.value);
+  e.target.nextElementSibling.textContent = fmtCam[k](camSet[k]);
+});
+settingsEl.addEventListener('change', e => e.target.blur()); // so the arrow keys go back to the signals and the throttle limit
+fpsEl.hidden = !gfx.meter;
+texQuality(); // (before the warm-up below uploads them)
+
 // one frame drawn while loading with nothing culled or hidden, so every shader and every object's GPU pipeline is built
+// (two of the run's tiles built for it - rainforest and the tunnel's lights, the estate's palms - and let go after)
+const kWarm = [KK.P[KP.sempahRR.i], LP.P[KP.temerlohRR.i]].map(p => kTileKey(p.x, p.z));
+kWarm.forEach(kBuild);
 // now: on the Mac (ANGLE on Metal) that happens at an object's first draw, and a town first coming into view stalled
 // that frame 100-130 ms (compileAsync alone doesn't help: it only links). The lights never change, so they hold
 {
@@ -4844,7 +5051,7 @@ renderer.setAnimationLoop(() => {
 
   const rush = speedFeel(dt, w);
   if (inCar) { // from the driver's seat, looking where the car points (so up and down hills too); swipes turn the head
-    camera.position.copy(EYE).applyMatrix4(body.matrixWorld);
+    camera.position.set(EYE.x, EYE.y + camSet.headY, EYE.z + camSet.headZ).applyMatrix4(body.matrixWorld); // (Settings: the head moved)
     body.getWorldQuaternion(eyeQ);
     camera.up.set(0, 1, 0).applyQuaternion(eyeQ);
     const p = orbitPitch - PITCH - 0.1;
