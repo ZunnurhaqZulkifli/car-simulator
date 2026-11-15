@@ -79,11 +79,12 @@
   .wl{ position:absolute; width:2.05%; aspect-ratio:1; transform:translate(-50%,-50%); color:transparent; transition:color .15s, filter .15s; }
   .wl.wide{ width:4.4%; aspect-ratio:2.2; }
   .wl svg{ width:100%; height:100%; display:block; overflow:visible; }
-  .wl.on-red{ color:#ff3324; filter:drop-shadow(0 0 4px rgba(255,51,36,.7)); }
-  .wl.on-amber{ color:#ffa21a; filter:drop-shadow(0 0 4px rgba(255,162,26,.65)); }
-  .wl.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 4px rgba(79,168,255,.7)); }
-  .wl.on-green{ color:#5cdc6d; filter:drop-shadow(0 0 4px rgba(92,220,109,.7)); }
-  .wl.on-white{ color:#f4f1ea; filter:drop-shadow(0 0 4px rgba(255,240,220,.6)); }
+  /* TFT pixels, not bulbs: crisp icons with only the screen's own faint halo */
+  .wl.on-red{ color:#ff3324; filter:drop-shadow(0 0 1.5px rgba(255,51,36,.55)); }
+  .wl.on-amber{ color:#ffa21a; filter:drop-shadow(0 0 1.5px rgba(255,162,26,.5)); }
+  .wl.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 1.5px rgba(79,168,255,.55)); }
+  .wl.on-green{ color:#5cdc6d; filter:drop-shadow(0 0 1.5px rgba(92,220,109,.55)); }
+  .wl.on-white{ color:#f4f1ea; filter:drop-shadow(0 0 1.5px rgba(255,240,220,.5)); }
   .wl.blink{ animation: wlBlink 0.5s steps(1) infinite; }
   @keyframes wlBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.15; } }
   /* car-service.js appends its service light to this field - park it on the right screen's bottom row */
@@ -279,6 +280,9 @@
         </div>
         <div class="wl" id="wl-engine" title="Engine (emissions)" style="left:18.31%;top:89.36%">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v2.5M10 3v2.5M6 8h11l2 2v3l-2 1v3l-3 2H8l-3-2v-4H4V9h1z"/></svg>
+        </div>
+        <div class="wl" id="wl-cruise" title="Cruise control" style="left:21.54%;top:89.36%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 17.5a8.6 8.6 0 1 1 17 0"/><path d="M12 6.8v1.8M6.3 9.3l1.2 1.2M17.7 9.3l-1.2 1.2M12 15.5l3.8-4.2"/><circle cx="12" cy="15.5" r="1.3" fill="currentColor" stroke="none"/></svg>
         </div>
         <!-- right screen bottom row (the service light parks at 81.38%) -->
         <div class="wl" id="wl-psm" title="PSM" style="left:65.38%;top:89.36%">
@@ -1026,6 +1030,8 @@
   const WL = {};
   document.querySelectorAll('.warning-lights > .wl').forEach(w => { WL[w.id.replace('wl-','')] = w; w.dataset.base = w.className; });
   const setWl = (k, cls) => { const w = WL[k], c = w.dataset.base + (cls ? ' ' + cls : ''); if(w.className !== c) w.className = c; };
+  const BULBS = /[?&]bulbs\b/.test(location.search);
+  const activeCode = re => { for(const c of CarService.codes.values()) if(c.status === 'active' && re.test(c.code)) return true; return false; };
 
   const savedState = window.__CAR_STATE__ || {};
   let ignition=false, braking=0, speed=0, engineOnTime=0;
@@ -1558,21 +1564,24 @@
       chassis: ['normal','sport','track'].indexOf(mode) }); // PASM follows the drive mode, soft (0) to firm (2): the driving page's body roll and pitch
 
     // ---- tell-tales: bulb check at terminal 15, then what the car reports ----
-    const bulb = ignition && engineOnTime < 2.2;
+    // behaviour after the Porsche 911 (992) owner's manual, "Warning and indicator lights": charge, oil, engine and ABS lit
+    // from terminal 15 until the engine runs, PSM flashes while it works; ?bulbs / window.__bulbs = true holds every lamp on
+    const held = BULBS || window.__bulbs, bulb = held || ignition && engineOnTime < 2.2, dead = ignition && !running; // stalled or blown too
     const overheating = coolantC > 112, oilLow = running && crankT > 2 && oilPressureBar < 0.5;
     setWl('airbag', bulb ? 'on-red' : '');
     setWl('belt', bulb ? 'on-red' : '');
-    setWl('engine', bulb || (ignition && (wearPct > 50 || overheating || CarTune.warnLight())) ? 'on-amber' : '');
-    setWl('abs', bulb ? 'on-amber' : (ignition && braking > 60 && speed > 5) ? 'on-amber blink' : '');
-    setWl('brake', ignition && (bulb || transmissionMode === 'P') ? 'on-red' : '');
+    setWl('engine', bulb || dead || (ignition && (wearPct > 50 || overheating || CarTune.warnLight() || activeCode(/^P(?!2B0A|250F|2560|0620|0562)/))) ? 'on-amber' : '');
+    setWl('abs', bulb || dead ? 'on-amber' : '');
+    setWl('brake', bulb || ignition && transmissionMode === 'P' ? 'on-red' : '');
     setWl('psm', bulb ? 'on-amber' : !ignition ? '' : tcIntervening ? 'on-amber blink' : psm === 'sport' ? 'on-amber' : '');
-    setWl('psmoff', ignition && (bulb || psm === 'off') ? 'on-amber' : '');
-    setWl('battery', ignition && (bulb || !running) ? 'on-red' : '');
-    setWl('oil', ignition && (bulb || !running || oilLow) ? 'on-red' : '');
-    setWl('temp', ignition && (bulb || overheating) ? 'on-red' : '');
-    setWl('fuel', ignition && (bulb || inReserve) ? 'on-amber' : '');
-    setWl('lighton', ignition && lightsOn ? 'on-green' : '');
-    setWl('highbeam', ignition && highBeamOn ? 'on-blue' : '');
+    setWl('psmoff', bulb || ignition && psm === 'off' ? 'on-amber' : '');
+    setWl('battery', bulb || dead || ignition && activeCode(/^P0620$/) ? 'on-red' : ''); // P0620: the belt is gone, nothing charges
+    setWl('oil', bulb || dead || oilLow ? 'on-red' : '');
+    setWl('temp', bulb || ignition && overheating ? 'on-red' : '');
+    setWl('fuel', bulb || ignition && inReserve ? 'on-amber' : '');
+    setWl('lighton', held || ignition && lightsOn ? 'on-green' : '');
+    setWl('highbeam', held || ignition && highBeamOn ? 'on-blue' : '');
+    setWl('cruise', held || ignition && cruiseActive ? 'on-green' : '');
 
     // ---- "Vehicle" title: warnings first, then launch control, then any message ----
     upMsgT = Math.max(0, upMsgT - dt);

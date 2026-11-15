@@ -66,17 +66,26 @@
   #cc-mark{ opacity:.22; transition:opacity .35s, filter .35s; }
   #cc-mark.on{ opacity:1; filter:drop-shadow(0 0 6px #ff8a1a); }
 
+  /* tell-tales: the E84 KOMBI's lamp field (BMW ST1205 "E84 Complete Vehicle" p.63; the E90's in ST502 p.11 is the same),
+     mapped onto this SVG by the dial centres (tools/lamps/maps.mjs). LEDs behind the smoked dead-front: unlit, invisible.
+     Charge, oil pressure, overheat and pre-glow are check-control symbols in the upper LCD, where the clock gives way */
   .warning-lights{ position:absolute; inset:0; pointer-events:none; }
-  .wl{ position:absolute; width:2.35%; aspect-ratio:1; transform:translate(-50%,-50%); color:#2a2b2f; transition:color .2s, filter .2s; }
-  .wl svg{ width:100%; height:100%; display:block; }
-  .wl.on-red{ color:#ff3b26; filter:drop-shadow(0 0 5px rgba(255,59,38,.85)); }
-  .wl.on-amber{ color:var(--amber); filter:drop-shadow(0 0 5px rgba(255,157,46,.75)); }
-  .wl.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 5px rgba(79,168,255,.85)); }
-  .wl.on-green{ color:#3ddc6a; filter:drop-shadow(0 0 5px rgba(61,220,106,.8)); }
+  .wl{ position:absolute; transform:translate(-50%,-50%); opacity:0; color:#000; transition:opacity .12s, color 0s linear .12s, filter 0s linear .12s; } /* (its colour holds while it fades) */
+  .wl svg{ width:100%; height:100%; display:block; overflow:visible; }
+  .wl[class*="on-"]{ transition:opacity .12s; }
+  .wl.on-red{ opacity:1; color:#ff3b1f; filter:drop-shadow(0 0 2px rgba(255,60,30,.95)) drop-shadow(0 0 7px rgba(255,40,20,.55)); }
+  .wl.on-amber{ opacity:1; color:#ffb21e; filter:drop-shadow(0 0 2px rgba(255,170,30,.95)) drop-shadow(0 0 7px rgba(255,140,20,.5)); }
+  .wl.on-green{ opacity:1; color:#38f04a; filter:drop-shadow(0 0 2px rgba(60,240,80,.9)) drop-shadow(0 0 6px rgba(60,230,80,.45)); }
+  .wl.on-blue{ opacity:1; color:#3e8bff; filter:drop-shadow(0 0 2px rgba(70,140,255,.95)) drop-shadow(0 0 7px rgba(60,130,255,.5)); }
+  .wl[data-cc][class*="on-"], .wl[title="Service required"][class*="on-"]{ filter:none; } /* LCD segments, no LED glow */
+  .wl[data-cc].on-red{ color:#ff4a26; } .wl[data-cc].on-amber, .wl[title="Service required"].on-amber{ color:var(--lcd); }
   .wl.blink{ animation: wlBlink 0.5s steps(1) infinite; }
-  @keyframes wlBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.15; } }
-  /* car-service.js appends its service light to this row - park it in the free slot on the bottom row */
-  .warning-lights > .wl[title="Service required"]{ left:54.69%; top:28.31%; }
+  @keyframes wlBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.06; } }
+  .wl text{ font-family:var(--cond); font-weight:700; fill:currentColor; }
+  .warning-lights > .wl[data-turn]{ width:3.85%; height:8.54%; } /* drive.html's arrows, as big as the field's own */
+  /* car-service.js appends its service light: on the E8x/E9x that's a check-control symbol in the upper LCD */
+  .warning-lights > .wl[title="Service required"]{ left:51.83%; top:60.34%; width:1.98%; height:4.41%; }
+  .cluster.cc #lcd-clock, .cluster.cc text:has(#lcd-temp){ opacity:0; }
 
   /* ---------- drive deck: start button, accelerator + brake, labelled groups ---------- */
   .deck{
@@ -294,10 +303,6 @@
         <!-- smoked tell-tale glass between the dials, dead-front until a lamp lights -->
         <rect x="442" y="37" width="426" height="215" rx="8" fill="url(#smokeG)" stroke="#2c2d31" stroke-width="1.2"/>
         <rect x="444" y="39" width="422" height="60" rx="7" fill="url(#glassG)"/>
-        <g fill="none" stroke="#2c2d31" stroke-width="2.4" stroke-linejoin="round">
-          <path d="M499,66 h-14 m0,0 l7,-7 m-7,7 l7,7 M499,59 v14"/>
-          <path d="M818,66 h14 m0,0 l-7,-7 m7,7 l-7,7 M818,59 v14"/>
-        </g>
         <!-- centre recess + the two orange-on-red LCDs -->
         <path d="M552,252 H758 V568 H552 Z" fill="#111113" stroke="#2e2f33" stroke-width="1.4"/>
         <path class="lcd-bg" d="M584,292 H726 V370 L714,382 H596 L584,370 Z" fill="url(#lcdG)" stroke="#050505" stroke-width="4"/>
@@ -381,42 +386,58 @@
         </g>
       </svg>
 
+      <!-- the lamp field as BMW draws it (ST1205 p.63, through tools/lamps/maps.mjs): steering, brake, MIL, air bag across
+           the top between the arrows; front fog, ABS over DTC, high beam, belt, rear fog; DSC and flat tyre below. No dipped-beam
+           lamp on the E8x/E9x, and the fuel reserve is the LCD's pump symbol -->
       <div class="warning-lights">
-        <div class="wl" id="wl-lowbeam" title="Dipped beam" style="left:45.31%;top:12.2%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5L3 9.5M10 11L3 13M10 14.5L3 16.5"/></svg>
+        <div class="wl" id="wl-steer" title="Steering" style="left:40.73%;top:15.17%;width:2.6%;height:4.07%">
+          <svg viewBox="0 0 34 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="12" r="9"/><path d="M2.5 13h17"/><path d="M29 3.5v11" stroke-width="3.4"/></g><circle cx="11" cy="13" r="2.6" fill="currentColor"/><circle cx="29" cy="20.5" r="1.9" fill="currentColor"/></svg>
         </div>
-        <div class="wl" id="wl-highbeam" title="High beam" style="left:48.44%;top:12.2%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5H3M10 10.5H3M10 13.5H3M10 16.5H3"/></svg>
+        <div class="wl" id="wl-brake" title="Parking brake / brake" style="left:45.18%;top:14.69%;width:2.75%;height:4.41%">
+          <svg viewBox="0 0 36 26"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="18" cy="13" r="8.8"/><path d="M5.5 4a13 13 0 0 0 0 18M30.5 4a13 13 0 0 1 0 18M18 7.8v6.4"/></g><circle cx="18" cy="18" r="1.5" fill="currentColor"/></svg>
         </div>
-        <div class="wl" id="wl-glow" title="Pre-glow" style="left:51.56%;top:12.2%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 9c0-2 2-3 3-1.5S8.5 9 9.5 7.5 12 6 12 9M12 9c0-2 2-3 3-1.5s2.5 1.5 3.5 0S21 6 21 9"/><path d="M4 13h16M6 13v4M18 13v4M12 13v6"/></svg>
+        <div class="wl" id="wl-engine" title="Engine malfunction" style="left:54.88%;top:14.81%;width:2.75%;height:3.73%">
+          <svg viewBox="0 0 36 22"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" d="M8 5h7V2.5h-5M15 2.5h6M18 2.5V5h5l2.5 2.5h3V4.5h3v14h-3v-3H26l-3 3.5H11L8 15.5H5v3H2.5V8H5v3h3z"/></svg>
         </div>
-        <div class="wl" id="wl-fuel" title="Fuel reserve" style="left:54.69%;top:12.2%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M4 21h12"/><rect x="7" y="6" width="6" height="4.5"/><path d="M15 8h2a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V9l-2.5-2.5"/></svg>
+        <div class="wl" id="wl-airbag" title="Airbag" style="left:59.46%;top:15%;width:2.21%;height:5.08%">
+          <svg viewBox="0 0 28 29"><g fill="currentColor"><circle cx="7" cy="5" r="3"/><path d="M3.5 10h6l3 6.5h6.5v3H11L8.5 14.5v12h-5z"/><circle cx="20.5" cy="9" r="6.2" opacity=".95"/></g></svg>
         </div>
-        <div class="wl" id="wl-engine" title="Engine (emissions)" style="left:42.21%;top:19.83%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v2.5M10 3v2.5M6 8h11l2 2v3l-2 1v3l-3 2H8l-3-2v-4H4V9h1z"/><circle cx="10" cy="14" r="1.4" fill="currentColor" stroke="none"/></svg>
+        <div class="wl" id="wl-fogf" title="Front fog lights" style="left:41%;top:23.97%;width:2.9%;height:4.58%">
+          <svg viewBox="0 0 35 25"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 3c7.5 0 11 4.5 11 9.5s-3.5 9.5-11 9.5z"/><path d="M3 6l13 3M3 12.5h13M3 19l13-3"/><path d="M9.5 1.5c-1.6 3.5 1.6 7 0 10.5s1.6 7 0 10.5"/></g></svg>
         </div>
-        <div class="wl" id="wl-battery" title="Charging" style="left:45.34%;top:19.83%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="10" rx="1.5"/><path d="M8 8V6h2v2M14 8V6h2v2M7 13h3M13 13h4"/></svg>
+        <div class="wl" id="wl-abs" title="ABS" style="left:45.31%;top:21.29%;width:2.75%;height:2.54%">
+          <svg viewBox="0 0 36 15"><text x="18" y="13.5" text-anchor="middle" font-size="16.5">ABS</text></svg>
         </div>
-        <div class="wl" id="wl-oil" title="Oil pressure" style="left:48.47%;top:19.83%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h4l2-2h5l7-2-6 9H6l-3-3z"/><path d="M14 9V7M11 7h6"/><path d="M21 15.5c0 1-.7 1.6-1.4 1.6s-1.4-.6-1.4-1.6c0-.8 1.4-2.6 1.4-2.6s1.4 1.8 1.4 2.6z"/></svg>
+        <div class="wl" id="wl-dtc" title="DTC" style="left:45.31%;top:26.37%;width:2.75%;height:2.54%">
+          <svg viewBox="0 0 36 15"><text x="18" y="13.5" text-anchor="middle" font-size="16.5">DTC</text></svg>
         </div>
-        <div class="wl" id="wl-temp" title="Coolant temperature" style="left:51.6%;top:19.83%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v11.5"/><circle cx="12" cy="17.5" r="3"/><path d="M12 3a2 2 0 0 1 2 2v9.5h-4V5a2 2 0 0 1 2-2z"/><path d="M15 7h3M15 10h3M4 20c1.5 1 3 1 4.5 0M15.5 20c1.5 1 3 1 4.5 0"/></svg>
+        <div class="wl" id="wl-highbeam" title="High beam" style="left:49.89%;top:22.78%;width:3.21%;height:5.08%">
+          <svg viewBox="0 0 35 26"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 3c8 0 12 4.5 12 10s-4 10-12 10z"/><path d="M2 5h15M2 10.5h15M2 16h15M2 21.5h15"/></g></svg>
         </div>
-        <div class="wl" id="wl-belt" title="Seatbelt" style="left:54.73%;top:19.83%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="5" r="2.4"/><path d="M8 21v-6.5C8 11 9.8 9 12 9s4 2 4 5.5V21"/><path d="M9 9.8l6 7.2"/></svg>
+        <div class="wl" id="wl-belt" title="Seat belt" style="left:54.61%;top:23.37%;width:1.45%;height:5.59%">
+          <svg viewBox="0 0 19 33"><g fill="currentColor"><circle cx="9.5" cy="3.5" r="3"/><path d="M5.5 8.5h8l2.3 10H13l-.6 13H6.6L6 18.5H3.2z"/></g><path d="M14 8L4.6 19.5" stroke="#000" stroke-width="2.2" fill="none"/></svg>
         </div>
-        <div class="wl" id="wl-abs" title="ABS" style="left:45.31%;top:28.31%">
-          <svg viewBox="0 0 24 24" fill="none"><text x="12" y="15.5" text-anchor="middle" font-size="8.5" font-weight="800" fill="currentColor" font-family="Arial">ABS</text><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6.5a10 10 0 0 0 0 11M20.5 6.5a10 10 0 0 1 0 11" stroke="currentColor" stroke-width="1.5"/></svg>
+        <div class="wl" id="wl-fogr" title="Rear fog light" style="left:58.92%;top:23.68%;width:2.9%;height:4.58%">
+          <svg viewBox="0 0 34 25"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 3C5.5 3 2 7.5 2 12.5S5.5 22 13 22z"/><path d="M18 6.5h13M18 12.5h13M18 18.5h13"/><path d="M24.5 1.5c-1.6 3.5 1.6 7 0 10.5s1.6 7 0 10.5"/></g></svg>
         </div>
-        <div class="wl" id="wl-dsc" title="DSC / DTC" style="left:48.44%;top:28.31%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13.5l1.5-4a2 2 0 0 1 1.9-1.3h7.2a2 2 0 0 1 1.9 1.3l1.5 4V16H5z"/><path d="M7.5 16v1.5M16.5 16v1.5"/><path d="M8.5 23c-1.2-1.2 1.2-2.3 0-3.5M15.5 23c-1.2-1.2 1.2-2.3 0-3.5"/></svg>
+        <div class="wl" id="wl-dsc" title="DSC" style="left:45.04%;top:32.64%;width:2.37%;height:4.92%">
+          <svg viewBox="0 0 31 29"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 8.5l6.5 11.5H9z"/><path d="M15.5 12.3v3.8"/><path d="M24.5 6.6A12 12 0 1 1 9.5 4.1"/></g><circle cx="15.5" cy="18.1" r="1" fill="currentColor"/><path d="M11.6 2.9L9.6 6.6 7.4 2.8z" fill="currentColor"/></svg>
         </div>
-        <div class="wl" id="wl-dscoff" title="DSC OFF" style="left:51.56%;top:28.31%">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10.5l1.3-3.3a1.8 1.8 0 0 1 1.7-1.2h8a1.8 1.8 0 0 1 1.7 1.2l1.3 3.3V13H5z"/><path d="M8 15.5c-1 -1 1 -2 0 -3"/><text x="12" y="22.5" text-anchor="middle" font-size="6.6" font-weight="800" fill="currentColor" stroke="none" font-family="Arial">OFF</text></svg>
+        <div class="wl" id="wl-tpms" title="Flat tyre" style="left:54.61%;top:32.64%;width:2.29%;height:5.08%">
+          <svg viewBox="0 0 29 30"><g fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3C3.5 9 3.5 18 6 24.5h17C25.5 18 25.5 9 21.5 3"/><path d="M5 28h19M8 24.5l-1 3.5M12.5 24.5l-.6 3.5M16.5 24.5l.6 3.5M21 24.5l1 3.5M14.5 9v8"/></g><circle cx="14.5" cy="20.5" r="1.5" fill="currentColor"/></svg>
+        </div>
+        <!-- check-control symbols in the upper LCD (ST502 p.28 draws them): battery, oil can, thermometer in waves, glow coil -->
+        <div class="wl" id="wl-battery" data-cc title="Charging" style="left:46.34%;top:53.9%;width:2.29%;height:3.56%">
+          <svg viewBox="0 0 30 21"><g fill="none" stroke="currentColor" stroke-width="2.4"><rect x="2" y="5.5" width="26" height="14"/><path d="M6 12.5h6M18 12.5h6M21 9.5v6"/></g><path fill="currentColor" d="M5 1.5h5v4H5zM20 1.5h5v4h-5z"/></svg>
+        </div>
+        <div class="wl" id="wl-oil" data-cc title="Engine oil pressure" style="left:50%;top:53.9%;width:2.75%;height:3.05%">
+          <svg viewBox="0 0 36 18"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M2 7.5h5l2.5-2h8l12-3.5-9.5 11.5H8L2 10.5z"/><path d="M12.5 5.5V2.5M10 2.5h5"/></g><path fill="currentColor" d="M33.5 12.5c0 1.7-1 2.7-2 2.7s-2-1-2-2.7c0-1.4 2-4 2-4s2 2.6 2 4z"/></svg>
+        </div>
+        <div class="wl" id="wl-temp" data-cc title="Coolant temperature" style="left:53.66%;top:53.9%;width:1.98%;height:4.07%">
+          <svg viewBox="0 0 26 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2v11M13 4.5h4.5M13 8h4.5M13 11.5h4.5"/><path d="M1.5 21.5c2.6-2 5 2 7.6 0s5-2 7.6 0 5 2 7.6 0"/></g><circle cx="13" cy="15.5" r="3" fill="currentColor"/></svg>
+        </div>
+        <div class="wl" id="wl-glow" data-cc title="Pre-glow" style="left:48.17%;top:60.34%;width:2.29%;height:3.05%">
+          <svg viewBox="0 0 30 18"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M2 2.5h3v3c0 6.5 2 9.5 3.5 9.5S10 5.5 12 5.5s2 9.5 3.5 9.5S17 5.5 19 5.5s2 9.5 3.5 9.5S25 12 25 5.5v-3h3"/></svg>
         </div>
       </div>
     </div>
@@ -1304,8 +1325,15 @@
   let refueling = false, rangeShowIn = 0;
   let rangePrevF = 0, rangePrevK = null, rangeWinF = 0, rangeWinK = 0; // rolling fuel / distance window behind the range readout
 
-  const wl = Object.fromEntries(['engine','battery','oil','temp','belt','lowbeam','highbeam','glow','fuel','abs','dsc','dscoff'].map(k => [k, $('wl-'+k)]));
+  const wl = Object.fromEntries(['steer','brake','engine','airbag','fogf','abs','dtc','highbeam','belt','fogr','dsc','tpms','battery','oil','temp','glow'].map(k => [k, $('wl-'+k)]));
   const lamp = (n, cls) => { const c = cls ? 'wl ' + cls : 'wl'; if(n.className !== c) n.className = c; };
+  const CC = Object.values(wl).filter(w => w.dataset.cc !== undefined);
+  // ?bulbs (or window.__bulbs = true): every lamp held on - for checking their places
+  const bulbsForced = () => window.__bulbs || /[?&]bulbs\b/.test(location.search);
+  const engineDead = () => CarTune.blown() || !!CarTune.ch.blown; // blown up: the ignition can stay on with it dead
+  const pFault = () => { for(const c of CarService.codes.values()) if(c.status === 'active' && c.code[0] === 'P') return true; return false; }; // an active powertrain code lights the MIL
+  const tyreLow = () => (CarService.parts.find(p => p.key === 'pressure')?.value || 0) > 60;
+  const svcLit = () => !!document.querySelector('.warning-lights > .wl[title="Service required"][class*="on-"]');
 
   function setMode(m, quiet){
     currentMode = m;
@@ -1792,22 +1820,29 @@
     CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition: running, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
       gearLabel: `${gearTxt.replace(/\d/,'')}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC, ambient: AMBIENT_C });
 
-    // ---- tell-tales: bulb check at power-on, then live. Charge + oil stay lit until it runs ----
-    if(ignition){
-      const all = powerOnTime < 1.6, overheating = coolantC > 112;
-      lamp(wl.engine, all || wearPct > 50 || overheating || CarTune.warnLight() ? 'on-amber' : '');
-      lamp(wl.battery, all || !running ? 'on-red' : '');
-      lamp(wl.oil, all || !running ? 'on-red' : (engineOnTime > 2 && oilPressureBar < 0.5 ? 'on-red blink' : ''));
-      lamp(wl.temp, all ? 'on-red' : overheating ? 'on-red blink' : '');
-      lamp(wl.belt, powerOnTime < 6 ? 'on-red' : ''); // belt reminder lamp for the first seconds after power-on
-      lamp(wl.glow, all || startPhase === 'glow' ? 'on-amber' : '');
-      lamp(wl.fuel, all || inReserve ? 'on-amber' : '');
-      lamp(wl.abs, all ? 'on-amber' : absActive ? 'on-amber blink' : '');
-      lamp(wl.dsc, all ? 'on-amber' : tcIntervening ? 'on-amber blink' : dsc === 'dtc' ? 'on-amber' : '');
-      lamp(wl.dscoff, all || dsc === 'off' ? 'on-amber' : '');
-      lamp(wl.lowbeam, lightsOn ? 'on-green' : '');
-      lamp(wl.highbeam, highBeamOn ? 'on-blue' : '');
-    }
+    // ---- tell-tales: the pre-drive check lights the warning lamps at power-on (~3 s; belt and air bag 6 s), then live.
+    // The MIL and the charge / oil symbols stay lit until it runs (a blown engine too), ABS + DSC until their self-check
+    // just after it starts. DSC: lit = DSC off, flashing = DSC or DTC cutting in; the DTC lamp shows DTC mode ----
+    const bulbs = bulbsForced();
+    if(ignition || bulbs){
+      const all = bulbs || powerOnTime < 3, run = running && !engineDead(), self = !run || engineOnTime < 1.5;
+      lamp(wl.steer, all ? 'on-amber' : '');
+      lamp(wl.brake, all || parked ? 'on-red' : '');
+      lamp(wl.engine, all || !run || wearPct > 50 || CarTune.warnLight() || pFault() ? 'on-amber' : ''); // incl. limp mode
+      lamp(wl.airbag, bulbs || powerOnTime < 6 ? 'on-red' : '');
+      lamp(wl.belt, bulbs || powerOnTime < 6 ? 'on-red' : '');
+      lamp(wl.abs, all || self ? 'on-amber' : '');
+      lamp(wl.dtc, all || dsc === 'dtc' ? 'on-amber' : '');
+      lamp(wl.dsc, all || self || dsc === 'off' ? 'on-amber' : tcIntervening ? 'on-amber blink' : '');
+      lamp(wl.tpms, all || tyreLow() ? 'on-amber' : '');
+      lamp(wl.highbeam, bulbs || highBeamOn ? 'on-blue' : '');
+      lamp(wl.fogf, bulbs ? 'on-green' : ''); lamp(wl.fogr, bulbs ? 'on-amber' : '');
+      lamp(wl.battery, bulbs || !run ? 'on-red' : '');
+      lamp(wl.oil, bulbs || !run || (engineOnTime > 2 && oilPressureBar < 0.5) ? 'on-red' : '');
+      lamp(wl.temp, bulbs || coolantC > 112 ? 'on-red' : '');
+      lamp(wl.glow, bulbs || startPhase === 'glow' ? 'on-amber' : '');
+    } else Object.values(wl).forEach(w => lamp(w, ''));
+    clusterEl.classList.toggle('cc', CC.some(w => w.className !== 'wl') || svcLit());
     clusterEl.classList.toggle('lit', ignition && lightsOn);
 
     if(++xdFrame >= 4){ xdFrame = 0; updateXdriveView(running, driveA, xdCruise); }

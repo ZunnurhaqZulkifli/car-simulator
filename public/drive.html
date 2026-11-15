@@ -217,6 +217,7 @@ const CARS = {
     tail: { re: /^x1_tail/, idle: 0.25, brake: 6, keep: v => v.y < 1.25 }, // (the clusters, not the third brake light up by the spoiler)
     lamps: { head: /^x1_head/, tail: /^x1_tail/ },
     exhaustX: 0.45,
+    arrows: [37.6, 62.4, 15.42], // where the E84's own turn arrows sit (BMW ST1205)
     grip : 1.6,
     chassis: { m: 1650, front: 0.53, rear: 0.6, h: 0.6 }, // kg, the front's share of the weight, the rear's of the drive (xDrive), CG height m
     stiff: 0.6, // tall and softly sprung
@@ -335,6 +336,7 @@ const CARS = {
     tail: { re: /^e90_tail\|/, idle: 0.25, brake: 6 },
     lamps: { head: /^e90_lens\|/, tail: /^e90_tail\|/ },
     exhaustX: 0.48, exhaustBoth: true, // a tip each side
+    arrows: [37.6, 62.4, 15.42], // where the E9x's own turn arrows sit (BMW ST502)
   },
   // the stock JDM car - already nose-first and right-hand drive (so its cabin isn't mirrored), the steering wheel a node of
   // its own, the spare wheel under the front lid left out of the wheels; prep paints its own white wheels (not grey
@@ -3103,11 +3105,13 @@ frame.addEventListener('load', () => {
   hole.geometry = new THREE.PlaneGeometry(1100, clusterH);
   hudAnchor.position.y = -0.637 + clusterH * 0.00081 / 2 + 0.008;
   // green turn arrows on the cluster, in its own warning-light style: at the two ends of a row of lights (the M cars),
-  // or placed over a cluster that lays its lights out freely (the X1)
-  const wls = w.document.querySelector('.warning-lights'), row = w.getComputedStyle(wls).display.includes('flex');
-  const [al, ar, at] = CAR.arrows || [38.5, 61.5, 11];
-  for (const [s, x, d] of [[1, al, 'M2 12l9-8v5h11v6H11v5z'], [-1, ar, 'M22 12l-9-8v5H2v6h11v5z']]) wls.insertAdjacentHTML(s === 1 && row ? 'afterbegin' : 'beforeend',
-    `<div class="wl" data-turn="${s}"${row ? '' : ` style="left:${x}%;top:${at}%"`}><svg viewBox="0 0 24 24"><path fill="currentColor" d="${d}"/></svg></div>`);
+  // or placed over a cluster that lays its lights out freely (the X1) - unless its page has its own ([data-turn])
+  if (!w.document.querySelector('[data-turn="1"]')) {
+    const wls = w.document.querySelector('.warning-lights'), row = w.getComputedStyle(wls).display.includes('flex');
+    const [al, ar, at] = CAR.arrows || [38.5, 61.5, 11];
+    for (const [s, x, d] of [[1, al, 'M2 12l9-8v5h11v6H11v5z'], [-1, ar, 'M22 12l-9-8v5H2v6h11v5z']]) wls.insertAdjacentHTML(s === 1 && row ? 'afterbegin' : 'beforeend',
+      `<div class="wl" data-turn="${s}"${row ? '' : ` style="left:${x}%;top:${at}%"`}><svg viewBox="0 0 24 24"><path fill="currentColor" d="${d}"/></svg></div>`);
+  }
   for (const s of [1, -1]) arrows[s] = w.document.querySelector(`[data-turn="${s}"]`);
   // keys typed while the car page has focus; the ones this page passes on (untrusted) were already handled here.
   // This page's own keys are caught first (capture) and stopped before the car page's handlers

@@ -1492,6 +1492,11 @@
 
   const wl = Object.fromEntries(['belt','door','brake','battery','oil','engine','4wd','master','side','highbeam','abs','srs','slip','vdcoff','fuel'].map(k => [k, $('wl-'+k)]));
   const lamp = (n, cls) => { const c = cls ? 'wl ' + cls : 'wl'; if(n.className !== c) n.className = c; };
+  // lamp map after the JDM night photo's bulb check; behaviour after the Nissan GT-R (R35) owner's manual, "Warning/indicator lights":
+  // charge, oil, MIL and 4WD lit from ON until the engine runs, slip flashes while VDC/TCS works, BRAKE with the parking brake set
+  const BULBS = /[?&]bulbs\b/.test(location.search); // ?bulbs or window.__bulbs = true holds every lamp on (the cluster check)
+  let bulbsHeld = false;
+  const activeCode = re => { for(const c of CarService.codes.values()) if(c.status === 'active' && re.test(c.code)) return true; return false; };
   // one-liners on the tach LCD (VDC, TRANS, launch, low fuel) over the space between the trip and the speed
   let lcdMsgT = 0;
   function lcdMessage(text){ if(!text) return; lcdMsg.textContent = text; lcdMsgT = 2.4; }
@@ -1961,21 +1966,26 @@
       chassis: ['comfort','normal','r'].indexOf(suspSw) }); // the SUSP switch's dampers, soft (0) to firm (2): the driving page's body roll and pitch
 
     // ---- tell-tales: the bulb check at key-on (the JDM photo's lamps), then live ----
-    if(ignition){
-      const all = powerOnTime < 2.2;
-      const warn = wearPct > 50 || coolantC > 112 || CarTune.warnLight() || (engineOnTime > 2 && oilPressureBar < 0.5);
-      lamp(wl.belt, powerOnTime < 6 ? 'on-red' : ''); // the belt reminder with the chime for the first seconds
-      lamp(wl.door, all ? 'on-amber' : '');
-      lamp(wl.brake, all || CarService.brakeMul() < 0.8 ? 'on-red' : '');
-      lamp(wl.battery, all || !running ? 'on-red' : '');
-      lamp(wl.oil, all || !running ? 'on-red' : (engineOnTime > 2 && oilPressureBar < 0.5 ? 'on-red blink' : ''));
-      lamp(wl.engine, all || !running || wearPct > 50 || coolantC > 112 || CarTune.warnLight() ? 'on-amber' : '');
-      lamp(wl['4wd'], all ? 'on-amber' : '');
+    const held = BULBS || window.__bulbs;
+    if(!ignition && !held && bulbsHeld) Object.values(wl).forEach(w => lamp(w, ''));
+    bulbsHeld = held;
+    if(ignition || held){
+      const all = held || powerOnTime < 2.2, dead = !running; // cranking, stalled or blown: no oil pressure, no charge
+      const mil = wearPct > 50 || coolantC > 112 || CarTune.warnLight() || activeCode(/^P(?!2B0A|250F|2560|0620|0562)/);
+      const warn = mil || (engineOnTime > 2 && oilPressureBar < 0.5);
+      lamp(wl.belt, held || powerOnTime < 6 ? 'on-red' : ''); // the belt reminder with the chime for the first seconds
+      lamp(wl.door, all ? 'on-red' : ''); // red, as the photo's bulb check
+      // the parking brake set while it stands in P, or the brakes themselves (not a wet road)
+      lamp(wl.brake, all || (transmissionMode === 'P' && speed < 0.5) || CarService.brakeMul()/(window.surfaceGrip || 1) < 0.8 ? 'on-red' : '');
+      lamp(wl.battery, all || dead || activeCode(/^P0620$/) ? 'on-red' : ''); // P0620: the belt is gone, nothing charges
+      lamp(wl.oil, all || dead ? 'on-red' : (engineOnTime > 2 && oilPressureBar < 0.5 ? 'on-red blink' : ''));
+      lamp(wl.engine, all || dead || mil ? 'on-amber' : '');
+      lamp(wl['4wd'], all || dead ? 'on-amber' : '');
       lamp(wl.master, all || (running && (warn || inReserve)) ? 'on-amber' : '');
-      lamp(wl.side, lightsOn ? 'on-green' : '');
-      lamp(wl.highbeam, highBeamOn ? 'on-blue' : '');
+      lamp(wl.side, held || lightsOn ? 'on-green' : '');
+      lamp(wl.highbeam, held || highBeamOn ? 'on-blue' : '');
       lamp(wl.abs, all ? 'on-amber' : '');
-      lamp(wl.srs, powerOnTime < 6 ? 'on-red' : ''); // the air bag unit's self-test runs a little longer
+      lamp(wl.srs, held || powerOnTime < 6 ? 'on-red' : ''); // the air bag unit's self-test runs a little longer
       lamp(wl.slip, all ? 'on-amber' : tcIntervening ? 'on-amber blink' : '');
       lamp(wl.vdcoff, all || dsc === 'off' ? 'on-amber' : '');
       lamp(wl.fuel, all || inReserve ? 'on-amber' : '');

@@ -1271,6 +1271,11 @@
   const wl = Object.fromEntries(['brake','srs','abs','eps','battery','oil','engine','fuel','tcs','highbeam','belt','cruise'].map(k => [k, $('wl-'+k)]));
   const lamp = (n, cls) => { const c = cls ? 'wl ' + cls : 'wl'; if(n.className !== c) n.className = c; };
   const doorLamp = $('door-lamp');
+  // lamp map + checks after the 1991-94 Acura NSX owner's manual, "Instrument Panel Indicators": BRAKE = parking brake / fluid,
+  // ABS, EPS, PGM-FI, charge and oil lit from ON until the engine runs; SRS ~6 s; TCS flashes while it works, lit when switched off
+  const BULBS = /[?&]bulbs\b/.test(location.search); // ?bulbs or window.__bulbs = true holds every lamp on (the cluster check)
+  let bulbsHeld = false;
+  const activeCode = re => { for(const c of CarService.codes.values()) if(c.status === 'active' && re.test(c.code)) return true; return false; };
 
   function shutDown(){
     if(startPhase === 'run') shutdownPending = true; // the thud once it has wound down
@@ -1663,20 +1668,24 @@
       gearLabel: gearTxt, speed, coolant: coolantC, boost: boostBar, egt: egrC, ambient: AMBIENT_C });
 
     // ---- tell-tales: bulb check with the key, then live. Charge + oil stay lit until it runs ----
-    if(ignition){
-      const all = powerOnTime < 2;
-      lamp(wl.brake, all ? 'on-red' : '');
-      lamp(wl.srs, powerOnTime < 6 ? 'on-red' : ''); // the SRS unit's self-test runs a little longer
-      lamp(wl.abs, all ? 'on-amber' : braking && speed > 5 ? 'on-amber blink' : '');
-      lamp(wl.eps, all ? 'on-red' : '');
-      lamp(wl.engine, all || wearPct > 50 || coolantC > 112 || CarTune.warnLight() ? 'on-amber' : '');
-      lamp(wl.battery, all || !running ? 'on-red' : '');
-      lamp(wl.oil, all || !running ? 'on-red' : (engineOnTime > 2 && oilPressureBar < 0.5 ? 'on-red blink' : ''));
+    const held = BULBS || window.__bulbs;
+    if(!ignition && !held && bulbsHeld){ Object.values(wl).forEach(w => lamp(w, '')); doorLamp.classList.remove('on'); }
+    bulbsHeld = held;
+    if(ignition || held){
+      const all = held || powerOnTime < 2, dead = !running; // cranking, stalled or blown: no oil pressure, no charge
+      // the handbrake: up while it stands in neutral (the BRAKE lamp), or the fluid / fade side of it
+      lamp(wl.brake, all || (transmissionMode === 'N' && speed < 0.5) || CarService.brakeMul()/(window.surfaceGrip || 1) < 0.8 ? 'on-red' : '');
+      lamp(wl.srs, held || powerOnTime < 6 ? 'on-red' : ''); // the SRS unit's self-test runs a little longer
+      lamp(wl.abs, all || dead ? 'on-amber' : '');
+      lamp(wl.eps, all || dead ? 'on-red' : '');
+      lamp(wl.engine, all || dead || wearPct > 50 || coolantC > 112 || CarTune.warnLight() || activeCode(/^P(?!2B0A|250F|2560|0620|0562)/) ? 'on-amber' : '');
+      lamp(wl.battery, all || dead || activeCode(/^P0620$/) ? 'on-red' : ''); // P0620: the belt is gone, nothing charges
+      lamp(wl.oil, all || dead ? 'on-red' : (engineOnTime > 2 && oilPressureBar < 0.5 ? 'on-red blink' : ''));
       lamp(wl.fuel, all || inReserve ? 'on-amber' : '');
       lamp(wl.tcs, all ? 'on-amber' : tcIntervening ? 'on-amber blink' : dsc === 'off' ? 'on-amber' : '');
-      lamp(wl.highbeam, highBeamOn ? 'on-blue' : '');
-      lamp(wl.belt, powerOnTime < 6 ? 'on-red' : ''); // belt reminder with the chime for the first seconds
-      lamp(wl.cruise, cruiseActive ? 'on-green' : '');
+      lamp(wl.highbeam, held || highBeamOn ? 'on-blue' : '');
+      lamp(wl.belt, held || powerOnTime < 6 ? 'on-red' : ''); // belt reminder with the chime for the first seconds
+      lamp(wl.cruise, held || cruiseActive ? 'on-green' : '');
       doorLamp.classList.toggle('on', all);
     }
 

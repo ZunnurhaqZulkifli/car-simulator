@@ -85,15 +85,20 @@
 
   /* tell-tales: dead-front behind the smoked glass until lit */
   .warning-lights{ position:absolute; inset:0; pointer-events:none; }
-  .wl{ position:absolute; width:2.05%; aspect-ratio:1; transform:translate(-50%,-50%); color:#1d1e1f; transition:color .15s, filter .15s; }
+  .wl{ position:absolute; width:2.05%; aspect-ratio:1; transform:translate(-50%,-50%); color:#1d1e1f; opacity:0; transition:opacity .12s, color 0s linear .12s, filter 0s linear .12s; } /* unlit: invisible behind the smoked glass (its colour holds while it fades) */
   .wl.wide{ width:4.4%; aspect-ratio:2.2; }
   .wl svg{ width:100%; height:100%; display:block; overflow:visible; }
-  .wl.on-red{ color:#ff3324; filter:drop-shadow(0 0 5px rgba(255,51,36,.85)); }
-  .wl.on-amber{ color:#ffa21a; filter:drop-shadow(0 0 5px rgba(255,162,26,.8)); }
-  .wl.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 5px rgba(79,168,255,.85)); }
-  .wl.on-green{ color:#5cdc6d; filter:drop-shadow(0 0 5px rgba(92,220,109,.85)); }
-  .wl.on-white{ color:#f4f1ea; filter:drop-shadow(0 0 5px rgba(255,240,220,.7)); }
-  .wl.blink{ animation: wlBlink 0.5s steps(1) infinite; }
+  .wl[class*="on-"]{ opacity:1; transition:opacity .12s; }
+  /* LEDs: a tight core glow + a soft halo in the lens, set once per change (no per-frame filters) */
+  .wl.on-red{ color:#ff3324; filter:drop-shadow(0 0 1.5px rgba(255,60,36,.95)) drop-shadow(0 0 6px rgba(255,40,24,.5)); }
+  .wl.on-amber{ color:#ffa21a; filter:drop-shadow(0 0 1.5px rgba(255,170,30,.95)) drop-shadow(0 0 6px rgba(255,140,20,.45)); }
+  .wl.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 1.5px rgba(80,150,255,.95)) drop-shadow(0 0 6px rgba(60,130,255,.5)); }
+  .wl.on-green{ color:#5cdc6d; filter:drop-shadow(0 0 1.5px rgba(92,220,109,.9)) drop-shadow(0 0 6px rgba(70,220,100,.42)); }
+  .wl.on-white{ color:#f4f1ea; filter:drop-shadow(0 0 1.5px rgba(255,240,220,.8)); }
+  .wl.blink{ animation: wlFlash 0.5s steps(1) infinite; }
+  @keyframes wlFlash{ 0%,49%{ opacity:1; } 50%,100%{ opacity:0; } }
+  /* the turn arrows printed dark on the panel either side; drive.html (data-turn) and ?bulbs light them */
+  #turn-l.on-green, #turn-r.on-green, #turn-l.bulb, #turn-r.bulb{ fill:#3ff05a; filter:drop-shadow(0 0 2px rgba(60,240,90,.9)) drop-shadow(0 0 7px rgba(60,230,80,.45)); }
   @keyframes wlBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.15; } }
   /* car-service.js appends its service light to this field - park it in the free slot on the bottom row */
   .warning-lights > .wl[title="Service required"]{ left:45.23%; top:34.27%; }
@@ -292,8 +297,8 @@
         <path d="M10 566 L10 262 C10 128 150 34 340 22 L960 22 C1150 34 1290 128 1290 262 L1290 566 Z" fill="url(#housingG)" stroke="#2c2b29" stroke-width="2"/>
         <path d="M36 556 L36 276 C36 158 168 66 340 56 L960 56 C1132 66 1264 158 1264 276 L1264 556 Z" fill="url(#panelG)" stroke="#1c1c1b" stroke-width="1.4"/>
         <!-- turn indicators, dead-front either side -->
-        <path id="turn-l" d="M50 262 l20 -14 v8 h14 v12 h-14 v8 z" fill="#1b1c1b"/>
-        <path id="turn-r" d="M1250 262 l-20 -14 v8 h-14 v12 h14 v8 z" fill="#1b1c1b"/>
+        <path id="turn-l" data-turn="1" d="M50 262 l20 -14 v8 h14 v12 h-14 v8 z" fill="#1b1c1b"/>
+        <path id="turn-r" data-turn="-1" d="M1250 262 l-20 -14 v8 h-14 v12 h14 v8 z" fill="#1b1c1b"/>
 
         <!-- centre: check-control display (dot matrix) over the SMG / odometer LCD -->
         <g id="upper">
@@ -319,6 +324,11 @@
             <g id="up-oil" class="up-fg up-red" transform="translate(618 336)">
               <path d="M2 20h11l4-4h14l20-6-17 24H12l-7-7z" fill="none" stroke-width="3.2" stroke-linejoin="round"/><path d="M24 16v-6M18 10h12" fill="none" stroke-width="3.2"/>
               <path d="M58 26c0 3-2 5-4 5s-4-2-4-5 4-8 4-8 4 5 4 8z"/>
+            </g>
+            <!-- charging (red): the alternator not charging - the engine isn't running -->
+            <g id="up-batt" class="up-fg up-red" transform="translate(624 338)">
+              <rect x="2" y="8" width="48" height="28" rx="3" fill="none" stroke-width="3.2"/><path d="M10 8V3h8v5M34 8V3h8v5" fill="none" stroke-width="3"/>
+              <path d="M10 22h9M14.5 17.5v9M33 22h9" fill="none" stroke-width="3.2" stroke-linecap="round"/>
             </g>
             <text id="up-text" class="up-fg up-txt" x="650" y="352" text-anchor="middle" font-size="17"><tspan id="up-l1" x="650"></tspan><tspan id="up-l2" x="650" dy="22" font-size="15"></tspan></text>
             <rect x="592" y="314" width="116" height="82" fill="url(#dotsP)" pointer-events="none"/>
@@ -1156,6 +1166,9 @@
   const WL = {};
   document.querySelectorAll('.warning-lights > .wl').forEach(w => { WL[w.id.replace('wl-','')] = w; w.dataset.base = w.className; });
   const setWl = (k, cls) => { const w = WL[k], c = w.dataset.base + (cls ? ' ' + cls : ''); if(w.className !== c) w.className = c; };
+  // ?bulbs (or window.__bulbs = true): every lamp held on, as the Predrive Check shows them - for checking their places
+  const bulbsForced = () => !!window.__bulbs || /[?&]bulbs\b/.test(location.search);
+  let bulbsShown = false;
 
   const savedState = window.__CAR_STATE__ || {};
   let ignition=false, braking=0, speed=0, engineOnTime=0;
@@ -1757,27 +1770,33 @@
       chassis: EDC_OPTS.indexOf(edc) }); // EDC, soft (0) to firm (2): the driving page's body roll and pitch
 
     // ---- tell-tales: bulb check at terminal 15, then what the car reports ----
-    const bulb = ignition && engineOnTime < 2.2;
-    const overheating = coolantC > 112, oilLow = running && crankT > 2 && oilPressureBar < 0.5;
-    setWl('airbag', bulb ? 'on-red' : '');
-    setWl('engine', bulb || (ignition && (wearPct > 50 || overheating || CarTune.warnLight())) ? 'on-amber' : '');
-    setWl('abs', bulb ? 'on-amber' : (ignition && braking > 60 && speed > 5) ? 'on-amber blink' : '');
-    setWl('belt', bulb ? 'on-red' : '');
-    setWl('rpa', bulb ? 'on-amber' : '');
+    // (ST505 E60 M5 "M Performance Controls" p.3/6 + ST046 E60 Driver Information p.7: Predrive Check at terminal 15, soldered-in LEDs;
+    // the MDM lamp "goes out shortly after the engine is started"; layout from a lit E60 M5 photo.) ?bulbs / window.__bulbs holds all on
+    const forced = bulbsForced(), bulb = forced || (ignition && engineOnTime < 3);
+    const alive = running && !CarTune.blown(), selfCheck = ignition && (!alive || crankT < 2.5); // the DME / DSC lamps hold until it runs
+    const overheating = coolantC > 112, oilLow = alive && crankT > 2 && oilPressureBar < 0.5;
+    const tyreLow = (CarService.parts.find(p => p.key === 'pressure')?.value || 0) > 60;
+    setWl('airbag', bulb || (ignition && engineOnTime < 6) ? 'on-red' : ''); // the airbag unit's self-test
+    setWl('engine', bulb || selfCheck || (ignition && (wearPct > 50 || overheating || CarTune.warnLight())) ? 'on-amber' : '');
+    setWl('abs', bulb || selfCheck ? 'on-amber' : '');
+    setWl('belt', bulb || (ignition && engineOnTime < 6) ? 'on-red' : ''); // with the belt chime
+    setWl('rpa', bulb || (ignition && tyreLow) ? 'on-amber' : '');
     setWl('ffog', bulb ? 'on-green' : '');
     setWl('rfog', bulb ? 'on-amber' : '');
-    setWl('dsc', bulb ? 'on-amber' : !ignition ? '' : tcIntervening ? 'on-amber blink' : dsc !== 'on' ? 'on-amber' : '');
-    setWl('mdm', ignition && (bulb || dsc === 'mdm') ? 'on-amber' : '');
-    setWl('brake', ignition && (bulb || (speed < 0.5 && transmissionMode === 'N')) ? 'on-red' : '');
-    setWl('mdrive', ignition && (bulb || mdActive) ? 'on-green' : '');
-    setWl('lighton', ignition && lightsOn ? 'on-green' : '');
-    setWl('highbeam', ignition && highBeamOn ? 'on-blue' : '');
+    setWl('dsc', bulb || selfCheck ? 'on-amber' : !ignition ? '' : tcIntervening ? 'on-amber blink' : dsc === 'off' ? 'on-amber' : ''); // MDM has its own lamp
+    setWl('mdm', bulb || selfCheck || (ignition && dsc === 'mdm') ? 'on-amber' : '');
+    setWl('brake', bulb || (ignition && speed < 0.5 && transmissionMode === 'N') ? 'on-red' : '');
+    setWl('mdrive', bulb || (ignition && mdActive) ? 'on-green' : '');
+    setWl('lighton', bulb || (ignition && lightsOn) ? 'on-green' : '');
+    setWl('highbeam', bulb || (ignition && highBeamOn) ? 'on-blue' : '');
+    if(forced !== bulbsShown){ bulbsShown = forced; ['turn-l', 'turn-r'].forEach(id => $(id).classList.toggle('bulb', forced)); }
 
     // ---- check-control display ----
     upMsgT = Math.max(0, upMsgT - dt);
     let warn = false;
     if(!ignition) setUpper(null);
     else if(bulb) { setUpper('bang'); warn = true; }
+    else if(!alive && !cranking){ setUpper(engineOnTime % 3 < 1.5 ? 'oil' : 'batt'); warn = true; } // a dead engine: no oil pressure, no charging
     else if(oilLow){ setUpper('oil', 0, 0, true); warn = true; }
     else if(overheating){ setUpper('temp', 0, 0, true); warn = true; }
     else if(launchState !== 'idle') setUpper('flag', 0, 0, launchState === 'go');
