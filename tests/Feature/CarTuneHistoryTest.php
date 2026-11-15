@@ -97,6 +97,19 @@ class CarTuneHistoryTest extends TestCase
         $this->assertEquals(500, $car->fresh()->odometer);
     }
 
+    // another website loading the car page (an iframe, a link) can't make the owner's open tab stale
+    public function test_a_load_from_another_site_never_takes_over_the_open_page(): void
+    {
+        Storage::fake('public')->put('cars/bmw-320d.html', '<html><head></head><body></body></html>');
+        $car = $this->car();
+        $page = fn ($html) => json_decode(Str::betweenFirst($html, '__CAR_STATE__ = ', ';</script>'), true)['page'];
+        $tab = $this->get('/car/bmw-320d/raw', ['Sec-Fetch-Site' => 'same-origin'])->getContent();
+        $this->get('/car/bmw-320d/raw', ['Sec-Fetch-Site' => 'cross-site'])->assertSee('<script>CarAPI.hold();</script>', false);
+
+        $this->postJson('/car/bmw-320d/state', ['page' => $page($tab), 'odometer' => 500] + $this->state)->assertOk();
+        $this->assertEquals(500, $car->fresh()->odometer);
+    }
+
     public function test_the_extra_service_parts_and_the_gearbox_are_saved(): void
     {
         $car = $this->car();

@@ -98,8 +98,9 @@ class CarSimController extends Controller
 
         // each load becomes the car's one live page - an older copy (a second tab, a back-button restore) holds
         // state that's out of date and saveState() turns it away instead of letting it save over newer progress.
-        // A test drive (public/drive.html) never saves, so it leaves whichever page is live alone
-        $testDrive = $request->boolean('test_drive');
+        // A test drive (public/drive.html) never saves, so it leaves whichever page is live alone - and so does a load
+        // from another website (the browser's Sec-Fetch-Site), which could otherwise lock the owner's open tab out
+        $testDrive = $request->boolean('test_drive') || $request->header('Sec-Fetch-Site') === 'cross-site';
         $page = Str::random(20);
         if (! $testDrive) {
             Cache::forever("car-page:{$car->id}", $page);
