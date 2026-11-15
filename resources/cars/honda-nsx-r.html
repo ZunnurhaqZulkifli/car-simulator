@@ -1185,7 +1185,7 @@
     onChange(T){
       REV_LIMIT_K = T.rev; REDLINE = T.shift; LAUNCH_RPM_K = T.launch; FINAL_DRIVE = T.finalDrive;
       GEAR_RATIOS = T.gears;
-      TC_GRIP = GRIP_BASE*T.grip; SND_HW = T.sound;
+      TC_GRIP = GRIP_BASE*T.grip; SND_HW = T.sound; SHIFT_CUT = [0.3*T.hw.shift, 1]; // a built box: the clutch is out for less
       heatTuneMul = 1 + Math.max(0, T.powerRatio - 1)*2.5;
       showMapNames();
     } });

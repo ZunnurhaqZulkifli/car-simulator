@@ -17,6 +17,11 @@
 //        once per frame, after the car's boost: tqMul scales its stock torque curve, cut scales the pedal's torque
 //        (speed limiter, misfires), egt is the exhaust temperature target, fuelMul scales its fuel flow
 //   CarTune.label(n)         - "Stage 1 · 236 hp" for the car's map readout
+//   CarTune.ch               - live channels; for the drive page's exhaust: ch.smoke (black, 0-100 %: a diesel short of
+//        air, or a petrol running rich under load), ch.oilSmoke (blue, 0-100 %: oil burnt past worn rings, turbo seals,
+//        a failed PCV valve or head gasket), ch.blown (true from the blow-up until the rebuild)
+//   'engineblow' on document - once, the frame the engine lets go: detail { cause, cyl, rpm, speed }. The engine dies
+//        with the key left on (the car's own switch-off, then its ignition-on), so the dash lights its warnings
 //
 // Everything else is owned here: the engine model (air, fuel, ignition / injection), per-cylinder knock and
 // detonation, wear of the tuning-sensitive parts (registered as CarService parts), fault codes and limp mode,
@@ -51,8 +56,9 @@
         stock: [0.35, 0.95, 1.3, 1.45, 1.5, 1.5, 1.5, 1.45, 1.4, 1.3, 1.2, 1.1, 1.0],
         hybrid: [0.25, 0.75, 1.2, 1.65, 1.85, 1.95, 1.95, 1.9, 1.85, 1.8, 1.7, 1.6, 1.5],
         big: [0.1, 0.35, 0.8, 1.3, 1.75, 2.15, 2.4, 2.45, 2.45, 2.4, 2.35, 2.25, 2.15],
+        race: [0.05, 0.2, 0.5, 0.9, 1.4, 1.95, 2.45, 2.75, 2.9, 2.9, 2.85, 2.75, 2.6],
       },
-      krpm: { stock: 220, hybrid: 200, big: 165 }, // each turbo's rated shaft speed (x1000 rpm): bigger wheels spin slower
+      krpm: { stock: 220, hybrid: 200, big: 165, race: 145 }, // each turbo's rated shaft speed (x1000 rpm): bigger wheels spin slower
       tq: 500, rod: 720, trans: { name: 'ZF 8HP45', cap: 660, uprated: 850, built: 1000 }, // rod: what the stock con-rods take (Nm)
     },
     B47: {
@@ -64,8 +70,9 @@
       turbos: {
         stock: [0.35, 1.05, 1.75, 1.9, 1.95, 1.9, 1.8, 1.65, 1.45],
         hybrid: [0.3, 0.9, 1.7, 2.2, 2.45, 2.45, 2.35, 2.2, 2.0],
+        big: [0.15, 0.5, 1.15, 1.9, 2.5, 2.8, 2.85, 2.75, 2.6],
       },
-      krpm: { stock: 230, hybrid: 210 },
+      krpm: { stock: 230, hybrid: 210, big: 180 },
       tq: 400, rod: 560, trans: { name: 'ZF 8HP50', cap: 560, uprated: 800, built: 950 },
     },
     // M3 Competition Touring: twin mono-scroll turbos. The stock map holds ~1.7 bar flat (the car spools it); its
@@ -80,13 +87,15 @@
       turboLabel: 'Turbochargers',
       turboOpts: [['stock', 'Stock twins', 'Two mono-scroll turbos, one per three cylinders: ~2.2 bar before they run out of breath.'],
         ['hybrid', 'Hybrid twins', 'Bigger compressor wheels in the stock housings: ~2.6 bar, a touch more lag.', { sound: { turbo: 1.25 } }],
-        ['big', 'Big twins', 'Big-turbo upgrade: ~3 bar and a huge top end, softer below 3,000 rpm.', { sound: { turbo: 1.45 } }]],
+        ['big', 'Big twins', 'Big-turbo upgrade: ~3 bar and a huge top end, softer below 3,000 rpm.', { sound: { turbo: 1.45 } }],
+        ['race', 'Race twins', 'Ball-bearing race twins on tubular manifolds: ~3.5 bar and a savage top end, little below 3,500 rpm.', { sound: { turbo: 1.7 } }]],
       turbos: {
         stock: [1.85, 2.0, 2.15, 2.25, 2.3, 2.3, 2.3, 2.25, 2.2, 2.15, 2.1, 2.0, 1.9],
         hybrid: [1.5, 1.9, 2.2, 2.45, 2.6, 2.65, 2.65, 2.6, 2.55, 2.5, 2.45, 2.35, 2.25],
         big: [0.8, 1.2, 1.7, 2.2, 2.6, 2.9, 3.0, 3.0, 2.95, 2.9, 2.85, 2.75, 2.6],
+        race: [0.5, 0.8, 1.2, 1.7, 2.3, 2.85, 3.25, 3.45, 3.5, 3.5, 3.45, 3.35, 3.2],
       },
-      krpm: { stock: 200, hybrid: 185, big: 160 },
+      krpm: { stock: 200, hybrid: 185, big: 160, race: 140 },
       tq: 650, rod: 950, trans: { name: 'ZF 8HP76', cap: 850, uprated: 1050, built: 1250 },
       presets: [
         { id: 'stock', name: 'Stock', desc: 'Factory Competition calibration: 530 hp / 650 Nm, 280 km/h limiter.', needs: {}, make: (e, s) => s },
@@ -94,6 +103,41 @@
           needs: { fuel: ['98', '102', 'e85'] },
           make: (e, s) => ({ ...s, boost: [1.95, 1.95, 1.95, 1.95, 1.95, 1.95, 1.95, 1.95, 1.95, 1.9, 1.85, 1.8, 1.75],
             timing: e.axis.map((r) => (r < 3000 ? 0.5 : 1.5)), afr: add(s.afr, -0.2), tq: 730, shiftSpeed: 1 }) },
+      ],
+    },
+    // M3 F80 (2015): the S55, two mono-scroll MHI turbos (front three / rear three cylinders) on ~1.2 bar that tapers
+    // up top: 550 Nm from 1,850 to 5,500, 431 PS held to 7,300, 7,600 cut. Forged crank, but its pressed-on hub is
+    // the weak link once a tune passes ~750 Nm. The GS7D36BG M DCT's clutch packs hold ~700 Nm stock
+    S55: {
+      fuel: 'petrol', name: 'S55B30 3.0 twin-turbo I6', cyl: 6, maxRpm: 7600, tstat: 92,
+      axis: [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000],
+      boost: [0.45, 1.0, 1.2, 1.2, 1.2, 1.2, 1.2, 1.18, 1.15, 1.1, 1.05, 1.0, 0.95],
+      afr: [12.8, 12.6, 12.5, 12.4, 12.3, 12.2, 12.1, 12.0, 11.9, 11.8, 11.7, 11.7, 11.6],
+      margin: [1.5, 1.0, 1.0, 1.2, 1.5, 1.8, 2.1, 2.4, 2.7, 2.9, 3.1, 3.3, 3.4],
+      cylMargin: [0, 0.2, 0, -0.3, -0.2, -0.6], // cylinder 6 runs hottest
+      turboLabel: 'Turbochargers',
+      turboOpts: [['stock', 'Stock twins', 'Two mono-scroll MHI turbos, one per three cylinders: ~1.7 bar before they run out of breath.'],
+        ['hybrid', 'Hybrid twins', 'Bigger billet compressor wheels in the stock housings: ~2.1 bar, a touch more lag.', { sound: { turbo: 1.25 } }],
+        ['big', 'Big twins', 'Big-turbo kit: ~2.5 bar and a huge top end, softer below 3,500 rpm.', { sound: { turbo: 1.45 } }],
+        ['race', 'Race single', 'Single-turbo conversion: one ball-bearing race turbo on a tubular manifold, ~2.95 bar and a savage top end, almost nothing below 3,500 rpm.', { sound: { turbo: 1.7 } }]],
+      turbos: {
+        stock: [0.6, 1.25, 1.55, 1.65, 1.7, 1.7, 1.7, 1.65, 1.6, 1.55, 1.45, 1.35, 1.25],
+        hybrid: [0.4, 1.0, 1.45, 1.8, 2.0, 2.1, 2.1, 2.05, 2.0, 1.95, 1.85, 1.75, 1.65],
+        big: [0.15, 0.45, 0.85, 1.3, 1.75, 2.15, 2.4, 2.5, 2.5, 2.45, 2.4, 2.3, 2.15],
+        race: [0.05, 0.2, 0.5, 0.9, 1.4, 1.95, 2.45, 2.8, 2.95, 2.95, 2.9, 2.8, 2.65],
+      },
+      krpm: { stock: 215, hybrid: 195, big: 165, race: 140 },
+      tq: 550, rod: 780, trans: { name: 'M DCT (GS7D36BG)', cap: 700, uprated: 900, built: 1100, fly: true }, // fly: a clutch and flywheel, not a converter
+      presets: [
+        { id: 'stock', name: 'Stock', desc: 'Factory calibration: 431 PS / 550 Nm on ~1.2 bar, 250 km/h limiter.', needs: {}, make: (e, s) => s },
+        { id: 'stage1', name: 'Stage 1', desc: 'bootmod3 Stage 1 + DCT flash on RON 98: ~1.5 bar, more timing, quicker shifts. ~510 PS / 650 Nm on stock turbos.',
+          needs: { fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, boost: e.boost.map((b, i) => +Math.min(b + 0.3, e.turbos.stock[i] * 0.9).toFixed(2)), timing: e.axis.map((r) => (r < 3000 ? 0.5 : 1.5)),
+            afr: add(s.afr, -0.2), tq: 650, vmax: 0, shiftSpeed: 1 }) },
+        { id: 'stage2', name: 'Stage 2', desc: 'Downpipes, intakes, alloy charge pipe, ~1.65 bar on RON 102: ~560 PS / 720 Nm.',
+          needs: { downpipe: ['sport', 'catless'], intake: ['open'], chargepipe: ['alu'], fuel: ['102', 'e85'] },
+          make: (e, s) => ({ ...s, boost: e.boost.map((b, i) => +Math.min(b + 0.45, e.turbos.stock[i] * 0.95).toFixed(2)), timing: e.axis.map((r) => (r < 3000 ? 0.5 : r < 5000 ? 1.5 : 2.5)),
+            afr: add(s.afr, -0.3), tq: 720, vmax: 0, shiftSpeed: 2 }) },
       ],
     },
     // M5 CS: a twin-scroll pair in the vee. Stock holds ~1.7 bar flat (the car spools it); its bootmod3 maps are the presets
@@ -107,13 +151,15 @@
       turboLabel: 'Turbochargers',
       turboOpts: [['stock', 'Stock twins', 'Twin-scroll pair in the hot vee: good for ~2.5 bar on a Stage 2 map.'],
         ['hybrid', 'Hybrid twins', 'Bigger compressor wheels in the stock housings: ~2.9 bar, a little more lag.', { sound: { turbo: 1.25 } }],
-        ['big', 'Big twins', 'Big-turbo kit: ~3.3 bar and an enormous top end, soft below 3,000 rpm.', { sound: { turbo: 1.45 } }]],
+        ['big', 'Big twins', 'Big-turbo kit: ~3.3 bar and an enormous top end, soft below 3,000 rpm.', { sound: { turbo: 1.45 } }],
+        ['race', 'Race twins', 'Ball-bearing race twins in the vee: ~3.95 bar, a monstrous top end, little below 3,500 rpm.', { sound: { turbo: 1.7 } }]],
       turbos: {
         stock: [1.9, 2.15, 2.45, 2.65, 2.8, 2.85, 2.85, 2.85, 2.8, 2.75, 2.65, 2.55, 2.45],
         hybrid: [1.5, 1.9, 2.35, 2.75, 3.0, 3.15, 3.2, 3.2, 3.15, 3.1, 3.05, 2.95, 2.85],
         big: [0.8, 1.2, 1.8, 2.4, 2.9, 3.25, 3.45, 3.5, 3.5, 3.45, 3.4, 3.3, 3.15],
+        race: [0.5, 0.8, 1.25, 1.85, 2.5, 3.1, 3.55, 3.85, 3.95, 3.95, 3.9, 3.8, 3.6],
       },
-      krpm: { stock: 185, hybrid: 170, big: 150 },
+      krpm: { stock: 185, hybrid: 170, big: 150, race: 135 },
       tq: 750, rod: 1150, trans: { name: 'ZF 8HP75', cap: 950, uprated: 1150, built: 1350 },
       presets: [
         { id: 'stock', name: 'Stock', desc: 'Factory CS calibration: 635 hp / 750 Nm.', needs: {}, make: (e, s) => s },
@@ -169,12 +215,14 @@
       margin: [2.0, 1.4, 1.4, 1.6, 1.9, 2.2, 2.5, 2.8, 3.1, 3.4, 3.6, 3.8, 3.9],
       cylMargin: [0, 0.2, -0.2, -0.4],
       turboOpts: [['stock', 'Stock', 'Twin-scroll single turbo - the 530e runs it gently, it has ~2 bar in it.'],
-        ['hybrid', 'Hybrid', 'Bigger compressor wheel: ~2.4 bar up top, a little more lag.', { sound: { turbo: 1.25 } }]],
+        ['hybrid', 'Hybrid', 'Bigger compressor wheel: ~2.4 bar up top, a little more lag.', { sound: { turbo: 1.25 } }],
+        ['big', 'Big single', 'Big-turbo kit: ~2.65 bar and a strong top end, soft below 3,000 rpm - the motor fills the gap.', { sound: { turbo: 1.45 } }]],
       turbos: {
         stock: [0.45, 1.25, 1.75, 1.95, 2.05, 2.05, 2.05, 2.05, 2.0, 1.95, 1.9, 1.85, 1.8],
         hybrid: [0.3, 1.0, 1.6, 2.1, 2.35, 2.45, 2.5, 2.5, 2.45, 2.4, 2.35, 2.3, 2.2],
+        big: [0.15, 0.45, 0.95, 1.5, 1.95, 2.3, 2.55, 2.65, 2.65, 2.6, 2.55, 2.45, 2.35],
       },
-      krpm: { stock: 230, hybrid: 210 },
+      krpm: { stock: 230, hybrid: 210, big: 175 },
       tq: 290, rod: 520, trans: { name: 'ZF 8HP eDrive', cap: 520, uprated: 700, built: 850 },
       // the eDrive side: the car reads these off T.hw. The motor makes min(its torque, the inverter's kW, what the
       // battery can deliver through the inverter); upgrades past stock add to the system's 252 PS / 420 Nm caps
@@ -268,13 +316,16 @@
         big: [0, 0.1, 0.3, 0.5, 0.75, 1.0, 1.25, 1.45, 1.6, 1.65, 1.65, 1.6, 1.55, 1.5, 1.45],
       },
       krpm: { stock: 0, twin: 190, big: 160 },
-      tq: 465, rod: 700, trans: { name: 'PDK 7-speed', cap: 700, uprated: 900, built: 1100 },
+      tq: 465, rod: 700, trans: { name: 'PDK 7-speed', cap: 700, uprated: 900, built: 1100, fly: true },
+      no: ['exhmani'], // a turbo kit brings its own headers
       // the parts that read wrong on an NA engine: a turbo build's plumbing isn't there until a kit is, and the tank
       // holds Super Plus as delivered
       swap: {
         intercooler: { opts: [['stock', 'None', 'Nothing to cool on the NA engine. With a turbo kit the charge goes in straight off the compressors - hot.', { ic: 0, soak: 0 }],
           ['kit', 'Kit cores', 'Air-to-air cores behind the rear intakes, as on a 911 Turbo: what a turbo build needs.', { ic: 0.8, soak: 6 }],
-          ['big', 'Big cores', 'Larger cores: cooler, steadier intake temps over repeated pulls.', { ic: 0.88, soak: 3 }]] },
+          ['big', 'Big cores', 'Larger cores: cooler, steadier intake temps over repeated pulls.', { ic: 0.88, soak: 3 }],
+          ['race', 'Race cores', 'Competition cores with water spray: the coolest, steadiest charge a turbo build can have.', { ic: 0.93, soak: 2 }],
+          ['pro', 'Water-to-air cores', 'Air-to-water cores with a front heat exchanger and twin pumps, as on the GT2 RS Weissach: no heat-soak.', { ic: 0.95, soak: 1.5 }]] },
         chargepipe: { opts: [['stock', 'Kit pipes', 'The turbo kit\'s own silicone and plastic pipes (nothing on the NA engine): hard pulls on high boost fatigue them until one splits.'],
           ['alu', 'Aluminium', 'Aluminium pipes and silicone couplers: hold any boost and barely age.', { cpWear: 0.08 }]] },
         diverter: { opts: [['stock', 'Kit diaphragm', 'The turbo kit\'s diaphragm valves (nothing on the NA engine): high boost tears them and they bleed boost.'],
@@ -287,7 +338,7 @@
         fuel: { opts: [['98', 'RON 98', 'Super Plus: what Porsche specifies for the GT3, and what the stock map is written for.', { octane: 2, k: 1 }],
           ['95', 'RON 95', 'Regular premium: allowed, but the stock map is knock-limited on it around peak torque - a little less power.', { octane: 0, k: 1 }],
           ['102', 'RON 102', 'Race fuel: ~5° more margin than RON 95 - what a turbo build on the stock fuel system runs.', { octane: 5, k: 1 }],
-          ['e85', 'E85', 'Ethanol: ~9° more margin and a cooler charge, but ~40% more fuel flow than a turbo build\'s pumps can give.', { octane: 9, k: 1.4, iat: -6 }]] },
+          ['e85', 'E85', 'Ethanol: knocks like ~RON 105 and its ~3x latent heat cools the charge ~10 °C, but it needs ~30% more fuel flow (~25% less range) than a turbo build\'s pumps give. With a flex sensor the ECU adds timing.', { octane: 7, k: 1.3, iat: -10, adv: 5 }]] },
       },
       presets: [
         { id: 'stock', name: 'Stock', desc: 'Factory GT3 RS calibration: 525 hp / 465 Nm, 9,000 rpm, no speed limiter.', needs: {}, make: (e, s) => s },
@@ -321,12 +372,15 @@
         stock: [0.45, 1.0, 1.15, 1.2, 1.2, 1.2, 1.15, 1.1, 1.05, 1.0, 0.95, 0.9, 0.85],
         hybrid: [0.3, 0.8, 1.2, 1.5, 1.65, 1.7, 1.7, 1.65, 1.6, 1.55, 1.45, 1.35, 1.25],
         big: [0.1, 0.35, 0.75, 1.2, 1.6, 1.95, 2.15, 2.2, 2.2, 2.15, 2.1, 2.0, 1.9],
+        race: [0.05, 0.2, 0.45, 0.85, 1.3, 1.8, 2.25, 2.55, 2.65, 2.65, 2.6, 2.5, 2.35],
       },
-      krpm: { stock: 220, hybrid: 200, big: 165 },
+      krpm: { stock: 220, hybrid: 200, big: 165, race: 145 },
       tq: 400, rod: 600, trans: { name: 'ZF 6HP21', cap: 500, uprated: 650, built: 800 },
       swap: { // the E9x has an air-to-air front-mount, not the B58's water-to-air
         intercooler: { opts: [['stock', 'Stock', 'Front-mounted air-to-air: heat-soaks over repeated pulls.', { ic: 0.8, soak: 10 }],
-          ['big', 'Big front-mount', 'Larger stepped core: cooler, steadier intake temps.', { ic: 0.9, soak: 4 }]] },
+          ['big', 'Big front-mount', 'Larger stepped core: cooler, steadier intake temps.', { ic: 0.9, soak: 4 }],
+          ['race', 'Race front-mount', 'Competition bar-and-plate core, as deep as the bumper takes: the coolest charge, barely heat-soaks.', { ic: 0.94, soak: 2.5 }],
+          ['pro', 'Water-to-air kit', 'Air-to-water chargecooler with its own pump and front heat exchanger: the coolest charge, no heat-soak.', { ic: 0.96, soak: 1.8 }]] },
       },
     },
     // NSX-R (NA1): the C30A 3.0 V6, balanced and blueprinted - DOHC VTEC on both cams (the high-lift lobes from
@@ -342,19 +396,24 @@
       cylMargin: [0, 0.2, -0.2, 0, -0.3, -0.4],
       turboLabel: 'Forced induction',
       turboOpts: [['stock', 'None (NA)', 'Naturally aspirated through the six-runner VVIS plenum: no boost, so the boost map does nothing.', { sound: { turbo: 0 } }],
-        ['sc', 'Supercharger kit', 'Centrifugal supercharger off the crank: boost climbs with the revs to ~0.6 bar at 8,000. Needs bigger injectors, a pump, an intercooler and a stronger clutch.', { sound: { turbo: 0.7 } }]],
+        ['sc', 'Supercharger kit', 'Centrifugal supercharger off the crank: boost climbs with the revs to ~0.6 bar at 8,000. Needs bigger injectors, a pump, an intercooler and a stronger clutch.', { sound: { turbo: 0.7 } }],
+        ['sc2', 'High-boost SC', 'A bigger head unit on a smaller pulley: ~0.9 bar by 8,000 - the boost (and the heat) of a turbo, still linear with the revs.', { sound: { turbo: 0.85 } }]],
       turbos: {
         stock: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         sc: [0.02, 0.06, 0.12, 0.16, 0.2, 0.25, 0.3, 0.35, 0.41, 0.47, 0.53, 0.58, 0.63, 0.66, 0.68],
+        sc2: [0.03, 0.08, 0.17, 0.22, 0.28, 0.35, 0.42, 0.49, 0.57, 0.66, 0.74, 0.81, 0.88, 0.92, 0.95],
       },
-      krpm: { stock: 0, sc: 52 },
-      tq: 300, rod: 460, trans: { name: 'Honda 5-speed manual', cap: 380, uprated: 480, built: 600 },
+      krpm: { stock: 0, sc: 52, sc2: 58 },
+      tq: 300, rod: 460, trans: { name: 'Honda 5-speed manual', cap: 380, uprated: 480, built: 600, fly: true },
+      no: ['exhmani', 'diinj', 'wastegate'], // headers, port injection only, and a supercharger's boost comes off its pulley
       // the parts that read wrong on this engine: a kit's plumbing isn't there until the kit is, it's port-injected,
       // and the gearbox is a manual
       swap: {
         intercooler: { opts: [['stock', 'None', 'Nothing to cool on the NA engine. With the supercharger the charge goes in hot.', { ic: 0, soak: 0 }],
           ['kit', 'Kit core', 'Air-to-air core in the side intake: what the supercharger needs.', { ic: 0.75, soak: 8 }],
-          ['big', 'Big core', 'Larger core with its own fan: cooler, steadier intake temps.', { ic: 0.85, soak: 4 }]] },
+          ['big', 'Big core', 'Larger core with its own fan: cooler, steadier intake temps.', { ic: 0.85, soak: 4 }],
+          ['race', 'Race core', 'Air-to-water race core with its own pump and front radiator: the coolest charge, barely heat-soaks.', { ic: 0.9, soak: 2.5 }],
+          ['pro', 'Twin race cores', 'Two air-to-water cores, a bigger front radiator and a spray bar: the coolest charge, no heat-soak.', { ic: 0.93, soak: 2 }]] },
         chargepipe: { opts: [['stock', 'Kit pipes', 'The supercharger kit\'s own silicone pipes (nothing on the NA engine): hard pulls on high boost fatigue them until one splits.'],
           ['alu', 'Aluminium', 'Aluminium pipes and silicone couplers: hold any boost and barely age.', { cpWear: 0.08 }]] },
         diverter: { label: 'Bypass valve', opts: [['stock', 'Kit diaphragm', 'The supercharger kit\'s bypass valve (nothing on the NA engine): high boost tears it and it bleeds boost.'],
@@ -365,16 +424,21 @@
           ['sport', 'Sport cats', 'High-flow cats: +2.5% flow and cooler exhaust.', { flow: 0.025, egt: -15, spool: -100, sound: { ex: 1.15, turbo: 1.1 } }],
           ['catless', 'Race headers', 'Equal-length race headers, no cats: +4% flow, the loudest. Off-road only - the cat monitor flags P0420.', { flow: 0.04, egt: -25, spool: -150, sound: { ex: 1.3, turbo: 1.2 }, catless: true }]] },
         injection: { label: 'Injectors', opts: [['stock', 'Stock', 'Sequential port injection: ~40% headroom over the stock fuelling.', { fuelCap: 1.4 }],
-          ['port', 'Big injectors', 'Higher-flow injectors: ~70% more fuel - what the supercharger and E85 need.', { fuelCap: 1.4, port: 0.7 }]] },
+          ['port', 'Big injectors', 'Higher-flow injectors: ~70% more fuel - what the supercharger and E85 need.', { fuelCap: 1.4, port: 0.7 }],
+          ['xl', 'Race injectors', '1,300 cc race injectors: ~120% more fuel - the high-boost supercharger on E85. Unscaled on the stock map they flood it.', { fuelCap: 1.4, port: 1.2 }],
+          ['xxl', 'Twin-injector rails', 'A second injector per cylinder on its own rail: ~180% more fuel - big boost on E85. Needs a big feed pump.', { fuelCap: 1.4, port: 1.8 }]] },
         hpfp: { label: 'Fuel pump', opts: [['stock', 'Stock', 'In-tank pump at 3 bar: ~25% headroom over the stock fuelling.', { pump: 1.25 }],
-          ['uprated', 'Uprated', 'High-flow in-tank pump: holds pressure at ~60% more flow.', { pump: 1.6 }]] },
+          ['uprated', 'Uprated', 'High-flow in-tank pump: holds pressure at ~60% more flow.', { pump: 1.6 }],
+          ['race', 'Twin race pumps', 'Two high-flow pumps on a surge tank: hold pressure at ~2.1x the stock flow.', { pump: 2.1 }]] },
         trans: { label: 'Clutch & gearbox', opts: [['stock', 'Stock', 'Twin-plate clutch on the close-ratio 5-speed: slips once the torque passes its rating.'],
-          ['uprated', 'Uprated clutch', 'Heavier clamp and sintered plates: holds far more torque.', { trans: 'uprated' }],
-          ['built', 'Built', 'Racing twin-plate clutch and dog-ring gears: holds the most, but it grabs and wears ~50% faster on the road.', { trans: 'built', transWear: 1.5 }]] },
+          ['uprated', 'Uprated clutch', 'Heavier clamp and sintered plates: holds far more torque and shifts ~15% quicker.', { trans: 'uprated', shift: 0.85 }],
+          ['built', 'Built', 'Racing twin-plate clutch and dog-ring gears: holds the most and shifts ~30% quicker, but it grabs and wears ~50% faster on the road.', { trans: 'built', transWear: 1.5, shift: 0.7 }],
+          ['race', 'Race', 'Triple-plate sintered clutch and a dog-engagement box: ~25% more than Built and shifts ~45% quicker, but it chatters and wears twice as fast on the road.', { trans: 'race', transWear: 2, shift: 0.55 }],
+          ['pro', 'Sequential', 'Sequential straight-cut dog box with a carbon triple-plate clutch: ~60% over Built and shifts ~50% quicker, but it whines, chatters and wears ~2.5x as fast on the road.', { trans: 'pro', transWear: 2.5, shift: 0.5 }]] },
         fuel: { opts: [['98', 'RON 98', 'Japanese high-octane premium: what the NSX-R\'s map is written for.', { octane: 2, k: 1 }],
           ['95', 'RON 95', 'Regular premium: allowed, but knock-limited around peak torque - a little less power.', { octane: 0, k: 1 }],
           ['102', 'RON 102', 'Race fuel: ~5° more margin than RON 95 - what a supercharged build on stock internals runs.', { octane: 5, k: 1 }],
-          ['e85', 'E85', 'Ethanol: ~9° more margin and a cooler charge, but ~40% more fuel flow than the stock injectors give.', { octane: 9, k: 1.4, iat: -6 }]] },
+          ['e85', 'E85', 'Ethanol: knocks like ~RON 105 and its ~3x latent heat cools the charge ~10 °C, but it needs ~30% more fuel flow (~25% less range) than the stock injectors give. Only a few % on an NA engine; rough cold starts in winter.', { octane: 7, k: 1.3, iat: -10, adv: 5 }]] },
       },
       presets: [
         { id: 'stock', name: 'Stock', desc: 'Factory NSX-R calibration: 280 PS / 294 Nm, VTEC at 5,800, fuel cut at 8,300.', needs: {}, make: (e, s) => s },
@@ -402,17 +466,22 @@
       cylMargin: [0, 0.2, -0.1, 0, -0.3, 0.1, 0, -0.2, 0.1, -0.4], // the back cylinders of each bank run hottest
       turboLabel: 'Forced induction',
       turboOpts: [['stock', 'None (NA)', 'Naturally aspirated through ten individual throttle bodies: no boost, so the boost map does nothing.', { sound: { turbo: 0 } }],
-        ['sc', 'Supercharger kit', 'Centrifugal supercharger off the crank: boost climbs with the revs to ~0.6 bar at 8,500. Needs bigger injectors, a pump, an intercooler and a stronger clutch.', { sound: { turbo: 0.7 } }]],
+        ['sc', 'Supercharger kit', 'Centrifugal supercharger off the crank: boost climbs with the revs to ~0.6 bar at 8,500. Needs bigger injectors, a pump, an intercooler and a stronger clutch.', { sound: { turbo: 0.7 } }],
+        ['sc2', 'High-boost SC', 'The bigger head unit on a smaller pulley: ~0.85 bar by 8,500 - near 800 PS on a built V10, and a lot more heat.', { sound: { turbo: 0.85 } }]],
       turbos: {
         stock: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         sc: [0.02, 0.05, 0.1, 0.13, 0.16, 0.2, 0.24, 0.28, 0.33, 0.38, 0.43, 0.48, 0.53, 0.57, 0.6, 0.62],
+        sc2: [0.03, 0.07, 0.14, 0.18, 0.22, 0.28, 0.34, 0.39, 0.46, 0.53, 0.6, 0.67, 0.74, 0.8, 0.84, 0.87],
       },
-      krpm: { stock: 0, sc: 55 },
-      tq: 520, rod: 700, trans: { name: 'Getrag SMG III 7-speed', cap: 600, uprated: 760, built: 900 },
+      krpm: { stock: 0, sc: 55, sc2: 60 },
+      tq: 520, rod: 700, trans: { name: 'Getrag SMG III 7-speed', cap: 600, uprated: 760, built: 900, fly: true },
+      no: ['exhmani', 'diinj', 'wastegate'],
       swap: {
         intercooler: { opts: [['stock', 'None', 'Nothing to cool on the NA engine. With the supercharger the charge goes in hot.', { ic: 0, soak: 0 }],
           ['kit', 'Kit core', 'Air-to-water core in the V: what the supercharger needs.', { ic: 0.75, soak: 8 }],
-          ['big', 'Big core', 'Larger core with its own pump: cooler, steadier intake temps.', { ic: 0.85, soak: 4 }]] },
+          ['big', 'Big core', 'Larger core with its own pump: cooler, steadier intake temps.', { ic: 0.85, soak: 4 }],
+          ['race', 'Race core', 'Twin-pass race core, a bigger pump and a front heat exchanger: the coolest charge, barely heat-soaks.', { ic: 0.9, soak: 2.5 }],
+          ['pro', 'Twin race cores', 'One race core per bank, twin pumps and a stacked front heat exchanger: the coolest charge, no heat-soak.', { ic: 0.93, soak: 2 }]] },
         chargepipe: { opts: [['stock', 'Kit pipes', 'The supercharger kit\'s own silicone pipes (nothing on the NA engine): hard pulls on high boost fatigue them until one splits.'],
           ['alu', 'Aluminium', 'Aluminium pipes and silicone couplers: hold any boost and barely age.', { cpWear: 0.08 }]] },
         diverter: { label: 'Bypass valve', opts: [['stock', 'Kit diaphragm', 'The supercharger kit\'s bypass valve (nothing on the NA engine): high boost tears it and it bleeds boost.'],
@@ -423,16 +492,21 @@
           ['sport', 'Sport cats', '200-cell cats: +2.5% flow and cooler exhaust.', { flow: 0.025, egt: -15, spool: -100, sound: { ex: 1.15, turbo: 1.1 } }],
           ['catless', 'Race headers', 'Equal-length race headers, no cats: +4% flow and a Formula 1 shriek. Off-road only - the cat monitor flags P0420.', { flow: 0.04, egt: -25, spool: -150, sound: { ex: 1.3, turbo: 1.2 }, catless: true }]] },
         injection: { label: 'Injectors', opts: [['stock', 'Stock', 'Sequential port injection: ~40% headroom over the stock fuelling.', { fuelCap: 1.4 }],
-          ['port', 'Big injectors', 'Higher-flow injectors: ~70% more fuel - what the supercharger and E85 need.', { fuelCap: 1.4, port: 0.7 }]] },
+          ['port', 'Big injectors', 'Higher-flow injectors: ~70% more fuel - what the supercharger and E85 need.', { fuelCap: 1.4, port: 0.7 }],
+          ['xl', 'Race injectors', '1,300 cc race injectors: ~120% more fuel - the high-boost supercharger on E85. Unscaled on the stock map they flood it.', { fuelCap: 1.4, port: 1.2 }],
+          ['xxl', 'Twin-injector rails', 'A second injector per cylinder on its own rail: ~180% more fuel - big boost on E85. Needs a big feed pump.', { fuelCap: 1.4, port: 1.8 }]] },
         hpfp: { label: 'Fuel pump', opts: [['stock', 'Stock', 'In-tank pumps at 5 bar: ~25% headroom over the stock fuelling.', { pump: 1.25 }],
-          ['uprated', 'Uprated', 'High-flow in-tank pumps: hold pressure at ~60% more flow.', { pump: 1.6 }]] },
+          ['uprated', 'Uprated', 'High-flow in-tank pumps: hold pressure at ~60% more flow.', { pump: 1.6 }],
+          ['race', 'Race pumps', 'Twin race pumps on a surge tank: hold pressure at ~2.1x the stock flow.', { pump: 2.1 }]] },
         trans: { label: 'Clutch & gearbox', opts: [['stock', 'Stock', 'The SMG III\'s single-plate clutch: slips once the torque passes its rating.'],
-          ['uprated', 'Uprated clutch', 'A twin-disc clutch and an SMG pump flash: holds far more torque.', { trans: 'uprated' }],
-          ['built', 'Built', 'Race twin-disc, uprated synchros and a race SMG map: holds the most, but grabs and wears ~50% faster on the road.', { trans: 'built', transWear: 1.5 }]] },
+          ['uprated', 'Uprated clutch', 'A twin-disc clutch and an SMG pump flash: holds far more torque and shifts ~15% quicker.', { trans: 'uprated', shift: 0.85 }],
+          ['built', 'Built', 'Race twin-disc, uprated synchros and a race SMG map: holds the most and shifts ~30% quicker, but grabs and wears ~50% faster on the road.', { trans: 'built', transWear: 1.5, shift: 0.7 }],
+          ['race', 'Race', 'Triple-disc race clutch, a straight-cut dog box behind it and a race SMG pump: ~25% more than Built and shifts ~45% quicker, harsh and wears twice as fast on the road.', { trans: 'race', transWear: 2, shift: 0.55 }],
+          ['pro', 'Sequential', 'Sequential dog box on the SMG hydraulics with a carbon quad-plate clutch: ~60% over Built and shifts ~50% quicker, brutal and wears ~2.5x as fast on the road.', { trans: 'pro', transWear: 2.5, shift: 0.5 }]] },
         fuel: { opts: [['98', 'RON 98', 'Super Plus: what BMW M specifies for the S85, and what the stock map is written for.', { octane: 2, k: 1 }],
           ['95', 'RON 95', 'Regular premium: allowed, but 12:1 on it is knock-limited around peak torque - a little less power.', { octane: 0, k: 1 }],
           ['102', 'RON 102', 'Race fuel: ~5° more margin than RON 95 - what a supercharged build on stock internals runs.', { octane: 5, k: 1 }],
-          ['e85', 'E85', 'Ethanol: ~9° more margin and a cooler charge, but ~40% more fuel flow than the stock injectors give.', { octane: 9, k: 1.4, iat: -6 }]] },
+          ['e85', 'E85', 'Ethanol: knocks like ~RON 105 and its ~3x latent heat cools the charge ~10 °C, but it needs ~30% more fuel flow (~25% less range) than the stock injectors give. Only a few % on an NA engine; rough cold starts in winter.', { octane: 7, k: 1.3, iat: -10, adv: 5 }]] },
       },
       presets: [
         { id: 'stock', name: 'Stock', desc: 'Factory M5 calibration: 507 PS / 520 Nm, fuel cut at 9,500 (raised from the 8,250 governor).', needs: {}, make: (e, s) => s },
@@ -459,32 +533,42 @@
       turboLabel: 'Turbochargers',
       turboOpts: [['stock', 'NISMO GT3 twins', 'IHI twins with the GT3 race car\'s bigger compressor wheels: good for ~1.6 bar before they run out of breath.'],
         ['hybrid', 'Hybrid twins', 'Bigger billet compressor wheels in the stock housings: ~2 bar, a touch more lag.', { sound: { turbo: 1.25 } }],
-        ['big', 'Big twins', 'Big-turbo kit: ~2.4 bar and an enormous top end, soft below 3,500 rpm.', { sound: { turbo: 1.45 } }]],
+        ['big', 'Big twins', 'Big-turbo kit: ~2.4 bar and an enormous top end, soft below 3,500 rpm.', { sound: { turbo: 1.45 } }],
+        ['race', 'Race twins', 'Drag-spec ball-bearing twins on tubular manifolds: ~2.8 bar and a 1,500 PS top end, nothing below 4,000 rpm.', { sound: { turbo: 1.7 } }]],
       turbos: {
         stock: [0.3, 0.75, 1.15, 1.45, 1.6, 1.65, 1.65, 1.65, 1.6, 1.55, 1.5, 1.45, 1.35],
         hybrid: [0.2, 0.55, 0.95, 1.4, 1.75, 1.95, 2.0, 2.0, 1.95, 1.9, 1.85, 1.75, 1.65],
         big: [0.1, 0.25, 0.55, 0.95, 1.4, 1.8, 2.15, 2.35, 2.4, 2.4, 2.35, 2.3, 2.2],
+        race: [0.05, 0.15, 0.35, 0.65, 1.05, 1.5, 1.95, 2.35, 2.65, 2.8, 2.8, 2.75, 2.6],
       },
-      krpm: { stock: 185, hybrid: 170, big: 150 },
-      tq: 652, rod: 950, trans: { name: 'GR6 dual-clutch', cap: 780, uprated: 1000, built: 1300 },
+      krpm: { stock: 185, hybrid: 170, big: 150, race: 135 },
+      tq: 652, rod: 950, trans: { name: 'GR6 dual-clutch', cap: 780, uprated: 1000, built: 1300, fly: true },
+      no: ['diinj'], // port-injected: its injectors are the Injectors part
       // its own wording: air-to-air front-mounts, two intakes and downpipes, port injection, in-tank pumps, recirculating valves, the GR6
       swap: {
         intercooler: { opts: [['stock', 'Stock', 'Front-mounted air-to-air cores: heat-soak a little over repeated pulls.', { ic: 0.8, soak: 10 }],
-          ['big', 'Big front-mount', 'Larger race cores: cooler, steadier intake temps.', { ic: 0.9, soak: 4 }]] },
+          ['big', 'Big front-mount', 'Larger race cores: cooler, steadier intake temps.', { ic: 0.9, soak: 4 }],
+          ['race', 'Race front-mount', 'One huge bar-and-plate core across the nose: the coolest charge, barely heat-soaks.', { ic: 0.94, soak: 2.5 }],
+          ['pro', 'Water-to-air kit', 'Air-to-water chargecoolers, twin pumps and a front heat exchanger, as on the drag cars: the coolest charge, no heat-soak.', { ic: 0.96, soak: 1.8 }]] },
         intake: { opts: [['stock', 'Stock', 'Twin airboxes with paper filters behind the bumper.'],
           ['open', 'Open intakes', 'Cone filters and big-bore inlet pipes: +1.5% flow and a lot more turbo whoosh.', { flow: 0.015, iat: 3, sound: { intake: 1.3, turbo: 1.2 } }]] },
         downpipe: { label: 'Downpipes', opts: [['stock', 'Stock', 'Factory downpipes with the close-coupled cats.'],
           ['sport', 'Sport cats', '100-cell cats: +2.5% flow, faster spool, cooler exhaust and a harder titanium rasp.', { flow: 0.025, egt: -15, spool: -100, sound: { ex: 1.15, turbo: 1.1 } }],
           ['catless', 'Catless', 'Straight downpipes: +4% flow, the coolest exhaust, the loudest. Off-road only - the cat monitor flags P0420.', { flow: 0.04, egt: -25, spool: -150, sound: { ex: 1.3, turbo: 1.2 }, catless: true }]] },
         injection: { label: 'Injectors', opts: [['stock', 'Stock', 'Sequential port injection: ~40% headroom over the stock fuelling.', { fuelCap: 1.4 }],
-          ['port', 'Big injectors', '1,000 cc injectors: ~70% more fuel - what E85 and the big turbos need.', { fuelCap: 1.4, port: 0.7 }]] },
+          ['port', 'Big injectors', '1,000 cc injectors: ~70% more fuel - what E85 and the big turbos need.', { fuelCap: 1.4, port: 0.7 }],
+          ['xl', 'Race injectors', '1,650 cc injectors: ~120% more fuel - the race twins on E85. Unscaled on the stock map they flood it.', { fuelCap: 1.4, port: 1.2 }],
+          ['xxl', 'Twin-injector rails', 'A second injector per cylinder on its own rail: ~180% more fuel - big boost on E85. Needs a big feed pump.', { fuelCap: 1.4, port: 1.8 }]] },
         hpfp: { label: 'Fuel pumps', opts: [['stock', 'Stock', 'Twin in-tank pumps: ~25% headroom over the stock fuelling.', { pump: 1.25 }],
-          ['uprated', 'Uprated', 'High-flow in-tank pumps: hold pressure at ~60% more flow.', { pump: 1.6 }]] },
+          ['uprated', 'Uprated', 'High-flow in-tank pumps: hold pressure at ~60% more flow.', { pump: 1.6 }],
+          ['race', 'Triple pumps', 'Three race pumps in a bucket with a return-style rail: hold pressure at ~2.1x the stock flow.', { pump: 2.1 }]] },
         diverter: { label: 'Bypass valves', opts: [['stock', 'Stock diaphragm', 'Recirculating valves: the boost goes back into the intakes on a lift. Well above stock boost the diaphragms tear and bleed it.'],
           ['piston', 'Uprated piston', 'Billet piston valves: hold any boost, a crisper whoosh, practically never wear.', { dvWear: 0.1, sound: { turbo: 1.05 } }]] },
         trans: { opts: [['stock', 'Stock', 'The GR6\'s factory clutch packs: they slip once the torque passes their rating.'],
-          ['uprated', 'Uprated packs', 'Extra clutch plates, stiffer springs and a TCU flash with more line pressure: holds far more torque.', { trans: 'uprated' }],
-          ['built', 'Built', 'Fully built GR6: billet baskets, more and thicker plates, a race TCU flash. Holds the most, but the stiff packs wear ~50% faster on the road.', { trans: 'built', transWear: 1.5 }]] },
+          ['uprated', 'Uprated packs', 'Extra clutch plates, stiffer springs and a TCU flash with more line pressure: holds far more torque and shifts ~15% quicker.', { trans: 'uprated', shift: 0.85 }],
+          ['built', 'Built', 'Fully built GR6: billet baskets, more and thicker plates, a race TCU flash. Holds the most and shifts ~30% quicker, but the stiff packs wear ~50% faster on the road.', { trans: 'built', transWear: 1.5, shift: 0.7 }],
+          ['race', 'Race GR6', 'Drag-spec GR6: billet input shaft and gears, the most plates the case takes: ~25% more than Built and shifts ~45% quicker, harsh and wears twice as fast on the road.', { trans: 'race', transWear: 2, shift: 0.55 }],
+          ['pro', 'Pro GR6', '2,000 hp-class GR6: billet gearset and shafts, 10-plate clutch packs, a billet basket and an uprated pump: ~60% over Built and shifts ~50% quicker, harsh and wears ~2.5x as fast on the road.', { trans: 'pro', transWear: 2.5, shift: 0.5 }]] },
       },
       presets: [
         { id: 'stock', name: 'Stock', desc: 'Factory NISMO calibration: 600 PS / 652 Nm on ~1.05 bar, the R-mode shift speeds.', needs: {}, make: (e, s) => ({ ...s, shiftSpeed: 1 }) },
@@ -495,6 +579,140 @@
           needs: { downpipe: ['sport', 'catless'], intake: ['open'], chargepipe: ['alu'], diverter: ['piston'], trans: ['uprated', 'built'], fuel: ['102', 'e85'] },
           make: (e, s) => ({ ...s, boost: e.boost.map((b, i) => +Math.min(b + 0.45, e.turbos.stock[i] * 0.92).toFixed(2)), timing: e.axis.map((r) => (r < 3000 ? 0.5 : r < 5000 ? 1.5 : 2.5)),
             afr: add(s.afr, -0.2), tq: 880, rev: 7300, shift: 7200, shiftSpeed: 2 }) },
+      ],
+    },
+    // RS 6 Avant performance (C7, 2016-18): the 4.0 TFSI (CWUC), two twin-scroll turbos inside the V on ~1.25 bar for
+    // 605 PS / 700 Nm (750 on dynamic's overboost). Direct injection, 10.1:1, hot-V cooling: a fair knock margin on RON 98.
+    // The ZF 8HP90's clutch packs are what hold a big tune back
+    TFSI40: {
+      fuel: 'petrol', name: '4.0 TFSI twin-turbo V8', cyl: 8, maxRpm: 7400, tstat: 92,
+      axis: [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000],
+      boost: [0.35, 0.95, 1.2, 1.25, 1.25, 1.25, 1.25, 1.25, 1.2, 1.15, 1.1, 1.05, 1.0],
+      afr: [12.9, 12.6, 12.4, 12.3, 12.2, 12.1, 12.0, 11.9, 11.8, 11.7, 11.6, 11.6, 11.5],
+      margin: [2.0, 1.7, 1.8, 2.1, 2.5, 2.9, 3.2, 3.5, 3.8, 4.0, 4.2, 4.3, 4.3],
+      cylMargin: [0, 0.1, -0.2, -0.4, 0, 0.2, -0.3, -0.5],
+      turboLabel: 'Turbochargers',
+      turboOpts: [['stock', 'Stock twins', 'Two twin-scroll turbos inside the V, one per bank: good for ~1.8 bar before they run out of breath.'],
+        ['hybrid', 'Hybrid twins', 'Bigger billet compressor wheels in the stock housings: ~2.15 bar, a touch more lag.', { sound: { turbo: 1.25 } }],
+        ['big', 'Big twins', 'Big-turbo kit in the V: ~2.55 bar and an enormous top end, soft below 3,000 rpm.', { sound: { turbo: 1.45 } }],
+        ['race', 'Race twins', 'Ball-bearing race twins in the V: ~3 bar and a savage top end, little below 3,500 rpm.', { sound: { turbo: 1.7 } }]],
+      turbos: {
+        stock: [0.45, 1.1, 1.45, 1.65, 1.75, 1.8, 1.8, 1.8, 1.75, 1.7, 1.6, 1.5, 1.4],
+        hybrid: [0.35, 0.85, 1.3, 1.7, 1.95, 2.1, 2.15, 2.15, 2.1, 2.05, 1.95, 1.85, 1.75],
+        big: [0.15, 0.4, 0.85, 1.35, 1.8, 2.2, 2.45, 2.55, 2.55, 2.5, 2.45, 2.35, 2.2],
+        race: [0.1, 0.25, 0.55, 0.95, 1.45, 1.95, 2.4, 2.75, 2.95, 3.0, 2.95, 2.85, 2.7],
+      },
+      krpm: { stock: 190, hybrid: 175, big: 155, race: 140 },
+      tq: 700, rod: 1000, trans: { name: 'ZF 8HP90', cap: 900, uprated: 1100, built: 1300 },
+      presets: [
+        { id: 'stock', name: 'Stock', desc: 'Factory performance calibration: 605 PS / 700 Nm (750 on overboost) on ~1.25 bar.', needs: {}, make: (e, s) => s },
+        { id: 'stage1', name: 'Stage 1', desc: 'ECU + TCU flash on RON 98: ~1.55 bar, more timing, quicker shifts. ~710 PS / 820 Nm on the stock turbos and packs.', needs: { fuel: ['98', '102', 'e85'] },
+          make: (e, s) => ({ ...s, boost: e.boost.map((b, i) => +Math.min(b + 0.3, e.turbos.stock[i] * 0.88).toFixed(2)), timing: e.axis.map((r) => (r < 3000 ? 0.5 : 1.5)),
+            afr: add(s.afr, -0.1), tq: 880, shiftSpeed: 1 }) },
+        { id: 'stage2', name: 'Stage 2', desc: 'Downpipes, intakes, alloy charge pipes and uprated packs, ~1.7 bar on RON 102: ~780 PS / 980 Nm.',
+          needs: { downpipe: ['sport', 'catless'], intake: ['open'], chargepipe: ['alu'], diverter: ['piston'], trans: ['uprated', 'built'], fuel: ['102', 'e85'] },
+          make: (e, s) => ({ ...s, boost: e.boost.map((b, i) => +Math.min(b + 0.5, e.turbos.stock[i] * 0.95).toFixed(2)), timing: e.axis.map((r) => (r < 3000 ? 0.5 : r < 5000 ? 1.5 : 2.5)),
+            afr: add(s.afr, -0.2), tq: 980, shiftSpeed: 2 }) },
+      ],
+    },
+    // 550d (the F10 page): its own quad-turbo build of the 3.0 diesel, two high- and two low-pressure turbos on ~3.2 bar for
+    // 550 hp / 1,300 Nm - the page's Map 4. Its old Maps 1-6 are the presets: 1-3 the softer calibrations, 5 and 6 the
+    // big-turbo builds those maps stood for (850 hp / 1,800 Nm, 1,300 hp / 2,400 Nm), which need the hardware to take it
+    B57Q: {
+      fuel: 'diesel', name: 'B57 3.0 quad-turbo diesel I6 (built)', cyl: 6, maxRpm: 7000, pcpLimit: 270, tstat: 88,
+      axis: [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500],
+      boost: [0.6, 1.6, 2.6, 3.1, 3.2, 3.2, 3.15, 3.05, 2.9, 2.75, 2.6, 2.45],
+      rail: [1000, 1600, 2100, 2400, 2500, 2500, 2500, 2500, 2450, 2400, 2350, 2300],
+      lambda: [1.6, 1.55, 1.55, 1.6, 1.65, 1.7, 1.7, 1.72, 1.75, 1.75, 1.78, 1.8], // lean at full load: room for the big maps' fuel
+      turboLabel: 'Turbochargers',
+      turboOpts: [['stock', 'Stock quad-turbo', 'Two high-pressure and two low-pressure turbos: boost from just off idle, ~3.6 bar.'],
+        ['big', 'Big turbos', 'A much larger low-pressure pair: ~4.4 bar and a huge top end, later to wake up.', { sound: { turbo: 1.3 } }],
+        ['race', 'Race compounds', 'Race compound pair on a tubular manifold: ~5 bar, enormous from 3,500 rpm, little before it.', { sound: { turbo: 1.55 } }]],
+      turbos: {
+        stock: [0.8, 1.9, 2.9, 3.4, 3.6, 3.6, 3.55, 3.45, 3.3, 3.15, 3.0, 2.85],
+        big: [0.4, 1.0, 2.0, 3.0, 3.8, 4.2, 4.4, 4.4, 4.3, 4.1, 3.9, 3.7],
+        race: [0.2, 0.6, 1.4, 2.4, 3.5, 4.3, 4.8, 5.0, 5.0, 4.8, 4.6, 4.3],
+      },
+      krpm: { stock: 240, big: 185, race: 160 },
+      curveMax: { iq: 280, rail: 3000 },
+      swap: { // the race build's triple-pass core comes with auxiliary radiators: Map 6 flat out at vmax holds ~100 °C, as the page's old map did
+        radiator: { opts: [['stock', 'Stock', 'Sized for the stock engine with a little margin.'],
+          ['alu', 'Aluminium', 'Thicker all-alloy core: ~25% more cooling.', { radUA: 1.25 }],
+          ['race', 'Race', 'Big twin-pass race radiator: ~50% more cooling.', { radUA: 1.5 }],
+          ['triple', 'Triple-pass', 'Triple-pass race core and two auxiliary radiators in the wheel arches: twice the cooling.', { radUA: 2 }],
+          ['aux', 'Endurance', 'Triple-pass core, four auxiliary radiators and a second electric pump: ~2.4x the cooling.', { radUA: 2.4 }]] },
+      },
+      tq: 1300, rod: 1650, trans: { name: 'ZF 8HP90', cap: 1450, uprated: 1900, built: 2500 },
+      presets: [
+        { id: 'stock', name: 'Map 4', desc: 'The build as delivered: 550 hp / 1,300 Nm on ~3.2 bar.', needs: {}, make: (e, s) => s },
+        ...[[1, 0.4, 0.35, 520, '220 hp / 520 Nm, the gentlest'], [2, 0.65, 0.55, 845, '358 hp / 845 Nm'], [3, 0.85, 0.75, 1105, '468 hp / 1,105 Nm']].map(([n, iq, b, tq, what]) => (
+          { id: 'map' + n, name: 'Map ' + n, desc: `The softer calibration: ${what} on less boost and fuel.`, needs: {},
+            make: (e, s) => ({ ...s, iq: e.axis.map(() => iq * 100), boost: e.boost.map((v) => +(v * b).toFixed(2)), tq }) })),
+        { id: 'map5', name: 'Map 5', desc: 'The big-turbo build: ~3.9 bar, forged internals, race injectors and pumps, uprated packs. ~850 hp / 1,800 Nm.',
+          needs: { turbo: ['big'], internals: ['forged'], gasket: ['mls'], trans: ['uprated'], intercooler: ['big'], chargepipe: ['alu'], radiator: ['race'], injectors: ['race'], pump: ['race'], lpfp: ['uprated'] },
+          make: (e, s) => ({ ...s, iq: e.axis.map((r) => (r < 2000 ? 130 : 156)), boost: e.turbos.big.map((c) => +(c * 0.9).toFixed(2)),
+            soi: e.axis.map((r) => (r < 2000 ? 1 : 2)), rail: s.rail.map((r) => Math.min(2800, r + 200)), smoke: 1.06, tq: 1800, egr: false }) },
+        { id: 'map6', name: 'Map 6', desc: 'The race build: race compounds at ~4.5 bar, a race block, 150% injectors, billet pump, a built box. ~1,300 hp / 2,400 Nm.',
+          needs: { turbo: ['race'], internals: ['race'], gasket: ['oring'], trans: ['built'], intercooler: ['race'], chargepipe: ['alu'], radiator: ['triple'], injectors: ['xl'], pump: ['billet'],
+            lpfp: ['bucket'], downpipe: ['delete'], egr: ['blank'] },
+          make: (e, s) => ({ ...s, iq: e.axis.map((r) => (r < 2000 ? 160 : 238)), boost: e.turbos.race.map((c) => +(c * 0.9).toFixed(2)),
+            soi: e.axis.map((r) => (r < 2000 ? 1 : 2)), rail: s.rail.map((r) => Math.min(2950, r + 400)), smoke: 1.04, tq: 2400, egr: false, dpf: false }) },
+      ],
+    },
+    // Proton Iriz 1.6: Proton's 1.6 VVT four (a Campro descendant) - port injection, 10.5:1, 110 hp / 150 Nm and a 6,800
+    // cut through a 5-speed manual. NA: the boost map does nothing until a turbo conversion goes on (the factory 1.6 CFE's
+    // turbo, then a bigger one). The page's old Stage 2 (215 hp / 250 Nm, a 9,400 cut) is the big-turbo, race-block build
+    VVT16: {
+      fuel: 'petrol', name: '1.6 VVT NA I4', cyl: 4, maxRpm: 7800, tstat: 92, na: true,
+      axis: [1000, 2000, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000],
+      boost: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      afr: [13.2, 13.0, 12.9, 12.8, 12.8, 12.7, 12.7, 12.6, 12.6, 12.6, 12.5, 12.5, 12.5, 12.5, 12.5],
+      margin: [1.5, 1.2, 1.0, 0.9, 0.9, 1.0, 1.2, 1.5, 1.8, 2.0, 2.2, 2.4, 2.5, 2.6, 2.6], // written for RON 95, Malaysia's regular
+      cylMargin: [0, -0.2, -0.3, 0.1],
+      turboLabel: 'Forced induction',
+      turboOpts: [['stock', 'None (NA)', 'Naturally aspirated: no turbo, so the boost map does nothing.', { sound: { turbo: 0 } }],
+        ['cfe', 'CFE turbo', 'The factory 1.6 CFE\'s turbo on a new manifold: ~0.9 bar from 3,500 rpm. Needs an intercooler, bigger injectors, a pump and a stronger clutch.'],
+        ['big', 'Big turbo', 'A bigger ball-bearing turbo: ~1.4 bar from 5,500 rpm, little below 3,500.', { sound: { turbo: 1.35 } }]],
+      turbos: {
+        stock: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        cfe: [0.1, 0.35, 0.7, 0.85, 0.9, 0.9, 0.9, 0.88, 0.85, 0.82, 0.78, 0.74, 0.7, 0.66, 0.62],
+        big: [0.02, 0.15, 0.4, 0.6, 0.85, 1.1, 1.3, 1.4, 1.42, 1.4, 1.35, 1.3, 1.22, 1.15, 1.08],
+      },
+      krpm: { stock: 0, cfe: 210, big: 175 },
+      tq: 150, rod: 260, trans: { name: '5-speed manual', cap: 200, uprated: 270, built: 340, fly: true },
+      no: ['exhmani', 'diinj'], // a turbo kit brings its manifold; port injection only
+      swap: {
+        intercooler: { opts: [['stock', 'None', 'Nothing to cool on the NA engine. With a turbo the charge goes in hot.', { ic: 0, soak: 0 }],
+          ['kit', 'Kit core', 'Front-mount air-to-air core: what a turbo build needs.', { ic: 0.78, soak: 8 }],
+          ['big', 'Big core', 'Larger front-mount: cooler, steadier intake temps.', { ic: 0.86, soak: 4 }],
+          ['race', 'Race core', 'Bar-and-plate race core as big as the bumper takes: the coolest charge.', { ic: 0.91, soak: 2.5 }],
+          ['pro', 'Water-to-air core', 'Air-to-water core with its own pump and front heat exchanger: the coolest charge, no heat-soak.', { ic: 0.94, soak: 2 }]] },
+        chargepipe: { opts: [['stock', 'Kit pipes', 'The turbo kit\'s silicone pipes (nothing on the NA engine): hard pulls on high boost fatigue them until one splits.'],
+          ['alu', 'Aluminium', 'Aluminium pipes and silicone couplers: hold any boost and barely age.', { cpWear: 0.08 }]] },
+        diverter: { label: 'Blow-off valve', opts: [['stock', 'Kit diaphragm', 'The turbo kit\'s blow-off valve (nothing on the NA engine): high boost tears it and it bleeds boost.'],
+          ['piston', 'Uprated piston', 'Billet piston valve: holds any boost, a louder whoosh, practically never wears.', { dvWear: 0.1, sound: { turbo: 1.05 } }]] },
+        injection: { label: 'Injectors', opts: [['stock', 'Stock', 'Sequential port injection: ~40% headroom over the stock fuelling.', { fuelCap: 1.4 }],
+          ['port', 'Big injectors', 'Higher-flow injectors: ~70% more fuel - what a turbo needs.', { fuelCap: 1.4, port: 0.7 }],
+          ['xl', 'Race injectors', '750 cc race injectors: ~120% more fuel - the big turbo on E85. Unscaled on the stock map they flood it.', { fuelCap: 1.4, port: 1.2 }],
+          ['xxl', 'Twin-injector rails', 'A second injector per cylinder on its own rail: ~180% more fuel - big boost on E85. Needs a big feed pump.', { fuelCap: 1.4, port: 1.8 }]] },
+        hpfp: { label: 'Fuel pump', opts: [['stock', 'Stock', 'In-tank pump at 3.5 bar: ~25% headroom over the stock fuelling.', { pump: 1.25 }],
+          ['uprated', 'Uprated', 'High-flow in-tank pump: holds pressure at ~60% more flow.', { pump: 1.6 }],
+          ['race', 'Race pump', 'Race pump on a surge tank: holds pressure at ~2.1x the stock flow.', { pump: 2.1 }]] },
+        trans: { label: 'Clutch & gearbox', opts: [['stock', 'Stock', 'Single-plate clutch on the 5-speed: slips once the torque passes its rating.'],
+          ['uprated', 'Uprated clutch', 'Heavier pressure plate and an organic-sintered disc: holds far more torque and shifts ~15% quicker.', { trans: 'uprated', shift: 0.85 }],
+          ['built', 'Built', 'Paddle clutch and shot-peened gears: holds the most and shifts ~30% quicker, but it grabs and wears ~50% faster on the road.', { trans: 'built', transWear: 1.5, shift: 0.7 }],
+          ['race', 'Race', 'Twin-plate race clutch and a dog box: ~25% more than Built and shifts ~45% quicker, but it chatters and wears twice as fast on the road.', { trans: 'race', transWear: 2, shift: 0.55 }],
+          ['pro', 'Sequential', 'Sequential straight-cut dog box with a cerametallic twin-plate clutch: ~60% over Built and shifts ~50% quicker, but it whines, chatters and wears ~2.5x as fast on the road.', { trans: 'pro', transWear: 2.5, shift: 0.5 }]] },
+      },
+      presets: [
+        { id: 'stock', name: 'Stage 1', desc: 'Factory calibration: 110 hp / 150 Nm, fuel cut at 6,800.', needs: {}, make: (e, s) => s },
+        { id: 'stage2', name: 'Stage 2', desc: 'The big-turbo build revved to 9,400: ~0.95 bar, a race block on titanium springs, race cams and a ported head on RON 102, a 5,500 rpm 2-step. ~215 hp / 250 Nm.',
+          needs: { turbo: ['big'], internals: ['race'], springs: ['titanium'], cams: ['race'], head: ['ported', 'big'], gasket: ['mls', 'oring'], intercooler: ['kit'], chargepipe: ['alu'],
+            diverter: ['piston'], injection: ['port'], hpfp: ['uprated'], lpfp: ['uprated'], trans: ['uprated'], radiator: ['triple'], fuel: ['102', 'e85'] },
+          // 250 Nm to 5,500, then less boost through the mid-range and more again up top (short of the turbo's overspeed):
+          // the page's old curve to 7,500 (215 hp), ~200 hp held from there to the cut
+          make: (e, s) => ({ ...s, boost: [0.02, 0.12, 0.32, 0.48, 0.68, 0.88, 0.95, 0.83, 0.74, 0.79, 0.86, 0.95, 0.97, 1.07, 0.96], timing: e.axis.map((r) => (r < 5000 ? 0 : -1)),
+            afr: e.axis.map((r) => (r < 3000 ? 12.8 : 11.9)), tq: 250, rev: 9400, shift: 9200, launch: 5500 }) },
       ],
     },
   };
@@ -525,7 +743,9 @@
     { k: 'radiator', group: 'Cooling', label: 'Radiator', opts: [
       opt('stock', 'Stock', 'Sized for the stock engine with a little margin.'),
       opt('alu', 'Aluminium', 'Thicker all-alloy core: ~25% more cooling.', { radUA: 1.25 }),
-      opt('race', 'Race', 'Big twin-pass race radiator: ~50% more cooling.', { radUA: 1.5 })] },
+      opt('race', 'Race', 'Big twin-pass race radiator: ~50% more cooling.', { radUA: 1.5 }),
+      opt('triple', 'Triple-pass', 'Triple-pass race core, as thick as the nose takes: ~75% more cooling.', { radUA: 1.75 }),
+      opt('aux', 'Triple + aux', 'Triple-pass core plus two auxiliary radiators in the bumper corners and a bigger header tank: ~2.1x the cooling.', { radUA: 2.1 })] },
     { k: 'waterpump', group: 'Cooling', label: 'Water pump', opts: [
       opt('stock', 'Stock', 'Electric coolant pump.'),
       opt('hf', 'High flow', '~30% more flow through the engine and radiator.', { wpFlow: 1.3 })] },
@@ -534,7 +754,9 @@
       opt('low', fuel === 'petrol' ? '82 °C' : '80 °C', 'Opens ~10 °C earlier: cooler running, a little more knock margin, slower warm-up.', { tstat: fuel === 'petrol' ? -10 : -8 })] },
     { k: 'oilcooler', group: 'Cooling', label: 'Oil cooler', opts: [
       opt('stock', 'Stock', 'Oil-to-coolant heat exchanger.'),
-      opt('big', 'Big oil cooler', 'Extra air-cooled oil cooler: much cooler oil on long hard runs.', { oilCool: 1.9 })] },
+      opt('big', 'Big oil cooler', 'Extra air-cooled oil cooler: much cooler oil on long hard runs.', { oilCool: 1.9 }),
+      opt('race', 'Race cooler', 'Thermostatic race cooler in the airstream plus a bigger heat exchanger: the oil barely climbs on track.', { oilCool: 2.6 }),
+      opt('dual', 'Dual race coolers', 'Two thermostatic race coolers, one in each front corner, plus the bigger heat exchanger: holds the oil on an endurance stint.', { oilCool: 3.4 })] },
   ];
   // the rest of the engine's bolt-ons: each one wears in the Servicing tab, and the upgrade lasts longer and takes more
   const ENGINE_MORE = (fuel) => [
@@ -549,7 +771,21 @@
       carry: () => (['hpfp', 'pump', 'injection', 'injectors'].some((k) => P.some((x) => x.k === k) && part(k) !== 'stock') || part('fuel') === 'e85' ? 'uprated' : null), opts: [
       opt('stock', 'Stock', fuel === 'petrol' ? 'In-tank pump feeding the HP pump: ~40% headroom. E85 and big power outrun it - the engine leans out.'
         : 'Electric lift pump feeding the HP pump: ~60% headroom. A big fuelling map outruns it.', { lp: fuel === 'petrol' ? 1.4 : 1.6 }),
-      opt('uprated', 'Uprated', 'Higher-flow pump and heavier wiring: feeds the HP side at well over twice the stock flow, and wears slower.', { lp: 2.4, lpWear: 0.7 })] },
+      opt('uprated', 'Uprated', 'Higher-flow pump and heavier wiring: feeds the HP side at well over twice the stock flow, and wears slower.', { lp: 2.4, lpWear: 0.7 }),
+      opt('bucket', 'Brushless bucket', 'Twin brushless pumps in a baffled bucket on their own controller: ~3.4x the stock flow, never starves in a corner, wears slowest.', { lp: 3.4, lpWear: 0.5 }),
+      opt('triple', 'Triple + surge tank', 'Three brushless pumps in the tank feeding an external surge tank and a -8 feed: ~4.6x the stock flow - big turbos on E85.', { lp: 4.6, lpWear: 0.45 })] },
+    // blow-by: worn rings let combustion gas into the crankcase and oil up past them - blue smoke, oil used
+    { k: 'rings', group: 'Engine', label: 'Piston rings', opts: [
+      opt('stock', 'Stock', 'Factory ring pack. Miles, heat, detonation and over-revving wear it: past ~70% the engine burns oil - blue smoke on the overrun, cold and under load.'),
+      opt('hd', 'Gapless rings', 'Gapless steel top rings and a low-tension oil ring: seal far better as they wear (~45% the wear rate), less blow-by, fewer pre-ignition events.', { ringWear: 0.45, lspi: 0.85 })] },
+    { k: 'pcv', group: 'Engine', label: fuel === 'petrol' ? 'PCV valve' : 'Crankcase vent valve', opts: [
+      opt('stock', 'Stock', fuel === 'petrol' ? 'Diaphragm valve in the cam cover. Miles, boost and blow-by tear it: a failed one pulls oil into the intake on the overrun and blows it in under boost - blue smoke.'
+        : 'Crankcase vent valve and oil separator. Miles, boost and blow-by wear it: a failed one feeds oil mist into the intake - blue smoke and an oily intercooler.'),
+      opt('uprated', 'Uprated', 'Stiffer diaphragm and a one-way check under boost: lasts about three times as long.', { pcvWear: 0.35 })] },
+    { k: 'pulley', group: 'Engine', label: 'Crank pulley', opts: [
+      opt('stock', 'Stock', 'Factory pulley with a rubber torsional damper.'),
+      opt('fluid', 'Fluid damper', 'Viscous race damper: kills crank harmonics up top - +150 rpm before the bearings suffer.', { rev: 150 }),
+      opt('light', 'Lightweight', 'Underdrive alloy pulley with no damper: ~1% more at the wheels, but crank harmonics wear the bearings near the limiter.', { tqAdd: 0.01, harm: 1 })] },
     { k: 'hoses', group: 'Cooling', label: 'Coolant hoses', opts: [
       opt('stock', 'Stock rubber', 'Factory rubber hoses: heat cycles perish them until they weep coolant - and one can burst.'),
       opt('silicone', 'Silicone', 'Reinforced silicone hoses: shrug off heat, last about four times as long.', { hoseWear: 0.25 })] },
@@ -560,13 +796,45 @@
   const PETROL_MORE = [
     { k: 'coils', group: 'Ignition', label: 'Ignition coils', opts: [
       opt('stock', 'Stock', 'Factory pencil coils. They weaken with miles (faster on worn plugs) and misfire under boost.'),
-      opt('ho', 'High-output', 'Stronger spark: half the boost misfires of a tired set, and they last twice as long.', { coilWear: 0.5, coilSpark: 0.5 })] },
+      opt('ho', 'High-output', 'Stronger spark: half the boost misfires of a tired set, and they last twice as long.', { coilWear: 0.5, coilSpark: 0.5 }),
+      opt('race', 'Race coils', 'Race coil packs with far more energy: a quarter of the misfires on high boost, and they barely wear.', { coilWear: 0.35, coilSpark: 0.25 })] },
     { k: 'diverter', group: 'Turbo & intake', label: 'Diverter valve', carry: (sv) => (part('turbo') !== 'stock' || overBoost(sv) > 0.4 ? 'piston' : null), opts: [
       opt('stock', 'Stock diaphragm', 'Factory diaphragm valve: vents the boost on a lift. Well above stock boost the diaphragm tears and it bleeds boost.'),
       opt('piston', 'Uprated piston', 'Billet piston valve: holds any boost, a crisper whoosh, practically never wears.', { dvWear: 0.1, sound: { turbo: 1.05 } })] },
+    // trap: how much of the crankcase's oil mist still reaches the intake (a failed PCV's blue smoke, the oily intercooler)
     { k: 'catchcan', group: 'Engine', label: 'Oil catch can', opts: [
       opt('none', 'None', 'Crankcase vapour goes straight back into the intake: oil mist bakes onto the direct-injected intake valves.'),
-      opt('can', 'Catch can', 'Traps the oil mist first: the intake valves carbon up at a third of the rate, and fewer pre-ignition events.', { carbon: 0.35, lspi: 0.6 })] },
+      opt('can', 'Catch can', 'Traps the oil mist first: the intake valves carbon up at a third of the rate, fewer pre-ignition events, and a failed PCV smokes less.', { carbon: 0.35, lspi: 0.6, trap: 0.55 }),
+      opt('dual', 'Dual cans', 'Baffled cans on both the PCV and the boost-side vent: carbon at a fifth of the rate, half the pre-ignition events, little oil mist left to burn.', { carbon: 0.2, lspi: 0.45, trap: 0.3 })] },
+    // water-methanol: progressive with boost, so it does nothing off boost (or on an NA engine without a kit)
+    { k: 'meth', group: 'Fuel', label: 'Water-methanol', opts: [
+      opt('none', 'None', 'No injection: the charge is as cool as the intercooler gets it.'),
+      opt('kit', 'Meth kit', '50/50 water-meth sprayed after the intercooler, rising with boost: ~2° more knock margin, ~15 °C cooler charge and cooler exhaust on full boost.', { meth: 1 }),
+      opt('dual', 'Dual nozzle', 'Two nozzles and a bigger pump: ~3° and ~22 °C on full boost - what a race-fuel map leans on.', { meth: 1.5 })] },
+    // E85 without a sensor: the ECU fuels on its trims, which can't find the ~30% more it needs at full load - and it can't time for it
+    { k: 'flex', group: 'Fuel', label: 'Flex-fuel sensor', carry: () => (part('fuel') === 'e85' ? 'kit' : null), opts: [
+      opt('none', 'None', 'No ethanol sensor: on E85 the ECU only gets there on its fuel trims - ~6% lean at full load.'),
+      opt('kit', 'Flex-fuel kit', 'Ethanol-content sensor in the feed line: the ECU fuels and times for whatever blend is in the tank - on E85 up to ~5° more timing, inside the knock margin.', { flex: true })] },
+    { k: 'wastegate', group: 'Turbo & intake', label: 'Boost control', opts: [
+      opt('stock', 'Stock', 'Factory wastegate on the ECU\'s own control: its spring lets the boost taper a little past peak torque.'),
+      opt('ebc', 'Boost controller', 'Electronic boost controller: the gate stays shut until the target - boost ~150 rpm sooner.', { spool: -150 }),
+      opt('gate', 'EBC + wastegate', 'Controller plus an uprated wastegate actuator: no creep and no taper - the turbo holds ~6% more up top if the map asks.', { spool: -150, taper: 0.06, sound: { turbo: 1.05 } })] },
+    { k: 'throttle', group: 'Turbo & intake', label: 'Throttle & manifold', opts: [
+      opt('stock', 'Stock', 'Factory throttle and intake manifold.'),
+      opt('big', 'Big throttle', 'Bigger-bore throttle: +1% flow up top and a sharper pedal.', { flow: 0.01 }),
+      opt('ported', 'Ported manifold', 'Ported intake manifold and a big throttle: +2.5% flow up top and a deeper induction note.', { flow: 0.025, sound: { intake: 1.12 } })] },
+    { k: 'exhmani', group: 'Exhaust', label: 'Turbo manifold', opts: [
+      opt('stock', 'Stock', 'Factory cast manifold: compact, quick to spool.'),
+      opt('tubular', 'Tubular', 'Equal-length tubular manifold: +2% flow up top and cooler exhaust, but its volume spools ~100 rpm later.', { flow: 0.02, egt: -15, spool: 100, sound: { turbo: 1.1, ex: 1.05 } })] },
+    { k: 'head', group: 'Engine', label: 'Cylinder head', opts: [
+      opt('stock', 'Stock', 'Factory cast ports.'),
+      opt('ported', 'Ported', 'CNC-ported and a multi-angle valve job: +2.5% flow up top.', { flow: 0.025 }),
+      opt('big', 'Big valves', 'Ported with oversize valves: +4.5% flow up top - the heavier valves float ~200 rpm sooner unless the springs are uprated.', { flow: 0.045, float: 200, sound: { intake: 1.05, ex: 1.05 } })] },
+    // injector scaling lives in the fuel map: on a still-stock map bigger injectors over-fuel (car-tune's injScale)
+    { k: 'diinj', group: 'Fuel', label: 'DI injectors', opts: [
+      opt('stock', 'Stock', 'Factory direct injectors.'),
+      opt('ext', 'High-flow', 'Higher-flow direct injectors: ~30% more fuel through the DI side. Unscaled on the stock map they run it rich.', { diMul: 1.3 }),
+      opt('race', 'Race DI', 'Race direct injectors: ~60% more fuel through the DI side - past ~2.1x the stock flow they need twin HP pumps. Unscaled on the stock map they run it rich.', { diMul: 1.6 })] },
   ];
   const DIESEL_MORE = [
     { k: 'glow', group: 'Ignition', label: 'Glow plugs', opts: [
@@ -578,6 +846,13 @@
     { k: 'swirl', group: 'Engine', label: 'Swirl flaps', opts: [
       opt('stock', 'Stock', 'Intake swirl flaps for a clean burn low down. Their spindles wear loose with miles and soot - a flap breaking off goes through a cylinder.'),
       opt('blank', 'Blanked', 'Flaps out, ports blanked: nothing to break off, a touch less torque below 2,000 rpm.', { swirlBlank: true })] },
+    { k: 'catchcan', group: 'Engine', label: 'Oil catch can', opts: [
+      opt('none', 'None', 'Crankcase vapour goes back into the intake: oil mist coats the intercooler and gums up with the EGR soot.'),
+      opt('can', 'Catch can', 'Traps the oil mist first: the intercooler fouls at half the rate and a failed vent valve smokes less.', { trap: 0.5 })] },
+    { k: 'meth', group: 'Fuel', label: 'Water-methanol', opts: [
+      opt('none', 'None', 'No injection.'),
+      opt('kit', 'Meth kit', 'Water-meth into the intake, rising with boost: ~12 °C cooler charge and ~50 °C cooler exhaust on full boost - EGT headroom for more fuel.', { meth: 1 }),
+      opt('dual', 'Dual nozzle', 'Two nozzles and a bigger pump: ~18 °C and ~75 °C on full boost.', { meth: 1.5 })] },
   ];
   const BRAKES = [
     { k: 'pads', group: 'Brakes', label: 'Brake pads', opts: [
@@ -598,8 +873,24 @@
   const COMMON = () => [
     { k: 'trans', group: 'Drivetrain', label: 'Transmission', opts: [
       opt('stock', 'Stock', 'Factory clutch packs. Slips once the torque passes their rating.'),
-      opt('uprated', 'Uprated packs', 'Extra clutch plates and a TCU flash with more line pressure: holds far more torque.', { trans: 'uprated' }),
-      opt('built', 'Built', 'Fully built box: more and thicker plates, billet drums, a race TCU flash. Holds the most torque, but the stiff packs wear ~50% faster on the road.', { trans: 'built', transWear: 1.5 })] },
+      opt('uprated', 'Uprated packs', 'Extra clutch plates and a TCU flash with more line pressure: holds far more torque and shifts ~15% quicker.', { trans: 'uprated', shift: 0.85 }),
+      opt('built', 'Built', 'Fully built box: more and thicker plates, billet drums, a race TCU flash. Holds the most torque and shifts ~30% quicker, but the stiff packs wear ~50% faster on the road.', { trans: 'built', transWear: 1.5, shift: 0.7 }),
+      opt('race', 'Race-built', 'Competition build: billet shafts and drums, the most plates the case takes: ~25% more than Built and shifts ~45% quicker, harsh and wears twice as fast on the road.', { trans: 'race', transWear: 2, shift: 0.55 }),
+      opt('pro', 'Pro-built', E.trans.fly
+        ? 'Drag-spec dual-clutch: billet clutch baskets packed with sintered plates, billet input shafts and a high-volume pump: ~60% over Built - the 1,000+ hp box - and shifts ~50% quicker, but it launches violently and wears ~2.5x as fast on the road.'
+        : E.fuel === 'diesel'
+          ? 'Pro build for diesel torque: billet input shaft, steel planetaries, the widest clutch packs and a billet low-stall lock-up converter: ~60% over Built and shifts ~50% quicker, firm, wears ~2.5x as fast on the road.'
+          : 'Pro build: billet input shaft and drums, a steel sun gear, the widest clutch packs and a billet converter: ~60% over Built - the 1,000+ hp box - and shifts ~50% quicker, firm, wears ~2.5x as fast on the road.', { trans: 'pro', transWear: 2.5, shift: 0.5 })] },
+    // cooler oil in the box: the built and race boxes' extra wear, offset (a clutch box cools its gear oil, a converter its ATF)
+    ((f) => ({ k: 'transcooler', group: 'Drivetrain', label: 'Gearbox cooler', opts: [
+      opt('stock', 'Stock', `Factory ${f} cooling: fine on the road, hot after hard laps.`),
+      opt('cooler', 'Cooler', `An add-on ${f} cooler with a thermostat: the box wears ~25% slower.`, { transWear: 0.75 }),
+      opt('race', 'Race', `A big stacked-plate ${f} cooler with its own fan: the box wears ~40% slower.`, { transWear: 0.6 }),
+      opt('dual', 'Dual race', `Two stacked-plate ${f} coolers with fans and a thermostatic bypass: the box wears ~50% slower.`, { transWear: 0.5 })] }))(E.trans.fly ? 'gearbox oil' : 'ATF'),
+    // a clutch's flywheel (not a converter's flexplate): less to spin up, so more of the torque reaches the road in the low gears
+    ...(E.trans.fly ? [{ k: 'flywheel', group: 'Drivetrain', label: 'Flywheel', opts: [
+      opt('stock', 'Stock', 'Factory dual-mass flywheel: smooth and heavy.'),
+      opt('light', 'Lightweight', 'Single-mass chromoly flywheel: ~3.5% harder acceleration in 1st, fading through the gears - and quicker revs. Chatters at idle, the clutch wears ~10% faster.', { fly: 0.035, transWear: 1.1 })] }] : []),
     { k: 'diff', group: 'Drivetrain', label: 'Final drive', opts: [[1, 'Stock ratio: relaxed cruising, highest top speed per rpm.'],
       [3.077 / 2.813, 'Shorter: ~9% more pull in every gear, top speed per gear drops.'], [3.385 / 2.813, 'Much shorter: strongest acceleration, busy at motorway speed.']]
       .map(([k, d]) => { const fd = +(cfg.finalDrive * k).toFixed(3); return opt(String(fd), fd.toFixed(2), d, { fd }); }) },
@@ -611,7 +902,9 @@
     opt('forged', 'Forged', 'Forged pistons and rods, head studs: a third of the damage from knock and pressure, rods good for 50% more torque, +400 rpm.',
       { dmg: 0.3, rod: 1.5, rev: 400, pcp: 25, margin: 0.4 }),
     opt('built', 'Fully built', 'Forged plus a billet crank, race bearings and lower compression: barely notices abuse, twice the rod rating, +800 rpm.',
-      { dmg: 0.12, rod: 2, rev: 800, pcp: 45, margin: 1 })] });
+      { dmg: 0.12, rod: 2, rev: 800, pcp: 45, margin: 1 }),
+    opt('race', 'Race block', 'Sleeved closed-deck block, billet crank and rods, race bearings and pistons: shrugs off nearly anything - 2.6x the rod rating, +1,100 rpm.',
+      { dmg: 0.06, rod: 2.6, rev: 1100, pcp: 70, margin: 1.4 })] });
   // an engine can describe its own turbos (twin / quad): [id, label, desc, fx] per E.turbos key
   const turboOpts = (dflt) => (E.turboOpts ? E.turboOpts.map((o) => opt(...o)) : dflt);
   const PARTS = {
@@ -620,10 +913,13 @@
       { k: 'turbo', group: 'Turbo & intake', label: E.turboLabel || 'Turbocharger', opts: turboOpts([
         opt('stock', 'Stock', 'Twin-scroll single turbo. Early spool, runs out of breath past 6,000 rpm.'),
         opt('hybrid', 'Hybrid', 'Bigger compressor wheel in the stock housing: ~1.9 bar up top, a little more lag.', { sound: { turbo: 1.25 } }),
-        opt('big', 'Big single', 'Big-turbo kit: 2.4 bar and a huge top end, very little below 3,000 rpm.', { sound: { turbo: 1.45 } })]) },
+        opt('big', 'Big single', 'Big-turbo kit: 2.4 bar and a huge top end, very little below 3,000 rpm.', { sound: { turbo: 1.45 } }),
+        opt('race', 'Race single', 'Ball-bearing race turbo on a top-mount manifold: ~2.9 bar and a savage top end, almost nothing below 3,500 rpm.', { sound: { turbo: 1.7 } })]) },
       { k: 'intercooler', group: 'Turbo & intake', label: 'Intercooler', opts: [
         opt('stock', 'Stock', 'Water-to-air, efficient but heat-soaks over repeated pulls.', { ic: 0.85, soak: 15 }),
-        opt('big', 'Big core', 'Larger core and heat exchanger: cooler, steadier intake temps.', { ic: 0.92, soak: 6 })] },
+        opt('big', 'Big core', 'Larger core and heat exchanger: cooler, steadier intake temps.', { ic: 0.92, soak: 6 }),
+        opt('race', 'Race core', 'Competition core, a bigger heat exchanger and pump: the coolest, steadiest charge of all.', { ic: 0.95, soak: 3 }),
+        opt('pro', 'Twin-core race', 'Two race cores, a stacked front heat exchanger and twin pumps: barely over ambient, even pull after pull.', { ic: 0.965, soak: 2 })] },
       { k: 'intake', group: 'Turbo & intake', label: 'Intake', opts: [
         opt('stock', 'Stock', 'Airbox with a paper filter.'),
         opt('open', 'Open cone', 'Free-flowing cone filter: +1.5% flow up top, louder turbo, a few °C warmer air.', { flow: 0.015, iat: 3, sound: { intake: 1.3, turbo: 1.15 } })] },
@@ -633,28 +929,36 @@
         opt('catless', 'Catless', 'No catalyst: +4% flow, coolest exhaust, loudest. Off-road only - the cat monitor flags P0420.', { flow: 0.04, egt: -25, spool: -150, sound: { ex: 1.3, turbo: 1.2 }, catless: true })] },
       { k: 'injection', group: 'Fuel', label: 'Fuel injection', opts: [
         opt('stock', 'Direct', 'Factory direct injection.', { fuelCap: 1.4 }),
-        opt('port', 'Port kit', 'Adds port injectors on top of DI: ~70% more fuel - what E85 needs.', { fuelCap: 1.4, port: 0.7 })] },
+        opt('port', 'Port kit', 'Adds port injectors on top of DI: ~70% more fuel - what E85 needs.', { fuelCap: 1.4, port: 0.7 }),
+        opt('portxl', 'Big port kit', 'Port kit with big injectors and its own rail: ~120% more fuel on top of DI - big turbos on E85.', { fuelCap: 1.4, port: 1.2 }),
+        opt('portmax', 'Twin-rail port kit', 'Two port injectors a cylinder on twin rails: ~180% more fuel on top of DI - race turbos on E85. Needs a big feed pump.', { fuelCap: 1.4, port: 1.8 })] },
       { k: 'hpfp', group: 'Fuel', label: 'HP fuel pump', opts: [
         opt('stock', 'Stock', '350 bar pump: ~25% headroom over stock fuelling.', { pump: 1.25 }),
-        opt('uprated', 'Uprated', 'Bigger stroke pump: holds rail pressure at ~60% more flow.', { pump: 1.6 })] },
+        opt('uprated', 'Uprated', 'Bigger stroke pump: holds rail pressure at ~60% more flow.', { pump: 1.6 }),
+        opt('race', 'Race', 'Stage 3 pump with a race cam lobe: holds rail pressure at ~2.1x the stock flow.', { pump: 2.1 }),
+        opt('twin', 'Twin pumps', 'A second HP pump off the exhaust cam with a dual-feed rail: ~2.6x the stock flow - what race DI injectors need.', { pump: 2.6 })] },
       { k: 'plugs', group: 'Ignition', label: 'Spark plugs', opts: [
         opt('stock', 'Stock heat range', 'Factory plugs.'),
-        opt('colder', 'One step colder', 'Sheds heat faster: ~0.8° more knock margin under boost.', { margin: 0.8 })] },
+        opt('colder', 'One step colder', 'Sheds heat faster: ~0.8° more knock margin under boost.', { margin: 0.8 }),
+        opt('colder2', 'Two steps colder', 'Race heat range: ~1.4° more knock margin, but they foul in town - they wear ~40% faster.', { margin: 1.4, plugWear: 1.4 })] },
       ...COMMON(),
       { k: 'fuel', group: 'Fuel', label: 'Fuel in the tank', opts: [
         opt('95', 'RON 95', 'Regular premium. The stock tune is knock-limited on it in hot weather.', { octane: 0, k: 1 }),
         opt('98', 'RON 98', 'Super plus: ~2° more knock margin. What most stage 1 maps are written for.', { octane: 2, k: 1 }),
         opt('102', 'RON 102', 'Race fuel: ~5° more margin.', { octane: 5, k: 1 }),
-        opt('e85', 'E85', 'Ethanol: ~9° more margin and a cooler charge, but needs ~40% more fuel flow.', { octane: 9, k: 1.4, iat: -6 })] },
+        opt('e85', 'E85', 'Ethanol: knocks like ~RON 105 and its ~3x latent heat cools the charge ~10 °C - on a turbo a matched map makes ~10-20% more than on 98. Needs ~30% more fuel flow (~25% less range), a flex-fuel sensor, and starts rough in winter.', { octane: 7, k: 1.3, iat: -10, adv: 5 })] },
     ],
     diesel: () => [
       INTERNALS('diesel'), ...VALVETRAIN('diesel'), ...ENGINE_MORE('diesel'), ...DIESEL_MORE, ...COOLING('diesel'), ...BRAKES,
       { k: 'turbo', group: 'Turbo & intake', label: E.turboLabel || 'Turbocharger', opts: turboOpts([
         opt('stock', 'Stock VGT', 'Variable-geometry turbo: strong low down, chokes past ~1.9 bar.'),
-        opt('hybrid', 'Hybrid VGT', 'Bigger compressor and turbine: ~2.4 bar, a touch more lag.', { sound: { turbo: 1.25 } })]) },
+        opt('hybrid', 'Hybrid VGT', 'Bigger compressor and turbine: ~2.4 bar, a touch more lag.', { sound: { turbo: 1.25 } }),
+        opt('big', 'Big VGT', 'A 3.0-diesel-sized VGT on an adapter: ~2.85 bar and a big top end, lazy below 2,000 rpm.', { sound: { turbo: 1.45 } })]) },
       { k: 'intercooler', group: 'Turbo & intake', label: 'Intercooler', opts: [
         opt('stock', 'Stock', 'Front-mounted air-to-air.', { ic: 0.75, soak: 8 }),
-        opt('big', 'Big core', 'Larger front-mount: cooler, denser air - more fuel can burn cleanly.', { ic: 0.86, soak: 3, ...E.bigIc })] },
+        opt('big', 'Big core', 'Larger front-mount: cooler, denser air - more fuel can burn cleanly.', { ic: 0.86, soak: 3, ...E.bigIc }),
+        opt('race', 'Race core', 'Competition bar-and-plate core as deep as the bumper takes: the densest charge, barely heat-soaks.', { ic: 0.92, soak: 1.5 }),
+        opt('pro', 'Water-to-air race', 'Air-to-water core with its own pump, front heat exchanger and a spray bar: the densest charge, no heat-soak.', { ic: 0.95, soak: 1.2 })] },
       { k: 'intake', group: 'Turbo & intake', label: 'Intake', opts: [
         opt('stock', 'Stock', 'Airbox with a paper filter.'),
         opt('open', 'Open cone', '+1.5% flow up top and more turbo whistle.', { flow: 0.015, iat: 2, sound: { intake: 1.3, turbo: 1.15 } })] },
@@ -668,11 +972,13 @@
       { k: 'injectors', group: 'Fuel', label: 'Injectors', opts: [
         opt('stock', 'Stock', 'Piezo injectors: ~30% headroom over stock fuelling.', { inj: 1.3 }),
         opt('uprated', 'Uprated', 'Bigger nozzles: ~60% more fuel per stroke than stock.', { inj: 1.6 }),
-        opt('race', 'Race', 'Big-nozzle race injectors: twice the stock fuel per stroke - for big-turbo builds.', { inj: 2 })] },
+        opt('race', 'Race', 'Big-nozzle race injectors: twice the stock fuel per stroke - for big-turbo builds.', { inj: 2 }),
+        opt('xl', '150% over', 'Hand-flowed race injectors with 150%-over nozzles: 2.5x the stock fuel per stroke - for the biggest builds.', { inj: 2.5 })] },
       { k: 'pump', group: 'Fuel', label: 'HP pump', opts: [
         opt('stock', 'Stock', 'Common-rail pump: holds rail pressure with ~35% flow headroom.', { pump: 1.35 }),
         opt('uprated', 'Uprated', 'Higher-flow pump: holds rail pressure at ~75% more fuelling.', { pump: 1.75 }),
-        opt('race', 'Twin pumps', 'A second high-pressure pump: holds rail pressure at ~2.2x the stock fuelling.', { pump: 2.2 }), ...(E.pumpOpts || []).map((o) => opt(...o))] },
+        opt('race', 'Twin pumps', 'A second high-pressure pump: holds rail pressure at ~2.2x the stock fuelling.', { pump: 2.2 }),
+        ...(E.pumpOpts || [['billet', 'Billet 3,000 bar', 'Billet race pump and rail rated to 3,000 bar, with its own lift pump: holds rail pressure at ~3x the stock fuelling.', { pump: 3.0, lp: 3.2 }]]).map((o) => opt(...o))] },
       ...COMMON(),
     ],
   };
@@ -698,12 +1004,15 @@
     W('lpfp', 'P0627', 'Feed pump', 'Fuel & air', 'Fuel feed pump weak', 'The low-pressure fuel pump is worn - it starves the HP pump at full load. Replace it.'),
     W('hoses', 'P1C50', 'Coolant hoses', 'Cooling', 'Coolant hose leaking', 'A perished hose is weeping coolant. Replace the hoses before one bursts.'),
     W('fan', 'P0480', 'Cooling fan', 'Cooling', 'Cooling fan fault', 'The electric fan motor is failing - it overheats in traffic. Replace the fan.'),
+    W('rings', 'P1C70', 'Piston rings', 'Engine', 'Oil consumption high', 'Worn piston rings are letting oil into the cylinders - blue smoke and low oil. Have the rings replaced.'),
+    W('pcv', 'P052E', 'PCV valve', 'Engine', 'Crankcase ventilation fault', 'The crankcase vent valve has failed - oil is getting into the intake and burning (blue smoke). Replace the valve.'),
   ];
   const WEAR = {
     petrol: [...WEAR_COMMON,
       W('plugs', 'P0350', 'Spark plugs', 'Ignition', 'Spark plugs worn', 'Ignition misfires under boost. Replace the spark plugs.'),
       W('coils', 'P0351', 'Ign. coils', 'Ignition', 'Ignition coil weak', 'Coil output low - misfires under load. Replace the coils.'),
       W('hpfp', 'P0087', 'Fuel pump', 'Fuel & air', 'Fuel pump worn', 'Rail pressure drops under load. Replace the high-pressure fuel pump.'),
+      W('injectors', 'P0172', 'Injectors', 'Fuel & air', 'System too rich', 'Leaking injectors are dribbling fuel - it runs rich, smokes black under load and fouls the plugs. Replace the injectors.'),
       W('cat', 'P0420', 'Catalyst', 'Turbo & exhaust', 'Catalyst efficiency low', 'Catalytic converter worn out. Have it replaced.', { removable: true }),
       W('diverter', 'P0033', 'Diverter valve', 'Turbo & exhaust', 'Diverter valve leaking', 'Torn diaphragm - the valve bleeds boost under load. Replace it.'),
       W('valves', 'P1C60', 'Intake valves', 'Fuel & air', 'Intake valves carboned up', 'Carbon on the intake valves is choking the airflow and causing misfires. Have them walnut-blasted.')],
@@ -741,7 +1050,9 @@
     P0524: { title: 'Engine oil pressure low', msg: 'Oil pressure too low. Stop the engine and top up the oil.', color: '#ff5f3d' },
     LIMP: { title: 'Drivetrain malfunction', msg: 'Reduced power. Drive moderately - have the vehicle checked.', color: '#ff5f3d' },
   };
-  for (let c = 1; c <= 8; c++) FAULTS['P030' + c] = { title: `Misfire cylinder ${c}`, msg: 'Engine misfiring. Reduced power - have the vehicle checked.' };
+  // misfires: P0301-P0310 (the V10's 9 and 10 too - an unknown code would throw in the frame loop)
+  const misCode = (n) => 'P03' + String(n + 1).padStart(2, '0');
+  for (let c = 0; c < 10; c++) FAULTS[misCode(c)] = { title: `Misfire cylinder ${c + 1}`, msg: 'Engine misfiring. Reduced power - have the vehicle checked.' };
 
   // ================= presets (per fuel; built from the engine's stock maps) - an engine can bring its own (E.presets) =================
   const add = (base, d) => base.map((v, i) => +(v + (Array.isArray(d) ? d[i] : d)).toFixed(3));
@@ -754,9 +1065,15 @@
       { id: 'stage2', name: 'Stage 2', desc: 'Needs a downpipe, a bigger intercooler and RON 98+.', needs: { downpipe: ['sport', 'catless'], intercooler: ['big'], chargepipe: ['alu'], fuel: ['98', '102', 'e85'] },
         make: (e, s) => ({ ...s, boost: e.boost.map((b, i) => Math.min(b + 0.5, e.turbos.stock[i] * 0.9)), timing: e.axis.map((r) => (r < 2500 ? 0.5 : r < 4500 ? 1.5 : 2.5)),
           afr: add(s.afr, -0.3), tq: 660, shift: s.shift + 200, vmax: 0 }) },
-      { id: 'stage3', name: 'Stage 3 E85', desc: 'Hybrid turbo on E85: port kit, uprated pump and gearbox.', needs: { turbo: ['hybrid', 'big'], injection: ['port'], hpfp: ['uprated'], lpfp: ['uprated'], chargepipe: ['alu'], diverter: ['piston'], fuel: ['e85'], trans: ['uprated'], intercooler: ['big'] },
+      { id: 'stage3', name: 'Stage 3 E85', desc: 'Hybrid turbo on E85: port kit, uprated pump and gearbox.', needs: { turbo: ['hybrid', 'big'], injection: ['port'], hpfp: ['uprated'], lpfp: ['uprated'], chargepipe: ['alu'], diverter: ['piston'], fuel: ['e85'], flex: ['kit'], trans: ['uprated'], intercooler: ['big'] },
         make: (e, s) => ({ ...s, boost: e.turbos.hybrid.map((c, i) => Math.max(e.boost[i], c * 0.9)), timing: e.axis.map((r) => (r < 2500 ? 2 : 5)),
           afr: s.afr.map((a) => Math.min(a, 11.9)), tq: 800, shift: s.shift + 300, vmax: 0, shiftSpeed: 1 }) },
+      { id: 'stage4', name: 'Stage 4 Race', desc: 'Race single on E85 with water-meth: a built engine, the big port kit, race pumps and a race-built gearbox.',
+        needs: { turbo: ['race'], internals: ['built'], gasket: ['oring'], injection: ['portxl'], diinj: ['ext'], hpfp: ['race'], lpfp: ['bucket'], chargepipe: ['alu'], diverter: ['piston'], fuel: ['e85'],
+          flex: ['kit'], meth: ['kit', 'dual'], trans: ['race'], intercooler: ['race'], radiator: ['triple'], plugs: ['colder', 'colder2'], coils: ['ho', 'race'] },
+        make: (e, s) => ({ ...s, boost: e.turbos.race.map((c, i) => +Math.max(e.boost[i], c * (e.axis[i] > 6000 ? 0.85 : 0.9)).toFixed(2)), // eased up top, where the fuel runs out first
+          timing: e.axis.map((r) => (r < 2500 ? 2 : 4)),
+          afr: s.afr.map((a) => Math.min(a, 11.7)), tq: e.tq * 2, shift: s.shift + 300, vmax: 0, shiftSpeed: 2 }) },
     ],
     diesel: [
       { id: 'stock', name: 'Stock', desc: 'Factory calibration.', needs: {}, make: (e, s) => s },
@@ -769,6 +1086,11 @@
       { id: 'stage3', name: 'Stage 3', desc: 'Hybrid turbo, injectors and pump - and a gearbox that can take it.', needs: { turbo: ['hybrid'], injectors: ['uprated'], pump: ['uprated'], intercooler: ['big'], chargepipe: ['alu'], trans: ['uprated'] },
         make: (e, s) => ({ ...s, iq: [100, 118, 140, 148, 150, 150, 148, 144, 138], boost: e.turbos.hybrid.map((c, i) => Math.max(e.boost[i], c * 0.9)),
           soi: [0, 1, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5], rail: s.rail.map((r) => Math.min(2400, r + 400)), smoke: 1.04, tq: 620, egr: false, shift: s.shift + 200, vmax: 0 }) },
+      { id: 'stage4', name: 'Stage 4', desc: 'Big VGT, 150% injectors and a billet pump at 2,600 bar, water-meth, a built engine and race-built gearbox.',
+        needs: { turbo: ['big'], injectors: ['xl'], pump: ['billet'], lpfp: ['uprated'], internals: ['built'], gasket: ['oring'], intercooler: ['race'], chargepipe: ['alu'], radiator: ['triple'],
+          downpipe: ['delete'], egr: ['blank'], meth: ['kit', 'dual'], trans: ['race'] },
+        make: (e, s) => ({ ...s, iq: [100, 125, 160, 190, 200, 200, 196, 190, 182], boost: e.turbos.big.map((c, i) => +Math.max(e.boost[i], c * 0.9).toFixed(2)),
+          soi: [0, 1, 1.5, 2, 2, 2, 2, 2, 2], rail: s.rail.map((r) => Math.min(2600, r + 600)), smoke: 1.04, tq: e.tq * 2, egr: false, dpf: false, shift: s.shift + 200, vmax: 0 }) },
     ],
   };
 
@@ -805,6 +1127,13 @@
     return c;
   }
   const part = (k) => tune.parts[k] || P.find((p) => p.k === k).opts[0].id;
+  // a preset's needs: one of the listed options - or, for a part whose options climb in tiers, anything above them
+  const TIERED = ['internals', 'gasket', 'springs', 'trans', 'transcooler', 'radiator', 'oilcooler', 'intercooler', 'injectors', 'injection', 'diinj', 'hpfp', 'pump', 'lpfp', 'coils', 'meth'];
+  const fits = (k, ok) => {
+    if (ok.includes(part(k))) return true;
+    const ids = TIERED.includes(k) ? P.find((p) => p.k === k).opts.map((o) => o.id) : [];
+    return ids.indexOf(part(k)) > Math.max(...ok.map((id) => ids.indexOf(id)));
+  };
   // how far a saved setup's maps push boost over stock - a car built for that had its boost plumbing done too
   const overBoost = (sv) => Math.max(0, ...[1, 2].map((n) => {
     const b = sv && sv.slots && sv.slots[n] && sv.slots[n].boost;
@@ -814,16 +1143,17 @@
     Object.keys(fx).forEach((k) => delete fx[k]);
     Object.assign(fx, { flow: 0, egt: 0, iat: 0, spool: 0, margin: 0, sound: { ex: 1, intake: 1, turbo: 1 }, grip: 1, octane: 0, k: 1, port: 0,
       dmg: 1, rod: 1, rev: 0, pcp: 0, cam: null, springLoad: 1, springWear: 1, float: 0, chainWear: 1, oilPump: 1,
-      radUA: 1, wpFlow: 1, tstat: 0, oilCool: 1, transWear: 1,
+      radUA: 1, wpFlow: 1, tstat: 0, oilCool: 1, transWear: 1, shift: 1,
       gasketWear: 1, cpWear: 1, lp: 9, lpWear: 1, hoseWear: 1, fanFlow: 1, fanWear: 1, coilWear: 1, coilSpark: 1, dvWear: 1, carbon: 1, lspi: 1,
-      glowWear: 1, vgtWear: 1, swirlBlank: false });
+      glowWear: 1, vgtWear: 1, swirlBlank: false,
+      ringWear: 1, pcvWear: 1, trap: 1, plugWear: 1, diMul: 1, meth: 0, flex: false, adv: 0, taper: 0, fly: 0, tqAdd: 0, harm: 0 });
     const brake = { bite: 1, fadeSet: 450, fadeAdd: 0, boil: 230, mass: 1, cool: 1, padWear: 1, discWear: 1, coldBite: 1, stab: 1, damperWear: 1 };
     P.forEach((p) => {
       const o = p.opts.find((x) => x.id === part(p.k)) || p.opts[0];
       Object.entries(o.fx).forEach(([k, v]) => {
-        if (['flow', 'egt', 'iat', 'spool', 'margin', 'port', 'rev', 'pcp'].includes(k)) fx[k] += v;
+        if (['flow', 'egt', 'iat', 'spool', 'margin', 'port', 'rev', 'pcp', 'float'].includes(k)) fx[k] += v;
         else if (k === 'sound') Object.entries(v).forEach(([layer, mul]) => { fx.sound[layer] *= mul; });
-        else if (['grip', 'springLoad', 'springWear', 'float'].includes(k)) fx[k] = k === 'float' ? fx[k] + v : fx[k] * v;
+        else if (['grip', 'springLoad', 'springWear', 'lspi', 'carbon', 'transWear', 'shift'].includes(k)) fx[k] *= v; // two parts can share these
         else if (k === 'tstat') fx.tstat += v;
         else if (k === 'brake') Object.entries(v).forEach(([bk, bv]) => { // set the pads' fade point, add to it, take the lowest cold bite, multiply the rest
           if (bk === 'fadeSet' || bk === 'boil') brake[bk] = bv;
@@ -837,7 +1167,11 @@
     fx.turbo = E.turbos[part('turbo')] || E.turbos.stock;
     const top = Math.max(...fx.turbo);
     fx.spoolRpm = E.axis[fx.turbo.findIndex((b) => b >= top * 0.9)] + fx.spool;
-    fx.transCap = E.trans[fx.trans] || E.trans.cap;
+    fx.transCap = E.trans[fx.trans] || E.trans.built * ({ race: 1.25, pro: 1.6 }[fx.trans] || 0) || E.trans.cap; // race / pro builds: a quarter / 60% over the built box
+    // injector scaling lives in the fuel map: an untouched stock map still meters for the stock injectors, so bigger ones
+    // the stock ECU drives (the DI side, or a port-only engine's) over-fuel by their extra flow - the fuel trims take ~15% back
+    const portOnly = (E.no || []).includes('diinj');
+    fx.injScale = Math.max(1, (portOnly ? (fx.fuelCap + fx.port) / fx.fuelCap : fx.diMul) * 0.85);
     fx.float = Math.max(0, fx.float); // race cams only float early on stock springs
     const { fadeSet, fadeAdd, ...hw } = brake;
     if (window.CarService && CarService.setHardware) CarService.setHardware({ ...hw, fade: fadeSet + fadeAdd });
@@ -860,7 +1194,8 @@
     const w = wearOf('turbo');
     if (w >= 100) return 0.2;
     // sooted VGT vanes can't close: no boost low down; a split charge pipe dumps it all
-    const cap = interp(E.axis, fx.turbo, rpm - fx.spool) * (1 - 0.4 * clamp01((w - 70) / 30)) * (1 - 0.5 * wearOf('vgt') / 100 * clamp01((3000 - rpm) / 2000));
+    const cap = interp(E.axis, fx.turbo, rpm - fx.spool) * (1 - 0.4 * clamp01((w - 70) / 30)) * (1 - 0.5 * wearOf('vgt') / 100 * clamp01((3000 - rpm) / 2000)) *
+      (1 + fx.taper * clamp01((rpm - fx.spoolRpm) / 2500)); // an uprated wastegate doesn't let it taper past peak
     return wearOf('chargepipe') >= 100 ? Math.min(cap, 0.35) : cap;
   }
   // a torn diverter or a tired charge pipe bleeds boost whatever the map asks for
@@ -905,13 +1240,18 @@
     const top = Math.max(...fx.turbo), flow = 0.33 * rpm / E.maxRpm * (1 + Math.max(0, b)) / (1 + top);
     return E.krpm[part('turbo')] * Math.sqrt((head(b) + flow) / (head(top) + 0.33)) * (1 + 0.12 * overspeed(b, rpm));
   }
-  const iatSteady = (b, rpm, soak = 0) => ambient() + compHeat(b, overspeed(b, rpm)) * (1 - fx.ic * (1 - wearOf('intercooler') * 0.25 / 100)) + fx.iat + soak; // a fouled core cools less
+  const methK = (b) => fx.meth * clamp01((b - 0.2) / 0.8); // water-meth flow: progressive with boost, full by ~1 bar
+  const iatSteady = (b, rpm, soak = 0) => ambient() + compHeat(b, overspeed(b, rpm)) * (1 - fx.ic * (1 - wearOf('intercooler') * 0.25 / 100)) + fx.iat + soak - // a fouled core cools less
+    methK(b) * (E.fuel === 'petrol' ? 15 : 12);
   const iatStock = (rpm) => ambient() + compHeat(interp(E.axis, E.boost, rpm), 0) * (1 - P.find((p) => p.k === 'intercooler').opts[0].fx.ic);
   const feedCap = () => fx.lp * (1 - 0.45 * wearOf('lpfp') / 100); // the low-pressure pump feeds everything downstream
   function fuelCapP() {
     const pump = fx.pump * (1 - 0.4 * wearOf('hpfp') / 100);
-    return Math.min(Math.min(fx.fuelCap, pump) + fx.port, feedCap()) * (E.fuelHead || 1) * (1 - wearOf('fuelfilter') * 0.15 / 100);
+    return Math.min(Math.min(fx.fuelCap * fx.diMul, pump) + fx.port, feedCap()) * (E.fuelHead || 1) * (1 - wearOf('fuelfilter') * 0.15 / 100);
   }
+  // a calibration nobody has touched still has the stock injector scaling (see fx.injScale)
+  const stockMap = (c) => CURVES().every((k) => c[k].every((v, i) => Math.abs(v - stockCal[k][i]) < 1e-6));
+  const leak = () => 0.12 * Math.pow(clamp01((wearOf('injectors') - 40) / 60), 1.5); // worn petrol injectors dribble: up to 12% rich
   let fuelRef = 1, powerRef = 1;
   function model(c, rpm, o = {}) {
     const bT = boostTarget(c, rpm), b = o.b ?? bT;
@@ -924,14 +1264,19 @@
       // fuel flow this asks for, against what the injectors + pump can deliver (1 = stock at its peak)
       const need = rpm * (1 + Math.max(0, interp(E.axis, E.boost, rpm))) * airT / afrT / fuelRef * fx.k;
       const cap = fuelCapP();
-      const afr = afrT * Math.max(1, need / cap);
+      // E85 with no flex-fuel sensor runs on its trims, ~6% lean; leaking injectors, or bigger ones on a stock map, run it rich
+      const blind = fx.k > 1 && !fx.flex ? 1.06 : 1, rich = (1 + leak()) * (stockMap(c) ? fx.injScale : 1);
+      const afr = afrT * Math.max(1, need / cap) * blind / rich;
       const bS = interp(E.axis, E.boost, rpm);
-      const margin = interp(E.axis, E.margin, rpm) + fx.octane + fx.margin - 4.5 * Math.max(0, b - bS) - 0.12 * (iat - iatStock(rpm)) -
+      const margin = interp(E.axis, E.margin, rpm) + fx.octane + fx.margin + 2 * methK(b) - 4.5 * Math.max(0, b - bS) - 0.12 * (iat - iatStock(rpm)) -
         1.8 * (afr - afrS) - 0.15 * Math.max(0, (o.coolant ?? 95) - 105) - wearOf('pistons') * 0.01;
-      const off = interp(E.axis, c.timing, rpm);
-      const retard = o.retard ?? (c.knock ? Math.max(0, off - margin) : 0);
       const dS = 2 + 4 * clamp01(bS / 1.0); // stock timing sits this far behind best torque (knock-limited)
-      const tq = airT * timingEff(dS - (off - retard)) / timingEff(dS) * lamEffP(afr / 14.7) / lamEffP(afrS / 14.7) * camMul(rpm) * chainMul();
+      // a flex-fuel ECU times for the ethanol: up to fx.adv more, never past best torque, 1° inside the knock margin -
+      // a turbo engine's knock-limited timing gains most, an NA one (2° short of best) barely anything
+      const map = interp(E.axis, c.timing, rpm);
+      const off = map + (fx.flex && fx.k > 1 ? clamp(Math.min(dS - map, margin - 1 - map), 0, fx.adv) : 0);
+      const retard = o.retard ?? (c.knock ? Math.max(0, off - margin) : 0);
+      const tq = airT * timingEff(dS - (off - retard)) / timingEff(dS) * lamEffP(afr / 14.7) / lamEffP(afrS / 14.7) * camMul(rpm) * chainMul() * (1 + fx.tqAdd);
       return Object.assign(r, { afrT, afr, need, cap, margin, off, retard, detonation: Math.max(0, off - retard - margin), tqRaw: tq,
         rail: 350 * clamp01(1 - Math.max(0, need - cap) * 2), duty: clamp(need / cap * 85, 0, 100) });
     }
@@ -949,7 +1294,7 @@
     const lamT = airT * lamS / fuelT + railBonus, lam = air * lamS / Math.max(0.05, fuel) + railBonus;
     const soi = interp(E.axis, c.soi, rpm);
     const eta = (l) => lamEffD(l) * (1 + 0.012 * soi - 0.0022 * soi * soi) * (1 + 0.025 * (rail / railS - 1));
-    const tq = fuelT * eta(lamT) / lamEffD(lamS) * camMul(rpm) * chainMul() * (fx.swirlBlank && rpm < 2000 ? 0.98 : 1); // blanked flaps: less swirl low down
+    const tq = fuelT * eta(lamT) / lamEffD(lamS) * camMul(rpm) * chainMul() * (fx.swirlBlank && rpm < 2000 ? 0.98 : 1) * (1 + fx.tqAdd); // blanked flaps: less swirl low down
     const pcp = (60 + 40 * (1 + Math.max(0, b))) * (1 + 0.02 * soi) * (0.85 + 0.15 * fuel) * (c.pilot ? 1 : 1.04); // peak cylinder pressure, bar
     return Object.assign(r, { iq, fuel, fuelT, lam, lamT, rail, railT, soi, pcp, injCap, tqRaw: tq,
       mg: fuel * 42, duty: clamp(fuel / injCap * 90, 0, 100) });
@@ -962,9 +1307,9 @@
   function egtSteady(m, load, rpm) {
     if (E.fuel === 'petrol') {
       return 200 + load * clamp01(rpm / E.maxRpm) * 650 + Math.max(0, m.b) * 60 + 70 * (m.afr - interp(E.axis, E.afr, rpm)) * load +
-        12 * (m.retard || 0) * load + fx.egt;
+        12 * (m.retard || 0) * load + fx.egt - 40 * methK(m.b) * load;
     }
-    return 170 + clamp01(rpm / (E.maxRpm * 0.78)) * 100 + 430 * (1.22 / m.lam) * load - 4 * m.soi * load + fx.egt;
+    return 170 + clamp01(rpm / (E.maxRpm * 0.78)) * 100 + 430 * (1.22 / m.lam) * load - 4 * m.soi * load + fx.egt - 50 * methK(m.b) * load;
   }
 
   // ================= prediction: the full-load curve a calibration should make =================
@@ -1021,7 +1366,11 @@
     if (E.fuel === 'diesel') {
       if (!fx.dpf && c.dpf) flag('crit', 'dpf', 'DPF removed but the DPF function is on: P2002 and limp mode.');
       if (fx.egrBlank && c.egr) flag('crit', 'egr', 'EGR blanked but the EGR function is on: P0401 and limp mode.');
-    } else if (fx.catless && c.dpf) flag('med', 'cat', 'Catless downpipe with the cat monitor on: P0420 stays lit.');
+    } else {
+      if (fx.catless && c.dpf) flag('med', 'cat', 'Catless downpipe with the cat monitor on: P0420 stays lit.');
+      if (fx.k > 1 && !fx.flex) flag('high', 'flex', 'E85 with no flex-fuel sensor: the ECU only gets there on its fuel trims - ~6% lean at full load. Fit the flex-fuel kit (Parts → Fuel).');
+      if (fx.injScale > 1.001 && stockMap(c)) flag('high', 'injscale', `Bigger injectors on the untouched stock map: it still meters for the stock ones and runs ~${Math.round((fx.injScale - 1) * 100)}% rich at full load - black smoke, less power. Load a map written for them, or tune the AFR map.`);
+    }
     const peak = pts.reduce((a, p) => (p.hp > a.hp ? p : a), pts[0]);
     const peakTq = pts.reduce((a, p) => (p.tq > a.tq ? p : a), pts[0]);
     const order = { crit: 0, high: 1, med: 2, info: 3 };
@@ -1032,14 +1381,14 @@
   // ================= live simulation =================
   const ch = { boost: 0, boostT: 0, afr: null, afrT: null, lambda: null, timing: 0, retard: 0, iat: 30, egt: 30, rail: 0, railT: 0,
     duty: 0, iq: 0, soi: 0, smoke: 0, pcp: 0, noise: 0, knock: 0, load: 0, rpm: 0, speed: 0, knockHit: false, fuelCut: false, doom: 0,
-    coolT: 30, oilT: 30, oilP: 1, turbo: 0, over: 0 };
+    coolT: 30, oilT: 30, oilP: 1, turbo: 0, over: 0, oilSmoke: 0, blown: false };
   let soak = 0, iatNow = 30, egtNow = 30, smokeNow = 0, misfireDip = 0, slipT = 0, leanT = 0, underT = 0, egtHotT = 0, overT = 0, pcpT = 0, revT = 0;
   const running = { rpm: 0, load: 0 }; // what the engine is doing when a cylinder gives up
   let pistonHits = 0; // piston damage dealt this frame - a share of it wears the engine as a whole
   let wasOn = false, startCold = false, regen = 0, forcedRegen = 0, knockLevel = 0, gripT = 0;
   const pending = {}; // wear accrued this frame, handed to CarService by each part's rate()
   const addWear = (k, v) => { if (wearParts[k] && v > 0) pending[k] = (pending[k] || 0) + v; };
-  const ambient = () => (window.CarDyno && CarDyno.ch && CarDyno.ch.ambient) || 30;
+  const ambient = () => { const a = window.CarDyno && CarDyno.ch && CarDyno.ch.ambient; return Number.isFinite(a) ? a : 30; }; // 0 °C is a reading, not 'unset'
   const fault = (code, state = 'event') => {
     if (!window.CarService || !CarService.fault) return;
     const f = FAULTS[code] || WEAR[E.fuel].find((d) => d.code === code); // a worn part's warning uses its own entry
@@ -1068,8 +1417,9 @@
     const out = { tqMul: 1, cut: 1, egt: egtNow, fuelMul: 1, wear: 0, derate: 1, coolant: coolT, oilPress: 1 };
     ch.rpm = rpm; ch.speed = i.speed; ch.knockHit = false;
     if (!on) {
-      Object.assign(ch, { afr: null, lambda: null, boost: i.boost, load: 0, rail: 0, duty: 0, smoke: 0, pcp: 0, noise: 0, retard: 0,
+      Object.assign(ch, { afr: null, lambda: null, boost: i.boost, load: 0, rail: 0, duty: 0, smoke: 0, oilSmoke: 0, pcp: 0, noise: 0, retard: 0,
         knock: 0, iq: 0, timing: 0, soi: 0, over: 0, turbo: ease(ch.turbo, 0, 1.5, dt) }); // the turbo spins down
+      smokeNow = 0; blueNow = 0;
       egtNow = ease(egtNow, ambient(), 25, dt); iatNow = ease(iatNow, ambient(), 30, dt); soak = ease(soak, 0, 120, dt);
       cyl.forEach((k) => { k.retard = 0; });
       out.egt = egtNow;
@@ -1094,12 +1444,15 @@
     // cylinders: compression loss from damage, dead cylinders, misfires
     let health = 0;
     cyl.forEach((k) => { health += k.dead ? 0 : 1 - 0.35 * Math.pow(k.damage / 100, 2); });
-    tqMul *= health / E.cyl * (wearOf('gasket') >= 100 ? 0.96 : 1); // a blown head gasket leaks compression
+    tqMul *= health / E.cyl * (wearOf('gasket') >= 100 ? 0.96 : 1) * (1 - 0.04 * clamp01((wearOf('rings') - 60) / 40)); // a blown head gasket, worn rings: compression leaks
+    // a light flywheel: less of the torque goes into spinning it up - most in 1st, fading through the gears
+    if (fx.fly && i.gear >= 0 && pedal > 0.5) tqMul *= 1 + fx.fly / (1 + i.gear);
     const firing = rpm / 120 * dt; // firings per cylinder this frame
     running.rpm = rpm; running.load = fuelCut ? 0 : load;
     if (E.fuel === 'petrol') petrolTick(c, m, i, dt, firing, load, fuelCut);
     else dieselTick(c, m, i, dt, firing, load, fuelCut);
     misfires(c, m, i, dt, firing, load, fuelCut);
+    exhaustSmoke(m, i, dt, rpm, load, fuelCut, pedal);
     misfireDip = Math.max(0, misfireDip - dt);
     if (misfireDip > 0) out.cut *= 1 - 0.6 / E.cyl;
 
@@ -1126,7 +1479,9 @@
     const egtLimit = E.fuel === 'petrol' ? 950 : 780;
     const lean = E.fuel === 'petrol' && m.afr - m.afrT > 0.5 && load > 0.8;
     out.wear = pistonHits * 0.3 / Math.max(dt, 1e-3) + (fuelCut ? 0 :
-      0.02 * Math.max(0, engineTq / E.tq - 1) + Math.max(0, egtNow - egtLimit) * 0.0006 + (lean ? 0.01 : 0));
+      0.02 * Math.max(0, engineTq / E.tq - 1) + Math.max(0, egtNow - egtLimit) * 0.0006 + (lean ? 0.01 : 0)) +
+      fx.harm * 0.02 * clamp01((rpm / maxRpm() - 0.8) / 0.2); // an undamped pulley: crank harmonics near the limiter
+    addWear('rings', pistonHits * 0.5 * fx.ringWear); // detonation and over-pressure crack the ring lands too
     pistonHits = 0;
     cooling(c, i, dt, rpm, load, fuelCut, engineTq, m, retardAvg, out);
     tqMul *= out.derate;
@@ -1208,10 +1563,10 @@
     const hazard = 10 * Math.pow(Math.max(0, doom - 0.85), 2) * Math.min(1.5, Math.pow(rpm / c.shift, 3)) * load * (1 + dead); // near the redline it's worst
     if (Math.random() < hazard * dt) blowUp(weakest, rpm, dead ? 'dead' : 'rod');
   }
-  let blown = false;
+  let blown = false, dying = false;
   function blowUp(n, rpm, why) {
     if (blown) return;
-    blown = true;
+    blown = true; ch.blown = true;
     cyl[n].damage = 100; cyl[n].dead = true;
     if (wearParts.pistons) wearParts.pistons.value = 100;
     const what = { rod: `con-rod through the block, cylinder ${n + 1}`, dead: `cylinder ${n + 1} came apart`, chain: `timing chain jumped - valves into the pistons`,
@@ -1219,19 +1574,28 @@
       swirl: `a swirl flap broke off into cylinder ${n + 1}` }[why];
     fault('P1C03', 'active');
     log('damage', `ENGINE BLOWN at ${fmt(rpm)} rpm: ${what}`);
-    sound('boom');
+    sound('boom', rpm);
     effects.explode(what.charAt(0).toUpperCase() + what.slice(1));
-    // the engine dies on the spot - the car's own switch-off, a beat later so it isn't mid-frame
-    setTimeout(() => { const b = document.getElementById('power-btn'); if (b && window.CarService && CarService.ignitionOn()) b.click(); }, 0);
+    // for the drive page's car: once, on this frame (never for an engine that loads blown)
+    document.dispatchEvent(new CustomEvent('engineblow', { detail: { cause: why, cyl: n + 1, rpm, speed: ch.speed } }));
+    // the engine dies on the spot but the key stays on, so the dash lights its warnings: the car's own switch-off, then
+    // its ignition-on (a held brake's start is vetoed quietly) - a beat later so it isn't mid-frame
+    setTimeout(() => {
+      const b = document.getElementById('power-btn');
+      if (!b || !window.CarService || !CarService.ignitionOn()) return;
+      dying = true;
+      try { b.click(); b.click(); } finally { dying = false; }
+    }, 0);
     apply();
   }
-  // a new short block: the pistons service, the car's engine repair, or fitting new internals
+  // a new short block: the pistons service, the car's engine repair, or fitting new internals (new rings come with it)
   function rebuild(note) {
     const was = blown;
     cyl.forEach((k) => { k.damage = 0; k.dead = false; k.knocks = 0; k.misfires = 0; });
     if (wearParts.pistons) wearParts.pistons.value = 0;
+    if (wearParts.rings) wearParts.rings.value = 0;
     noiseShown = false;
-    if (blown) { blown = false; fault('P1C03', 'clear'); effects.clear(); }
+    if (blown) { blown = false; ch.blown = false; fault('P1C03', 'clear'); effects.clear(); }
     if (was && note) log('repair', note);
     apply();
   }
@@ -1304,11 +1668,15 @@
     addWear('gasket', (km * 0.0015 + cylP * cylP * 0.2 * dt + Math.max(0, coolT - 112) * 0.02 * dt) * fx.gasketWear);
     addWear('chargepipe', (km * 0.002 + Math.pow(Math.max(0, over - 0.25), 1.5) * 0.3 * dt) * fx.cpWear);
     addWear('diverter', (km * 0.002 + Math.max(0, over - 0.4) * 0.15 * dt) * fx.dvWear);
-    addWear('intercooler', km * 0.002 * (1 + wearOf('turbo') / 50)); // a tired turbo mists oil into it
+    addWear('intercooler', km * 0.002 * (1 + wearOf('turbo') / 50 + wearOf('pcv') / 50 * fx.trap)); // a tired turbo or a failed PCV mists oil into it
+    // rings: miles (faster on old oil), hot oil and coolant, over-revving; the PCV valve: miles, boost, and the blow-by worn rings send it
+    addWear('rings', (km * 0.0012 * oil + Math.max(0, oilT - 125) * 0.004 * dt + Math.max(0, coolT - 115) * 0.01 * dt +
+      Math.max(0, rpm - maxRpm()) / 1000 * 0.3 * dt) * fx.ringWear);
+    addWear('pcv', (km * 0.0015 + Math.max(0, i.boost) * load * 0.002 * dt) * (1 + wearOf('rings') / 100) * oil * fx.pcvWear);
     addWear('lpfp', km * 0.003 * (1 + load) * fx.lpWear);
     addWear('hoses', (km * 0.002 + dt * 0.0002 * (1 + Math.max(0, coolT - 100) / 5)) * fx.hoseWear);
     addWear('fan', (km * 0.001 + (fanOn ? dt * 0.003 : 0)) * fx.fanWear);
-    addWear('valves', km * 0.01 * fx.carbon * oil); // old oil, more blow-by, more carbon
+    addWear('valves', km * 0.01 * fx.carbon * oil * (1 + wearOf('pcv') / 100 * fx.trap)); // old oil, more blow-by, more carbon
     const sooty = c.egr && !fx.egrBlank ? 1.3 : 1; // an open EGR feeds soot to the vanes and flaps
     addWear('vgt', km * 0.005 * (1 + smokeNow / 25) * sooty * fx.vgtWear);
     addWear('swirl', km * 0.004 * sooty);
@@ -1340,7 +1708,7 @@
       if (fx.egrBlank && c.egr) { fault('P0401', 'active'); setLimp('P0401'); } else if (!(wearParts.egr && wearParts.egr.value >= 100)) fault('P0401', 'clear');
     } else if (fx.catless && c.dpf) fault('P0420', 'active');
     else if (!(wearParts.cat && wearParts.cat.value >= 100)) fault('P0420', 'clear');
-    cyl.forEach((k, n) => { if (k.dead) { fault('P030' + (n + 1), 'active'); setLimp('P030' + (n + 1)); } });
+    cyl.forEach((k, n) => { if (k.dead) { fault(misCode(n), 'active'); setLimp(misCode(n)); } });
     if (wearOf('dpf') >= 100 && fx.dpf) setLimp('P2463');
   }
 
@@ -1379,7 +1747,7 @@
     lspiCool = Math.max(0, lspiCool - dt);
     if (boosted && i.rpm < 3200 && i.boost > 0.85 && lspiCool <= 0) {
       const rate = 0.0025 * (i.boost - 0.8) * (3200 - i.rpm) / 1000 * (window.CarService ? CarService.oilMul() : 1) *
-        ({ 0: 1, 2: 0.7, 5: 0.4, 9: 0.15 }[fx.octane] ?? 1) * fx.lspi * (1 + wearOf('valves') / 100); // oil mist + carbon deposits set it off
+        ({ 0: 1, 2: 0.7, 5: 0.4, 7: 0.15 }[fx.octane] ?? 1) * fx.lspi * (1 + wearOf('valves') / 100); // oil mist + carbon deposits set it off
       if (Math.random() < rate * dt * 60) {
         const n = Math.floor(Math.random() * E.cyl);
         damage(n, 8 + Math.random() * 14, 'lspi');
@@ -1400,7 +1768,8 @@
     addWear('hpfp', i.speed * dt / 3600 * 0.002);
     // plugs and coils: mileage, harder under boost; worn plugs strain the coils
     const km = i.speed * dt / 3600;
-    addWear('plugs', km * 0.04 * (1 + 1.5 * Math.max(0, i.boost - 1)));
+    addWear('plugs', km * 0.04 * (1 + 1.5 * Math.max(0, i.boost - 1)) * fx.plugWear * (1 + leak() * 5)); // leaking injectors foul them
+    addWear('injectors', km * 0.003 * fx.k + (pedal > 0.85 && m.duty > 92 ? 0.006 * dt : 0)); // miles (ethanol is harder on them), and run flat out
     addWear('coils', km * 0.008 * (1 + wearOf('plugs') / 50) * fx.coilWear);
     // the catalyst cooks on hot exhaust and burbles
     if (!fx.catless) addWear('cat', Math.max(0, egtNow - 900) * 0.0004 * dt + (fuelCut && c.burble >= 2 && i.rpm > 2000 ? 0.004 * (c.burble - 1) * dt : 0) + km * 0.002);
@@ -1463,24 +1832,58 @@
   }
   function burnSoot(v) { if (wearParts.dpf) wearParts.dpf.value = Math.max(0, wearParts.dpf.value - v); }
 
+  // ---- exhaust smoke: blue from oil getting into the cylinders, black from a petrol running rich under load ----
+  // each oil source by its wear: faint up to ~70%, heavy at 100%
+  const sev = (w) => (w < 70 ? 0.12 * Math.pow(w / 70, 3) : 0.12 + 0.88 * Math.pow((w - 70) / 30, 1.3));
+  let blueNow = 0, puff = 0, hardT = 0;
+  function exhaustSmoke(m, i, dt, rpm, load, fuelCut, pedal) {
+    const overrun = fuelCut ? clamp01((rpm - 1300) / 3000) : 0; // high manifold vacuum pulls oil past rings and seals, and up a failed PCV
+    const cold = clamp01((60 - (i.coolant ?? 90)) / 40), boostF = clamp01(Math.max(0, i.boost) / 1.2) * load;
+    hardT = ease(hardT, load > 0.6 && i.boost > 0.5 ? 1 : 0, load > 0.6 ? 20 : 90, dt); // a hot, hard-worked turbo
+    const idle = !fuelCut && pedal < 0.08 && rpm < 1400 ? 1 : 0;
+    // turbo seals leak on boost, and at idle after hard running; a head gasket smokes steadily
+    const turbo = E.na && part('turbo') === 'stock' ? 0 : sev(wearOf('turbo')) * (0.15 + 0.9 * boostF + 0.9 * idle * hardT);
+    const blue = sev(wearOf('rings')) * (0.25 + overrun + 0.6 * cold + 0.7 * clamp01((load - 0.6) / 0.4)) + turbo +
+      sev(wearOf('pcv')) * (0.9 * boostF + 0.8 * overrun) * fx.trap + sev(wearOf('gasket')) * 0.55;
+    const blueT = 100 * clamp01(blue);
+    blueNow = ease(blueNow, blueT, blueT > blueNow ? 0.4 : 1.5, dt);
+    // the oil it burns: about a litre an hour at heavy smoke (the Oil level row - 100% there is 1.5 L down)
+    const lvl = blueNow > 1 && window.CarService && CarService.parts.find((p) => p.key === 'oilLevel');
+    if (lvl) lvl.value = Math.min(100, lvl.value + blueNow / 100 * 0.018 * dt);
+    ch.oilSmoke = blueNow;
+    if (E.fuel !== 'petrol') return; // a diesel's black smoke is its own (dieselTick)
+    // black: richer than the factory mixture under real load and revs (a stock full-throttle pull is at most a haze), and a
+    // misfire's raw fuel; ethanol barely soots
+    const lam = m.afr / 14.7, dl = interp(E.axis, E.afr, rpm) / 14.7 - lam;
+    const rich = 0.06 * clamp01((0.86 - lam) / 0.06) + Math.pow(clamp01((dl - 0.01) / 0.11), 1.3);
+    const lf = clamp01((load - 0.7) / 0.25), rf = 0.35 + 0.65 * clamp01((rpm - 1500) / Math.max(1000, E.maxRpm - 2500));
+    puff = Math.max(0, puff - dt * 2.5);
+    const blackT = fuelCut ? 0 : 100 * clamp01((rich * lf * rf + puff * clamp01((load - 0.4) / 0.3)) * (fx.k > 1 ? 0.3 : 1));
+    smokeNow = ease(smokeNow, blackT, blackT > smokeNow ? 0.15 : 0.8, dt);
+    ch.smoke = smokeNow;
+  }
+
   // ---- misfires: worn plugs / coils under boost, worn injectors, dead cylinders ----
   let missCool = 0;
   function misfires(c, m, i, dt, firing, load, fuelCut) {
     if (fuelCut) return;
     missCool = Math.max(0, missCool - dt);
     const ign = E.fuel === 'petrol' ? Math.pow(clamp01((wearOf('plugs') - 55) / 45), 2) * clamp01(E.na ? load : i.boost / 1.2) * 0.05 +
-      Math.pow(clamp01((wearOf('coils') - 60) / 40), 2) * 0.03 * load * fx.coilSpark + Math.pow(clamp01((wearOf('valves') - 80) / 20), 2) * 0.02 : 0;
+      Math.pow(clamp01((wearOf('coils') - 60) / 40), 2) * 0.03 * load * fx.coilSpark + Math.pow(clamp01((wearOf('valves') - 80) / 20), 2) * 0.02 +
+      Math.pow(clamp01((wearOf('injectors') - 80) / 20), 2) * 0.02 : 0; // a leaking injector floods its cylinder
     const inj = E.fuel === 'diesel' ? Math.pow(clamp01((wearOf('injectors') - 60) / 40), 2) * 0.03 : 0;
-    const cold = E.fuel === 'diesel' && startCold && wearOf('glow') > 70 ? 0.04 : 0;
+    const cold = E.fuel === 'diesel' ? (startCold && wearOf('glow') > 70 ? 0.04 : 0)
+      : fx.k > 1 && startCold && i.coolant < 50 ? 0.02 * clamp01((10 - ambient()) / 20) : 0; // E85 barely vaporises cold: rough until it warms, worst below freezing
     cyl.forEach((k, n) => {
       if (k.dead) { nextDead(k, i.rpm); return; }
       const p = (ign + inj + cold) * (n === weakCyl ? 2 : 1) + (n === weakCyl && wearOf('gasket') >= 100 ? 0.05 : 0); // a blown gasket floods one cylinder
       if (p > 0 && poisson(firing * p)) {
         k.misfires++;
         misfireDip = 0.06;
+        puff = Math.min(1, puff + 0.35); // its fuel goes out unburnt: a puff of black
         sound('miss');
         addWear('cat', 0.15);
-        if (missCool <= 0) { fault('P030' + (n + 1)); missCool = 20; }
+        if (missCool <= 0) { fault(misCode(n)); missCool = 20; }
       }
     });
   }
@@ -1501,10 +1904,10 @@
       // under real load and revs a failing cylinder doesn't just stop firing - it takes the engine with it
       if (running.load > 0.5 && running.rpm > 3500 && Math.random() < 0.6) return blowUp(n, running.rpm, why);
       k.dead = true;
-      fault('P030' + (n + 1), 'active');
+      fault(misCode(n), 'active');
       if (window.CarService) CarService.announce('Engine damaged', `Cylinder ${n + 1} has lost compression. Stop the engine - it needs a rebuild.`, '#ff5f3d');
       log('damage', `Cylinder ${n + 1} destroyed (${E.fuel === 'petrol' ? 'detonation' : 'overload'})`);
-      setLimp('P030' + (n + 1));
+      setLimp(misCode(n));
     }
     if (wearParts.pistons) wearParts.pistons.value = Math.max(...cyl.map((x) => x.damage));
   }
@@ -1577,17 +1980,40 @@
     } else if (kind === 'tock') { // rod knock: a hollow metallic tock with a dull thud under it
       burst(0.03, 'bandpass', 1050 + Math.random() * 250, 4, 0.16 * amt, 0.028);
       burst(0.04, 'lowpass', 320, 1, 0.12 * amt, 0.035);
-    } else if (kind === 'boom') { // the engine letting go: the blast, a crack, shrapnel rattling out, grinding, then oil on the exhaust
-      burst(1.4, 'lowpass', 150, 0.8, 1, 1.3);
-      burst(0.25, 'bandpass', 2600, 1.2, 0.55, 0.22);
-      tone(t, 'sine', 95, 28, 0.8, 0.8);
-      for (let n = 0; n < 28; n++) {
-        const at = t + 0.04 + Math.pow(Math.random(), 1.6) * 1.9;
-        hit(at, 0.06, 'bandpass', 1400 + Math.random() * 4800, 8 + Math.random() * 12, (0.1 + Math.random() * 0.18) * (1 - (at - t) / 2.2), 0.03 + Math.random() * 0.06);
+    } else if (kind === 'boom') { // the engine letting go (amt: the rpm it went at): a huge bang and the rod through the block,
+      // metal clattering out, the engine coughing to a stop and locking, then oil and coolant hissing on the hot exhaust
+      const rpm = clamp(amt, 1500, 9500), t0 = actx.currentTime;
+      tone(t0, 'sine', 70, 18, 1, 1.2); // the bang: a sub-bass thump under a broadband blast and its crack
+      hit(t0, 1.6, 'lowpass', 220, 0.7, 1, 1.5);
+      hit(t0, 0.2, 'highpass', 2200, 0.5, 0.8, 0.14);
+      hit(t0 + 0.07, 0.14, 'bandpass', 1500, 2, 0.65, 0.12); // the rod hitting the block a beat later
+      hit(t0 + 0.07, 0.4, 'lowpass', 160, 1, 0.6, 0.35);
+      for (let n = 0; n < 44; n++) { // shrapnel and parts bouncing out and down the road, thinning out - some ring
+        const at = t0 + 0.05 + Math.pow(Math.random(), 1.8) * 2.6, k = 1 - (at - t0) / 2.9, f = 700 + Math.random() * 5200;
+        hit(at, 0.06, 'bandpass', f, 9 + Math.random() * 14, (0.08 + Math.random() * 0.2) * k, 0.025 + Math.random() * 0.06);
+        if (Math.random() < 0.3) tone(at, 'sine', f * 1.3, f * 1.29, 0.05 * k, 0.25 + Math.random() * 0.3);
       }
-      const grind = hit(t + 0.15, 1.8, 'bandpass', 1200, 3, 0.18, 1.7);
-      grind.frequency.setValueAtTime(1500, t + 0.15); grind.frequency.exponentialRampToValueAtTime(350, t + 1.9); // spinning down
-      hit(t + 0.4, 3.6, 'highpass', 2600, 0.7, 0.07, 3.4);
+      const grind = hit(t0 + 0.15, 1.8, 'bandpass', 1200, 3, 0.18, 1.7);
+      grind.frequency.setValueAtTime(1500, t0 + 0.15); grind.frequency.exponentialRampToValueAtTime(350, t0 + 1.9); // the crank grinding down
+      // dying: its last firings winding down from the rpm it blew at, coughing and missing, then a clunk as it locks solid
+      const die = 1.9, o = actx.createOscillator(), lp = actx.createBiquadFilter(), g = actx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(Math.min(300, rpm / 120 * E.cyl), t0 + 0.05); o.frequency.exponentialRampToValueAtTime(5, t0 + die);
+      lp.type = 'lowpass'; lp.frequency.setValueAtTime(900, t0); lp.frequency.exponentialRampToValueAtTime(110, t0 + die);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(0.28 * vol, t0 + 0.12);
+      for (let s = t0 + 0.25; s < t0 + die - 0.15; s += 0.1 + Math.random() * 0.18) g.gain.setValueAtTime(0.28 * vol * Math.random() * (1 - (s - t0) / die), s);
+      g.gain.linearRampToValueAtTime(0.0001, t0 + die);
+      o.connect(lp).connect(g).connect(out); o.start(t0); o.stop(t0 + die + 0.05);
+      hit(t0 + die, 0.25, 'lowpass', 200, 1, 0.55, 0.2);
+      hit(t0 + die + 0.01, 0.06, 'bandpass', 1400, 5, 0.2, 0.05);
+      // oil and coolant on the exhaust: a hiss that swells, then sizzles away
+      const src = actx.createBufferSource(), bp = actx.createBiquadFilter(), hg = actx.createGain();
+      src.buffer = noiseBuf; src.loop = true;
+      bp.type = 'bandpass'; bp.frequency.value = 4500; bp.Q.value = 0.8;
+      hg.gain.setValueAtTime(0.0001, t0 + 0.3); hg.gain.exponentialRampToValueAtTime(0.13 * vol, t0 + 1.1);
+      hg.gain.exponentialRampToValueAtTime(0.05 * vol, t0 + 3.5); hg.gain.exponentialRampToValueAtTime(0.0001, t0 + 6);
+      src.connect(bp).connect(hg).connect(out); src.start(t0 + 0.3); src.stop(t0 + 6.1);
+      for (let n = 0; n < 30; n++) hit(t0 + 0.6 + Math.random() * 4.5, 0.015, 'highpass', 5500, 1, 0.03 + Math.random() * 0.05, 0.012);
     } else if (kind === 'clicks') { // a flat battery: the starter solenoid chattering
       for (let n = 0; n < 7; n++) hit(t + n * 0.06, 0.012, 'bandpass', 2400 + Math.random() * 400, 5, 0.14, 0.012);
     } else if (kind === 'crank') { // the starter strains against a seized engine and gives up with a clunk
@@ -1760,7 +2186,7 @@
       vmax: c.vmax,
       finalDrive: fd,
       grip: gripNow(),
-      shiftCut: [[0.22, 0.3], [0.15, 0.2], [0.08, 0.1]][c.shiftSpeed || 0],
+      shiftCut: [[0.22, 0.3], [0.15, 0.2], [0.08, 0.1]][c.shiftSpeed || 0].map((v) => v * fx.shift), // a built box shifts quicker on top of the TCU flash
       burble: E.fuel === 'petrol' ? [0, 1, 1.6, 2.4][c.burble ?? 1] : 1,
       sound: { ...fx.sound, exLp: 1 + (fx.sound.ex - 1) * 0.6 }, // layer volumes for the louder hardware
       powerRatio: predicted(slot).hp / powerRef, // tuned peak power over stock - how much more heat the cooling has to shed
@@ -1782,6 +2208,7 @@
     api.fuel = E.fuel;
     P = [...PARTS[E.fuel](), ...(E.parts || []).map((p) => ({ ...p, opts: p.opts.map((o) => opt(...o)) }))]; // plus the engine's own (a hybrid's eDrive)
     if (E.swap) P = P.map((p) => (E.swap[p.k] ? { ...p, label: E.swap[p.k].label || p.label, opts: E.swap[p.k].opts.map((o) => opt(...o)) } : p)); // its own wording of a part
+    if (E.no) P = P.filter((p) => !E.no.includes(p.k)); // parts this engine has no use for
     CURVE_DEF.boost.max = Math.max(2.8, Math.ceil(Math.max(...Object.values(E.turbos).flat()) * 2 + 0.6) / 2);
     Object.entries(E.curveMax || {}).forEach(([k, v]) => { CURVE_DEF[k].max = Math.max(CURVE_DEF[k].max, v); });
     stockCal = stockFor(c);
@@ -1808,7 +2235,7 @@
     const first = c.slots || ['stock', 'stage1'];
     // a car's first tune: the preset standing in for the old map it was on comes with the hardware it needs
     if (!saved) Object.entries((presetsOf().find((x) => x.id === first[(c.slot || (S.engineMap === 2 ? 2 : 1)) - 1]) || {}).needs || {})
-      .forEach(([k, ok]) => { if (!ok.includes(part(k))) tune.parts[k] = ok[0]; });
+      .forEach(([k, ok]) => { if (!fits(k, ok)) tune.parts[k] = ok[0]; });
     mergeFx();
     [1, 2].forEach((n) => {
       const s = saved && saved.slots && saved.slots[n];
@@ -1826,14 +2253,14 @@
       cyl.push({ retard: 0, damage: d, dead: d >= 100, knocks: 0, misfires: 0, balance: (Math.random() - 0.5) * 0.6 });
     }
     weakCyl = Math.floor(Math.random() * E.cyl);
-    blown = (w.blown || 0) >= 100;
+    blown = ch.blown = (w.blown || 0) >= 100;
     // a seized engine: the start gets a starter clunk instead; a flat 12V battery (the Servicing tab's) only clicks
     // the solenoid. CarService.startButton asks first with 'carstart' (switching off still goes through)
     document.addEventListener('carstart', (e) => {
       const flat = sharedWear('battery') >= 100;
       if (!(blown || flat)) return;
       e.preventDefault();
-      if (blown) crank();
+      if (blown) { if (!dying) crank(); }
       else if (audioReady()) { if (actx.state === 'suspended') actx.resume(); sound('clicks'); CarService.announce('Battery flat', 'The starter only clicks - replace the 12V battery in Servicing.', '#ff9d2e'); }
     });
     // the car's own engine repair rebuilds it
@@ -1938,9 +2365,13 @@
     tune.parts[k] = id;
     const fresh = { turbo: 'turbo', hpfp: 'hpfp', pump: 'pump', injectors: 'injectors', trans: 'trans', chain: 'chain', springs: 'springs',
       oilpump: 'oilpump', radiator: 'radiator', waterpump: 'waterpump', thermostat: 'thermostat', intercooler: 'intercooler', gasket: 'gasket',
-      chargepipe: 'chargepipe', lpfp: 'lpfp', hoses: 'hoses', fan: 'fan', coils: 'coils', diverter: 'diverter', glow: 'glow', vgt: 'vgt', swirl: 'swirl' }[k];
+      chargepipe: 'chargepipe', lpfp: 'lpfp', hoses: 'hoses', fan: 'fan', coils: 'coils', diverter: 'diverter', glow: 'glow', vgt: 'vgt', swirl: 'swirl',
+      rings: 'rings', pcv: 'pcv', diinj: 'injectors', injection: (E.no || []).includes('diinj') ? 'injectors' : null }[k]; // a port-only engine's injectors are that part
     if (fresh && wearParts[fresh]) { if (!(fresh in swapWear)) swapWear[fresh] = wearParts[fresh].value; wearParts[fresh].value = 0; }
-    if (k === 'internals') { if (wearParts.pistons && !('pistons' in swapWear)) swapWear.pistons = wearParts.pistons.value; rebuild(null); } // a built engine goes in as a fresh short block
+    if (k === 'internals') { // a built engine goes in as a fresh short block
+      ['pistons', 'rings'].forEach((w) => { if (wearParts[w] && !(w in swapWear)) swapWear[w] = wearParts[w].value; });
+      rebuild(null);
+    }
   }
 
   // ---- My maps: whole setups the owner names and saves - the parts, the calibration (maps, limiters, gearbox, ECU
@@ -2125,8 +2556,25 @@
       border-right:1px solid #2a2d33;cursor:pointer;}
     .ct-seg button:last-child{border-right:0;}
     .ct-seg button[aria-pressed=true]{background:rgba(232,64,42,.16);color:#fff;}
-    .ct-parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;}
+    .ct-parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:10px;}
     .ct [hidden]{display:none !important;}
+    .ct-ptop{position:sticky;top:0;z-index:3;background:#0d0e10;padding:6px 0 8px;margin-top:-6px;}
+    .ct-jump{display:flex;gap:6px;overflow-x:auto;margin-top:8px;scrollbar-width:none;contain:inline-size;} /* scrolls in whatever width it gets - its chips mustn't widen the panel */
+    .ct-jump::-webkit-scrollbar{display:none;}
+    /* a phone: the page may shrink to the screen (several pages centre a fixed 1,060 px rig in a flex body, which pushes
+       the panel off the left edge) and the side panel drops under the rig, so the Parts list fits; the drive page's
+       iframe is 1,100 px wide unless its panel is open, so its cluster view never sees this */
+    @media (max-width:640px){body:has(.ct){min-width:0;max-width:100%;}.page-layout:has(.ct){flex-wrap:wrap;min-width:0;}.page-layout:has(.ct)>*{min-width:0;max-width:100%;}}
+    .ct-jump button{flex:none;font:700 .54rem/1 "Segoe UI",system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;padding:6px 9px;border-radius:999px;
+      border:1px solid #2a2d33;background:#121418;color:#8a8f96;cursor:pointer;white-space:nowrap;}
+    .ct-jump button:hover{color:#fff;}
+    .ct-jump b{font-weight:700;color:#ffb020;margin-left:4px;}
+    .ct-ghead{width:100%;background:none;border:0;border-bottom:1px solid var(--line);padding:0 0 6px;margin:14px 0 8px;cursor:pointer;scroll-margin-top:84px;font:inherit;}
+    .ct-ghead span:first-child::before{content:'▾';display:inline-block;width:12px;transition:transform .15s;}
+    .ct-ghead[aria-expanded=false] span:first-child::before{transform:rotate(-90deg);}
+    .ct-ghead small{font:.54rem/1 "Courier New",monospace;letter-spacing:0;text-transform:none;color:var(--dim);}
+    .ct-part .ct-seg{flex-wrap:wrap;gap:1px;background:#2a2d33;}
+    .ct-part .ct-seg button{flex:1 1 64px;border-right:0;}
     .ct-search{display:flex;align-items:center;gap:10px;}
     .ct-search input{flex:1;min-width:0;box-sizing:border-box;background:#121418;border:1px solid #2a2d33;border-radius:7px;color:#f4f6f8;padding:7px 10px;font:inherit;font-size:.68rem;}
     .ct-search input:focus{outline:none;border-color:#e8402a;}
@@ -2459,7 +2907,7 @@
     // presets
     const pre = body.querySelector('[data-presets]');
     presetsOf().forEach((p) => {
-      const miss = Object.entries(p.needs).filter(([k, ok]) => !ok.includes(part(k))).map(([k]) => P.find((x) => x.k === k).label);
+      const miss = Object.entries(p.needs).filter(([k, ok]) => !fits(k, ok)).map(([k]) => P.find((x) => x.k === k).label);
       const b = document.createElement('button');
       b.className = 'ct-preset';
       b.dataset.preset = p.id;
@@ -2777,17 +3225,22 @@
   // 'worn' (a condition bar past 60%) filter on the part's state instead of its text
   const PART_GROUPS = ['Engine', 'Turbo & intake', 'Exhaust', 'Fuel', 'Ignition', 'Cooling', 'Hybrid', 'Brakes', 'Drivetrain', 'Chassis'];
   const WEAR_OF = { internals: 'pistons engine', gasket: 'gasket', turbo: 'turbo', chargepipe: 'chargepipe', diverter: 'diverter', vgt: 'vgt',
-    intercooler: 'intercooler', hpfp: 'hpfp', pump: 'pump fuelfilter', lpfp: 'lpfp', injectors: 'injectors', injection: 'fuelfilter', trans: 'trans',
+    intercooler: 'intercooler', hpfp: 'hpfp', pump: 'pump fuelfilter', lpfp: 'lpfp', injectors: 'injectors', injection: 'injectors fuelfilter', trans: 'trans',
     plugs: 'plugs', coils: 'coils', glow: 'glow', egr: 'egr', intake: 'airfilter', catchcan: 'valves', swirl: 'swirl', springs: 'springs', chain: 'chain',
     oilpump: 'oilpump', oilcooler: 'oil', radiator: 'radiator', waterpump: 'waterpump', thermostat: 'thermostat', hoses: 'hoses coolant', fan: 'fan',
-    pads: 'brake', discs: 'discs', fluid: 'fluid', suspension: 'dampers', tyres: 'tyre pressure' };
+    pads: 'brake', discs: 'discs', fluid: 'fluid', suspension: 'dampers', tyres: 'tyre pressure', rings: 'rings oilLevel', pcv: 'pcv', diinj: 'injectors' };
   let partQuery = '';
+  const folded = new Set(); // groups folded away (while the page is open)
   function buildParts(body) {
     const groups = PART_GROUPS.filter((g) => P.some((p) => p.group === g));
     const shared = (k) => window.CarService && CarService.parts.find((x) => x.key === k);
-    body.innerHTML = `<div class="ct-search"><input type="search" data-partsearch placeholder="Search parts - gasket, turbo, fuel, worn, upgraded..." aria-label="Search parts">` +
-      `<span data-partcount></span></div>` +
-      groups.map((g) => `<div class="ct-label" style="margin:14px 0 8px"><span>${g}</span></div><div class="ct-parts" data-g="${g}"></div>`).join('') +
+    const ups = (g) => P.filter((p) => p.group === g && p.k !== 'fuel' && part(p.k) !== p.opts[0].id).length;
+    // the search and a jump to each group (with its upgraded count) stay in view while the long list scrolls
+    body.innerHTML = `<div class="ct-ptop"><div class="ct-search"><input type="search" data-partsearch placeholder="Search parts - gasket, turbo, fuel, worn, upgraded..." aria-label="Search parts">` +
+      `<span data-partcount></span></div><div class="ct-jump" role="group" aria-label="Jump to a group">` +
+      groups.map((g) => `<button data-to="${g}">${g}${ups(g) ? `<b>${ups(g)}</b>` : ''}</button>`).join('') + '</div></div>' +
+      groups.map((g) => `<button class="ct-label ct-ghead" data-fold="${g}" aria-expanded="${!folded.has(g)}"><span>${g}</span>` +
+        `<small>${ups(g)} of ${P.filter((p) => p.group === g).length} upgraded</small></button><div class="ct-parts" data-g="${g}"></div>`).join('') +
       '<div class="ct-hint" data-nomatch hidden>No parts match.</div>';
     P.forEach((p) => {
       const cur = p.opts.find((o) => o.id === part(p.k));
@@ -2812,10 +3265,27 @@
       const worn = (c) => c.dataset.keys.split(' ').some((k) => k && (wearParts[k] || shared(k)).value > 60);
       const hit = (c, w) => (w === 'worn' ? worn(c) : w === 'upgraded' || w === 'stock' ? c.dataset.state === w : c.dataset.text.includes(w));
       body.querySelectorAll('.ct-part').forEach((c) => { c.hidden = !words.every((w) => hit(c, w)); shown += !c.hidden; });
-      body.querySelectorAll('[data-g]').forEach((g) => { g.hidden = ![...g.children].some((c) => !c.hidden); g.previousElementSibling.hidden = g.hidden; });
+      body.querySelectorAll('[data-g]').forEach((g) => {
+        const any = [...g.children].some((c) => !c.hidden);
+        g.previousElementSibling.hidden = !any;
+        g.hidden = !any || (folded.has(g.dataset.g) && !words.length); // a search opens every group it finds something in
+      });
+      body.querySelectorAll('[data-to]').forEach((b) => { b.hidden = body.querySelector(`[data-fold="${b.dataset.to}"]`).hidden; });
       body.querySelector('[data-nomatch]').hidden = shown > 0;
       body.querySelector('[data-partcount]').textContent = words.length ? `${shown} of ${P.length}` : `${P.length} parts`;
     };
+    body.querySelectorAll('[data-fold]').forEach((h) => h.addEventListener('click', () => {
+      const g = h.dataset.fold;
+      if (folded.has(g)) folded.delete(g); else folded.add(g);
+      h.setAttribute('aria-expanded', String(!folded.has(g)));
+      filter();
+    }));
+    body.querySelectorAll('[data-to]').forEach((b) => b.addEventListener('click', () => {
+      const h = body.querySelector(`[data-fold="${b.dataset.to}"]`);
+      if (folded.delete(b.dataset.to)) { h.setAttribute('aria-expanded', 'true'); filter(); }
+      h.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      b.blur();
+    }));
     search.value = partQuery; // a part change re-renders the view - the search stays
     search.addEventListener('input', filter);
     filter();
@@ -3015,7 +3485,7 @@
       <tr><td><b>Limiters</b></td><td>Rev limit, speed limiter, launch rpm, shift point, shift speed</td><td>Vmax off lifts the 250 km/h limit</td><td>Revs past ${fmt(maxRpm())} rpm wear the engine; Race shifts wear the clutch packs</td></tr>
     </table>
     <h3>Fuel is your knock margin</h3>
-    <p><b>RON 95</b> is what the stock tune expects, and it's already knock-limited on a hot day. <b>RON 98</b> gives about 2° more margin, <b>RON 102</b> about 5°, and <b>E85</b> about 9° (plus a cooler charge). E85 needs about 40% more fuel, though, so it needs a <b>port injection kit</b> and an <b>uprated pump</b>.</p>
+    <p><b>RON 95</b> is what the stock tune expects, and it's already knock-limited on a hot day. <b>RON 98</b> gives about 2° more margin, <b>RON 102</b> about 5°, and <b>E85</b> knocks like ~RON 105 and cools the charge ~10 °C (about 8° in all), and with a <b>flex-fuel sensor</b> the ECU adds up to ~5° of timing: ~10-20% more on a turbo engine with a matched map, only a few % on an NA one. It carries ~28% less energy per litre, though: ~30% more fuel flow (a <b>port injection kit</b> and an <b>uprated pump</b>), ~25% less range, and rough cold starts in winter. <b>Water-methanol</b> adds ~2° and a cooler charge on boost, on any fuel.</p>
     <h3>Your first petrol tune</h3>
     <ol>
       <li>Warm up, open <b>Dyno</b>, turn on Dyno mode, roll into <b>4th</b> at about 2,000 rpm and do a full pull. That's your <b>stock baseline</b>.</li>
@@ -3038,14 +3508,23 @@
       <tr><td><b>Stock</b></td><td>all of it</td><td>~${fmt(E.rod)} Nm</td><td>${fmt(E.maxRpm)} rpm</td></tr>
       <tr><td><b>Forged</b> pistons, rods, head studs</td><td>~30%</td><td>~${fmt(E.rod * 1.5)} Nm</td><td>${fmt(E.maxRpm + 400)} rpm</td></tr>
       <tr><td><b>Fully built</b>: billet crank, race bearings, lower compression</td><td>~12%</td><td>~${fmt(E.rod * 2)} Nm</td><td>${fmt(E.maxRpm + 800)} rpm</td></tr>
+      <tr><td><b>Race block</b>: sleeved closed deck, billet crank and rods</td><td>~6%</td><td>~${fmt(E.rod * 2.6)} Nm</td><td>${fmt(E.maxRpm + 1100)} rpm</td></tr>
     </table>
     <p>Fitting new internals puts in a fresh short block, which also repairs any damage. A built engine still wears; it just takes far more abuse first.</p>
+    <p>Past each part's top tier: a <b>race-built gearbox</b> holds ~25% more than Built, a <b>triple-pass radiator</b> cools ~75% more than stock, ${E.fuel === 'petrol'
+    ? 'a <b>race HP pump</b>, the <b>big port kit</b> and <b>high-flow DI injectors</b> feed E85 on a big turbo, a <b>brushless bucket</b> feeds them, and <b>water-methanol</b> cools the charge and adds knock margin on boost. E85 needs a <b>flex-fuel sensor</b>, or it runs lean. Bigger injectors on an untouched stock map run it rich - load a map written for them'
+    : 'the <b>billet pump</b> and <b>150%-over injectors</b> feed the biggest maps, a <b>brushless bucket</b> lift pump feeds them, and <b>water-methanol</b> takes EGT down for more fuel'}.</p>
+    <h3>Exhaust smoke</h3>
+    <ul>
+      <li><b>Blue</b> is oil burning. Worn <b>piston rings</b> smoke on the overrun, cold and under load; tired <b>turbo seals</b> on boost and at idle after a hard run; a failed <b>PCV valve</b> under boost and on the overrun (a catch can traps some of it); a leaking <b>head gasket</b> steadily. It's faint until a part is ~70% worn, heavy at 100%, and it burns oil - watch the oil level.</li>
+      <li><b>Black</b> is fuel that didn't burn. ${E.fuel === 'petrol' ? 'On a petrol: a map richer than the factory mixture at high load and revs, leaking injectors, bigger injectors on a stock map, and misfires. A stock full-throttle pull is at most a haze; never at idle or cruise.' : 'On a diesel: more fuel than the air can burn - a stab of throttle before the boost arrives, or a fuel map past the smoke limiter.'}</li>
+    </ul>
     <h3>When it goes bad - and when it lets go</h3>
     <p>Everything a hard tune does to the engine shows up in <b>Servicing</b>. <b>Engine</b> is general wear: torque over stock, hot exhaust, running lean, over-revving, overheating. <b>Pistons</b> is the worst cylinder's damage from ${E.fuel === 'petrol' ? 'detonation and pre-ignition' : 'cylinder pressure and exhaust heat'}. Low oil starves the bottom end on top of that.</p>
     <ul>
       <li>Past about <b>55%</b> you'll hear a <b>rod knock</b>: once per revolution, louder under load. At 70% the dashboard warns of engine noise.</li>
       <li>Past about <b>85%</b> every hard pull at high revs is a gamble, and more so with a dead cylinder. A cylinder that fails under full load usually takes the engine with it.</li>
-      <li>When it <b>lets go</b>, a rod goes through the block: a bang, shrapnel, smoke pouring off it, and the engine dies on the spot. It won't turn over again - just a starter clunk - until you <b>repair the Engine</b> or <b>service the Pistons</b>, which rebuilds it.</li>
+      <li>When it <b>lets go</b>, a rod goes through the block: a bang, shrapnel, smoke pouring off it, and the engine dies on the spot with the key still on, so the dash lights its warnings. It won't turn over again - just a starter clunk - until you <b>repair the Engine</b> or <b>service the Pistons</b>, which rebuilds it.</li>
     </ul>
     <h3>Cooling and oil</h3>
     <p>Every bit of fuel burned puts heat into the coolant: roughly a third of it. The radiator sheds heat with airflow (road speed, then the fan), and only once the thermostat opens. A stock engine flat out at speed sits just above its ${E.tstat} °C thermostat. A tune that makes more power puts in more heat than the stock radiator can shed, and knock-retarded or lean running adds more. "Needs attention" shows where it settles.</p>
@@ -3068,7 +3547,7 @@
     <p>The <b>Diagnostics</b> tab reads every fault this page can set, shows the ECU's live data, and runs service functions: ${E.fuel === 'diesel' ? 'a DPF regeneration, injector balance and compression tests' : 'a compression test, misfire counters and resetting the knock adaptation'}. Every change - tunes, parts, services, refuels, faults - goes into the <b>History</b> tab, and you can restore the car to any point there.</p>
     <h3>Fault codes you may see</h3>
     <table><tr><th>Code</th><th>Meaning</th></tr>
-      ${Object.entries(FAULTS).filter(([k, f]) => k !== 'LIMP' && !/^P030[2-8]/.test(k) && (!f.fuel || f.fuel === E.fuel)).map(([k, f]) => `<tr><td><code>${k === 'P0301' ? 'P0301-6' : k}</code></td><td>${esc(k === 'P0301' ? 'Misfire in that cylinder' : f.title)}</td></tr>`).join('')}
+      ${Object.entries(FAULTS).filter(([k, f]) => k !== 'LIMP' && !/^P03(0[2-9]|10)/.test(k) && (!f.fuel || f.fuel === E.fuel)).map(([k, f]) => `<tr><td><code>${k === 'P0301' ? 'P0301-' + String(E.cyl).padStart(2, '0') : k}</code></td><td>${esc(k === 'P0301' ? 'Misfire in that cylinder' : f.title)}</td></tr>`).join('')}
       ${WEAR[E.fuel].filter((d) => !FAULTS[d.code]).map((d) => `<tr><td><code>${d.code}</code></td><td>${esc(d.title)}</td></tr>`).join('')}
     </table>`;
 
@@ -3089,7 +3568,8 @@
         row('Fuel rail pressure', fmt(c.rail) + ' bar', c.rail < c.railT - 40 ? 'bad' : ''),
         row('Injector duty', c.duty.toFixed(0) + ' %', c.duty > 90 ? 'warn' : ''),
         row('Knock adaptation', adapt < 0.999 ? `-${((1 - adapt) * 100).toFixed(0)}% boost` : 'none', adapt < 0.95 ? 'warn' : ''),
-        row('Fuel', part('fuel') === 'e85' ? 'E85' : 'RON ' + part('fuel')));
+        row('Fuel', part('fuel') === 'e85' ? 'E85' : 'RON ' + part('fuel')),
+        row('Exhaust smoke', `${Math.round(c.smoke)}% black · ${Math.round(c.oilSmoke)}% blue`, c.smoke > 40 || c.oilSmoke > 30 ? 'warn' : ''));
     } else {
       rows.push(row('Injection quantity', c.iq.toFixed(1) + ' mg/stroke'),
         row('Lambda', c.lambda == null ? 'fuel cut' : c.lambda.toFixed(2), c.lambda && c.lambda < 1.1 ? 'bad' : c.lambda && c.lambda < 1.18 ? 'warn' : ''),
@@ -3097,6 +3577,7 @@
         row('Injection timing ±', (c.soi >= 0 ? '+' : '') + c.soi.toFixed(1) + '°'),
         row('Peak cylinder pressure', fmt(c.pcp) + ' bar', c.pcp > pcpLimit() ? 'bad' : c.pcp > pcpLimit() - 15 ? 'warn' : ''),
         row('Smoke opacity', c.smoke.toFixed(0) + ' %', c.smoke > 40 ? 'warn' : ''),
+        row('Blue oil smoke', c.oilSmoke.toFixed(0) + ' %', c.oilSmoke > 30 ? 'warn' : ''),
         row('DPF soot load', fx.dpf ? Math.round(wearOf('dpf')) + ' %' + (regen > 0 || forcedRegen > 0 ? ' · regenerating' : '') : 'removed', wearOf('dpf') > 80 ? 'bad' : wearOf('dpf') > 60 ? 'warn' : ''));
     }
     const tstat = E.tstat + fx.tstat;
@@ -3116,7 +3597,7 @@
         out('> Cranking with injection disabled...', 'hi');
         for (let n = 0; n < E.cyl; n++) {
           await sleep(350);
-          const k = cyl[n], pct = k.dead ? 8 + Math.random() * 6 : 100 - k.damage * 0.7 - Math.random() * 2;
+          const k = cyl[n], pct = k.dead ? 8 + Math.random() * 6 : 100 - k.damage * 0.7 - wearOf('rings') * 0.12 - Math.random() * 2; // worn rings leak it down
           out(`    Cylinder ${n + 1}   ${pct.toFixed(0).padStart(3)}%   ${k.dead ? 'FAIL' : pct < 80 ? 'LOW ' : 'OK  '}`, k.dead ? 'err' : pct < 80 ? 'warn' : 'ok');
         }
       } },
