@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Diesel Instrument Cluster</title>
 <style>
   :root{
@@ -421,7 +422,7 @@
       <button id="shift-up-btn">Gear &plus;</button>
     </div>
   </div>
-  <div class="hint">8-speed, tap Gear &minus;/&plus; to go manual, Press D for auto &middot; Engine Map controls how much power is unlocked, from a mild 220&nbsp;hp on Map 1 up to a 1300&nbsp;hp race tune on Map 6 &mdash; Map 6 also extends the speedometer to 400&nbsp;km/h. &middot; TC button toggles traction control &middot; launch control: at a stop hold W + S, release S to launch &middot; L headlights, H high beam</div>
+  <div class="hint">8-speed, tap Gear &minus;/&plus; to go manual, Press D for auto &middot; Map 1 / Map 2 are the tune's two calibrations (the Tuning tab: maps, parts, wear) &mdash; the big maps extend the speedometer and tach &middot; TC button toggles traction control &middot; launch control: at a stop hold W + S, release S to launch &middot; L headlights, H high beam</div>
 
   <button class="mute-fab" id="mute-btn" title="Toggle engine sound" aria-label="Toggle engine sound"></button>
   <button class="dyno-toggle-btn" id="dyno-toggle-btn" title="Dyno chart" aria-label="Toggle dyno chart">
@@ -524,12 +525,8 @@
   <div class="tune-row" id="map-group">
     <span class="tune-label">Map</span>
     <div class="tune-btns">
-      <button class="num-btn active" id="map-btn-1" data-map="1">1</button>
-      <button class="num-btn" id="map-btn-2" data-map="2">2</button>
-      <button class="num-btn" id="map-btn-3" data-map="3">3</button>
-      <button class="num-btn" id="map-btn-4" data-map="4">4</button>
-      <button class="num-btn" id="map-btn-5" data-map="5">5</button>
-      <button class="num-btn" id="map-btn-6" data-map="6">6</button>
+      <button class="num-btn active" id="map-btn-1" data-map="1" title="Map 1 (1)">1</button>
+      <button class="num-btn" id="map-btn-2" data-map="2" title="Map 2 (2)">2</button>
     </div>
     <button class="icon-btn" id="refuel-btn" title="Refuel" aria-label="Refuel">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -662,8 +659,8 @@
 
   /* ---------------- TACHOMETER (0-6 x1000, diesel redline ~4.5) ---------------- */
   const TACH_MIN=0;
-  let TACH_MAX=8; // 8k for Map 4 and below, 12k for Map 5-6
-  const REDLINE=6.7; // always matches the real auto-shift point, regardless of dial scale
+  let TACH_MAX=8; // 8k up to ~550 hp, 12k for the big-turbo maps
+  let REDLINE=6.7; // always matches the real auto-shift point (the tune's), regardless of dial scale
   const tachTicks = document.getElementById('tach-ticks');
   const tachRedline = document.getElementById('tach-redline');
   function buildTachTicks(){
@@ -779,11 +776,12 @@
   engTempNeedle.style.transformOrigin = '100px 100px';
   const engTempReadout = document.getElementById('engtemp-readout');
 
-  // turbo boost gauge: -1 (vacuum) to 2.5 bar (max), 0 and operating range in between
-  // BOOST_MAX is the gauge face; STOCK_BOOST_MAX the stock turbos' ceiling (maps 1-3), BIG_TURBO_BOOST_MAX the
-  // much larger turbos fitted from Map 4 up - more peak boost, but they spool later and slower
-  const BOOST_MIN=-1, BOOST_MAX=3.5, STOCK_BOOST_MAX=2.5, BIG_TURBO_BOOST_MAX=3.5;
-  const bigTurbos = ()=> currentMap >= 4;
+  // turbo boost gauge: -1 (vacuum) to 5 bar (the race compounds' ceiling), 0 and operating range in between
+  // BOOST_MAX is the gauge face; BOOST_PEAK the map's peak boost (car-tune.js). The big turbos (a part) make more
+  // peak boost, but they spool later and slower
+  const BOOST_MIN=-1, BOOST_MAX=5, STOCK_BOOST_MAX=2.5;
+  let BOOST_PEAK = 3.2, SND_HW = { ex:1, intake:1, turbo:1 }; // louder hardware (car-tune.js)
+  const bigTurbos = ()=> CarTune.part('turbo') !== 'stock';
   const boostNeedle = document.getElementById('boost-needle');
   boostNeedle.style.transformOrigin = '100px 100px';
   const boostReadout = document.getElementById('boost-readout');
@@ -822,12 +820,12 @@
     tqRedarcG.innerHTML = '';
     tqRedarcG.appendChild(redlineArc(angleFor(TQ_MAX*0.86,0,TQ_MAX), angleFor(TQ_MAX,0,TQ_MAX)));
   }
-  buildBigGaugeTicks(document.getElementById('boost-ticks'), [-1,0,1,2,3], BOOST_MAX, BOOST_MIN);
+  buildBigGaugeTicks(document.getElementById('boost-ticks'), [-1,0,1,2,3,4,5], BOOST_MAX, BOOST_MIN);
   document.getElementById('boost-bluearc').appendChild(
     el('path',{d:arcPath(100,100,80,angleFor(BOOST_MIN,BOOST_MIN,BOOST_MAX),angleFor(-0.15,BOOST_MIN,BOOST_MAX)), stroke:'#4fa8ff','stroke-width':3.4, fill:'none', opacity:'0.9'})
   );
   document.getElementById('boost-redarc').appendChild(
-    redlineArc(angleFor(3,BOOST_MIN,BOOST_MAX), angleFor(BOOST_MAX,BOOST_MIN,BOOST_MAX))
+    redlineArc(angleFor(4.5,BOOST_MIN,BOOST_MAX), angleFor(BOOST_MAX,BOOST_MIN,BOOST_MAX))
   );
   buildGaugeScales();
   const hpNeedle = document.getElementById('hp-needle');
@@ -1214,13 +1212,13 @@
     // intake: airflow whoosh - scales with throttle opening and rpm, filter brightens with both
     const airflow = (0.12 + throttlePct*0.88) * (0.25 + revFactor*0.75);
     intakeFilter.frequency.setTargetAtTime(550 + airflow*1700 + revFactor*550, t, 0.1);
-    const intakeVol = soundOn ? Math.min(0.13, airflow*0.14) : 0.0001;
+    const intakeVol = soundOn ? Math.min(0.13, airflow*0.14)*SND_HW.intake : 0.0001;
     intakeGain.gain.setTargetAtTime(intakeVol, t, 0.08);
 
     // exhaust: drone pitched at the firing frequency; tailpipe boom rises slightly with rpm, swells under load
     exhaustSrc.playbackRate.setTargetAtTime(simRpm/EX_LOOP_RPM, t, 0.03); // the pulse train stays locked to the crank
     exhaustFilter.frequency.setTargetAtTime(260 + simRpm*0.06, t, 0.08); // dark - no resonant peak (a Q-4 peak on a saw was the electronic whistle)
-    const exhaustVol = soundOn ? Math.min(0.18, 0.05 + throttlePct*0.09 + revFactor*0.08) : 0.0001;
+    const exhaustVol = soundOn ? Math.min(0.18, 0.05 + throttlePct*0.09 + revFactor*0.08)*SND_HW.ex : 0.0001;
     exhaustGain.gain.setTargetAtTime(exhaustVol, t, 0.06);
   }
 
@@ -1237,7 +1235,7 @@
     }
     const big = bigTurbos();
     // X1-style VNT shaft lag: the wheels spool with the boost but keep spinning down for seconds after a lift
-    const boostRaw = Math.max(0, Math.min(1, boostBar/(big ? BIG_TURBO_BOOST_MAX : STOCK_BOOST_MAX)));
+    const boostRaw = Math.max(0, Math.min(1, boostBar/(big ? BOOST_PEAK : STOCK_BOOST_MAX))); // the big turbos: normalised to the boost this map reaches
     turboSpin += (boostRaw - turboSpin)*(1 - Math.exp(-dt/(boostRaw > turboSpin ? 0.15 : 2.0)));
     const boostNorm = turboSpin;
     // idle spin: the wheels take a moment to wake up after a start and coast down for seconds after the key is off
@@ -1489,8 +1487,8 @@
   // switched off, the full drive goes through and the excess spins the wheels up (revs flare).
   // Launch control: at a standstill in gear, hold W + S - revs hold at LAUNCH_RPM_K on the brake;
   // let go of S with W still held and it launches with optimal slip and no TC cut, until 100 km/h.
-  const TC_GRIP = 9.0; // m/s^2 of drive before the tyres let go (xDrive AWD - grips much harder before TC steps in)
-  const LAUNCH_RPM_K = 2.8, LAUNCH_BOOST = 1.08;
+  let TC_GRIP = 9.0; // m/s^2 of drive before the tyres let go (xDrive AWD - grips much harder before TC steps in); x the tune's T.grip
+  let LAUNCH_RPM_K = 2.8; const LAUNCH_BOOST = 1.08;
   let tcOn = true, tcIntervening = false, wheelspinK = 0, launchState = 'idle'; // idle | armed | engage | go
   let launchTimer = 0; const LAUNCH_ENGAGE_S = 0.35; // brake off -> drive engaging: revs held, no pull yet
   const tcBtn = document.getElementById('tc-btn');
@@ -1649,20 +1647,20 @@
   const HP_WATTS = 550*735.5; // ~404.5 kW
   const TORQUE_NM = 1300;
 
-  // ---- drivetrain physics (same model as the M5 CS): the engine's own torque curve (RPM_TORQUE_TABLE, scaled to
-  // the map), x what the turbo has built, x the pedal, goes through the real gear + final drive to the tyres, less
+  // ---- drivetrain physics (same model as the M5 CS): the engine's own torque curve (RPM_TORQUE_TABLE, x the
+  // tune's multiplier), x what the turbo has built, x the pedal, goes through the real gear + final drive to the tyres, less
   // driveline loss. Real rolling resistance, real brakes, and engine braking from the engine's own friction. ----
   const DRIVELINE_EFF = 0.88, ROLL_RES = 0.13, BRAKE_DECEL = 14.5; // m/s^2: rolling resistance, full-pedal braking (uprated)
   const NA_TORQUE_FRAC = 0.4; // share of the curve the engine makes before the turbo is pushing
   const engineFrictionNm = rpm => 28 + rpm*0.012; // what it drags when it isn't fuelling - engine braking
   // drive modes change the pedal map (Sport sharper, ECO PRO softer), not the power - full power is always there
   const PEDAL_EXP = { comfort:1.2, sport:1.0, eco:1.5 };
-  // the map's curve: the stock table scaled to the map's power, capped at the map's rated torque
+  // the stock curve (Map 4, the build as delivered); car-tune.js's tqMul makes it the slot's calibration
   function engineTorqueAt(rpm){
     const t = RPM_TORQUE_TABLE;
     let v = t[t.length-1][1];
     for(let i=1;i<t.length;i++) if(rpm <= t[i][0]){ v = t[i-1][1] + (t[i][1]-t[i-1][1])*(rpm-t[i-1][0])/(t[i][0]-t[i-1][0]); break; }
-    return Math.min(v*MAP_POWER_MUL[currentMap-1], TORQUE_NM*MAP_TORQUE_MUL[currentMap-1]);
+    return v;
   }
 
   // shiftBaseK/shiftFullK: the D-mode upshift rpm at light throttle / full throttle - comfort and
@@ -1764,17 +1762,14 @@
     throttleVal.textContent = throttleSlider.value+'%';
     throttleSlider.style.setProperty('--pct', throttleSlider.value+'%');
   });
-  // Maps 1-4 scale power and torque together (proportional tunes of the stock 550hp/1300Nm).
-  // Maps 5-6 are extreme builds with explicitly stated hp/Nm figures that aren't the same ratio
-  // as stock, so power and torque get their own multiplier arrays from here on.
-  const MAP_POWER_MUL = [0.40, 0.65, 0.85, 1.00, 850/550, 1300/550];
-  const MAP_TORQUE_MUL = [0.40, 0.65, 0.85, 1.00, 1800/1300, 2400/1300];
+  // Map 1 / Map 2 are the tune's two calibration slots (car-tune.js). Gauge faces are cosmetic: a slot gets the face of
+  // the old map (Map 1's 220 hp up to Map 6's 1,300 hp race tune) nearest the power it's predicted to make
   const MAP_HP_LABEL = [220, 358, 468, 550, 850, 1300];
-  const MAP_NM_LABEL = [520, 845, 1105, 1300, 1800, 2400];
   // gauge faces only - purely cosmetic scale per map, the underlying speed/rpm physics are never clamped
   const MAP_SPD_MAX = [260, 300, 330, 330, 450, 500];
   const MAP_TACH_MAX = [6, 6, 8, 8, 12, 12];
   const MAP_CONSUMPTION_MAX = [15, 20, 30, 40, 50, 70];
+  let mapsReady = false; // the faces are rebuilt once the page's own state exists (see the end)
   let currentMap = 1; // default Map 1
   const wearPctTxt = document.getElementById('wear-pct');
   const wearBarFill = document.getElementById('wear-bar-fill');
@@ -1792,47 +1787,70 @@
   function setMap(n){
     currentMap = n;
     mapBtns.forEach((b,i)=> b.classList.toggle('active', i+1===n));
-    const newSpdMax = MAP_SPD_MAX[n-1];
+    CarTune.setSlot(n);
+    mapFaces();
+  }
+  // button titles and the gauge faces for the slot's calibration
+  function mapFaces(){
+    const n = currentMap, p = CarTune.predict(n);
+    const f = MAP_HP_LABEL.reduce((b, hp, i)=> Math.abs(hp - p.hp) < Math.abs(MAP_HP_LABEL[b] - p.hp) ? i : b, 0); // the old map it stands for
+    mapBtns.forEach((b,i)=> { b.title = `Map ${i+1}: ${CarTune.label(i+1)} (${i+1})`; });
+    const newSpdMax = MAP_SPD_MAX[f];
     if(newSpdMax !== SPD_MAX){
       SPD_MAX = newSpdMax;
       buildSpeedoTicks();
       if(cruiseActive) updateCruiseMarker();
     }
-    const newTachMax = MAP_TACH_MAX[n-1];
-    if(newTachMax !== TACH_MAX){
-      TACH_MAX = newTachMax;
-      buildTachTicks();
-    }
-    const newConsMax = MAP_CONSUMPTION_MAX[n-1];
+    TACH_MAX = MAP_TACH_MAX[f];
+    buildTachTicks(); // its red zone follows the tune's shift point too
+    const newConsMax = MAP_CONSUMPTION_MAX[f];
     if(newConsMax !== CONSUMPTION_MAX){
       CONSUMPTION_MAX = newConsMax;
       buildConsumptionTicks();
     }
-    // Map 4 and above: extend gauge thresholds to 2000hp / 3000Nm for headroom on the bigger tunes
-    const newHpMax = n>=4 ? 2000 : 1400;
-    const newTqMax = n>=4 ? 3000 : 2600;
+    // from ~550 hp: extend gauge thresholds to 2000hp / 3000Nm for headroom on the bigger tunes
+    const newHpMax = f>=3 ? 2000 : 1400;
+    const newTqMax = f>=3 ? 3000 : 2600;
     if(newHpMax !== HP_MAX || newTqMax !== TQ_MAX){
       HP_MAX = newHpMax; TQ_MAX = newTqMax;
       buildGaugeScales();
     }
-    CarDyno.init({ hpMax: MAP_HP_LABEL[n-1], tqMax: MAP_NM_LABEL[n-1] });
+    CarDyno.init({ hpMax: Math.ceil(p.hp/10)*10, tqMax: Math.ceil(p.tq/10)*10 });
   }
   mapBtns.forEach((b,i)=> b.addEventListener('click', ()=> setMap(i+1)));
 
   // Our own simulated 8-speed gearing (not derived from a real transmission's ratios) -
   // ---- ZF 8-speed ratios + final drive on the 275/35 R19 tyres: engine rpm is a true ratio of road speed ----
-  const GEAR_RATIOS = [4.714, 3.143, 2.106, 1.667, 1.285, 1.000, 0.839, 0.667];
-  const FINAL_DRIVE = 2.813, WHEEL_R = 0.3375; // m, rolling radius
+  let GEAR_RATIOS = [4.714, 3.143, 2.106, 1.667, 1.285, 1.000, 0.839, 0.667]; // the tune's Gearbox map can change them
+  let FINAL_DRIVE = 2.813; const WHEEL_R = 0.3375; // m, rolling radius; the final drive is a part (car-tune.js)
   const WHEEL_KMH_PER_KRPM = 2*Math.PI*WHEEL_R*60; // km/h per 1000 wheel rpm
   const kmhPerKrpm = g => WHEEL_KMH_PER_KRPM/(GEAR_RATIOS[g]*FINAL_DRIVE);
-  const IDLE_RPMK = 0.6, REV_LIMIT_K = 11, AUTO_SHIFT_RPM_MAX = 6.7; // REV_LIMIT_K is the true absolute ceiling (last gear / M-mode over-rev); AUTO_SHIFT_RPM_MAX is where D shifts at full throttle
+  const IDLE_RPMK = 0.6;
+  let REV_LIMIT_K = 7, AUTO_SHIFT_RPM_MAX = 6.7; // from the tune: REV_LIMIT_K is the true absolute ceiling (last gear / M-mode over-rev); AUTO_SHIFT_RPM_MAX is where D shifts at full throttle
+  let SHIFT_K = GEAR_RATIOS.map(()=> 6.7); // full-throttle upshift per gear (the tune's Gearbox map)
   // GEAR_SPAN[i] = km/h each gear reaches the full-throttle shift point at - picks the gear coming out of P/N
-  const GEAR_SPAN = GEAR_RATIOS.map((_,g)=> AUTO_SHIFT_RPM_MAX*kmhPerKrpm(g));
+  let GEAR_SPAN = GEAR_RATIOS.map((_,g)=> SHIFT_K[g]*kmhPerKrpm(g));
   function pickGearForSpeed(spd){
     let g = 0;
     for(let i=0;i<GEAR_SPAN.length-1;i++){ if(spd >= GEAR_SPAN[i]) g = i+1; }
     return g;
   }
+  let SHIFT_CUT = [0.22, 0.3], heatTuneMul = 1; // upshift torque dip [s, depth]; how much more heat the tune makes
+  // engine_map is the slot (1 / 2). Before the tune it was Map 1-6: a car without a saved tune yet gets its old map as a
+  // preset with the hardware it needs - Map 4 (the build as delivered) is the stock calibration in slot 1
+  const legacy = savedState.engineMap || 4;
+  currentMap = savedState.tune ? (legacy === 2 ? 2 : 1) : (legacy === 4 ? 1 : 2);
+  CarTune.init({ engine:'B57Q', torque:RPM_TORQUE_TABLE, rev:7000, shift:6700, launch:2800, vmax:0, finalDrive:2.813, gears:GEAR_RATIOS.slice(),
+    wheelR: WHEEL_R, slot: currentMap, slots: ['stock', legacy === 4 ? 'map5' : 'map'+legacy], setMap:(n)=> setMap(n),
+    onChange(T){
+      REV_LIMIT_K = T.rev; AUTO_SHIFT_RPM_MAX = REDLINE = T.shift; LAUNCH_RPM_K = T.launch; FINAL_DRIVE = T.finalDrive;
+      GEAR_RATIOS = T.gears; SHIFT_K = T.shiftK;
+      GEAR_SPAN = GEAR_RATIOS.map((_,g)=> SHIFT_K[g]*kmhPerKrpm(g));
+      TC_GRIP = 9.0*T.grip; SHIFT_CUT = T.shiftCut; SND_HW = T.sound;
+      heatTuneMul = 1 + Math.max(0, T.powerRatio - 1)*2.5;
+      BOOST_PEAK = Math.max(0.5, ...[2, 3, 4, 5].map(k => CarTune.boostAt(k)));
+      if(mapsReady) mapFaces();
+    } });
   // torque converter: below its lock-up speed the engine can't drop under idle + stall slip
   function computeGearRpm(g, spd, throttle){
     let raw = Math.max(IDLE_RPMK + throttle*0.9, spd/kmhPerKrpm(g) + throttle*0.35);
@@ -1902,15 +1920,10 @@
 
     // ---- turbo boost: real lag - needs sustained high throttle before it even starts building,
     // and light/mid throttle barely registers at all (steeply non-linear, not a slow creep) ----
-    // spool curve: half boost at 2400rpm, full boost (of whatever the current map allows) at 4200rpm
-    // big turbos (Map 4+): larger, heavier wheels - half boost only at 3200rpm, full at 5000rpm
+    // the full-pedal target at this rpm comes from the tune's boost map, capped by what its turbos can make - the big
+    // turbos (a part): larger, heavier wheels that only make their boost much higher up
     const big = bigTurbos();
-    const [spoolHalfK, spoolFullK] = big ? [3.2, 5.0] : [2.4, 4.2];
-    let spoolFactor;
-    if(rpmK <= 0.8) spoolFactor = 0;
-    else if(rpmK <= spoolHalfK) spoolFactor = ((rpmK-0.8)/(spoolHalfK-0.8)) * 0.5;
-    else if(rpmK <= spoolFullK) spoolFactor = 0.5 + ((rpmK-spoolHalfK)/(spoolFullK-spoolHalfK)) * 0.5;
-    else spoolFactor = 1.0;
+    const boostFull = ignition ? CarTune.boostAt(rpmK) : -0.3;
     // genuine lag: only builds toward "spooled" once throttle has been meaningfully open for a bit,
     // and decays quickly the moment you lift - this is the actual delay before boost responds at all
     if(throttlePct > 0.01){ boostThrottleHighTime += dt; } else { boostThrottleHighTime = Math.max(0, boostThrottleHighTime - dt*2.5); }
@@ -1918,15 +1931,15 @@
                           : Math.max(0, Math.min(1, (boostThrottleHighTime - 0.05)/0.18));
     const throttleForBoost = throttlePct * lagFactor; // part throttle builds part boost, same as a real turbo
     const desiredBoost = ignition
-      ? (-0.3 + throttleForBoost*spoolFactor*(big ? BIG_TURBO_BOOST_MAX+0.3 : MAP_POWER_MUL[currentMap-1]*(STOCK_BOOST_MAX+0.3)))
+      ? (-0.3 + throttleForBoost*(boostFull+0.3))
       : -0.3;
     const boostRate = desiredBoost > boostBar ? (big ? 0.03 : 0.06) : 0.09; // big turbos build boost at half the rate - then hit hard
     boostBar += (desiredBoost - boostBar) * boostRate;
-    boostBar = Math.max(BOOST_MIN, Math.min(big ? BIG_TURBO_BOOST_MAX : STOCK_BOOST_MAX, boostBar));
+    boostBar = Math.max(BOOST_MIN, Math.min(5.5, boostBar)); // physical boost - the gauge needle pins at its own max
     updateTurboSound(boostBar, rpmK, throttlePct, dt);
     // how far the turbo has got toward the boost it can make at THIS rpm (0..1). The torque table is already the
     // fully-spooled curve, so only genuine lag - boost still building after you open the throttle - takes torque away
-    const boostAvail = spoolFactor*(big ? BIG_TURBO_BOOST_MAX+0.3 : Math.min(STOCK_BOOST_MAX+0.3, MAP_POWER_MUL[currentMap-1]*(STOCK_BOOST_MAX+0.3)));
+    const boostAvail = Math.max(0, boostFull+0.3);
     const boostDemand = throttlePct*boostAvail; // what this pedal asks for once spooled - only lag short of it costs torque
     const boost01 = boostDemand < 0.05 ? 1 : Math.max(0, Math.min(1, (boostBar + 0.3)/boostDemand));
 
@@ -1940,11 +1953,13 @@
     prevThrottleForBov = throttlePct;
     // cold engine makes less power - rich warm-up mixture, high oil/friction drag, the ECU holds it
     // back until the coolant is warm. 70% by 30C, full power only at ~90C operating temp.
-    const coldPowerMul = 0.7 + 0.3 * Math.max(0, Math.min(1, (coolantC - 30) / 60));
+    // warmShift: operating temp follows the fitted thermostat (88C stock, 80C with the low-temp one)
+    const warmShift = CarTune.tstat() - 88;
+    const coldPowerMul = 0.7 + 0.3 * Math.max(0, Math.min(1, (coolantC - 30) / (60 + warmShift)));
     const wearPowerMul = (1 - (wearPct/100)*0.1) * coldPowerMul; // wear: up to 10% loss at 100%; combined with the cold-engine penalty
     // cold fast idle: the ECU holds a raised idle through the whole warm-up, only dropping to normal
     // idle once the engine reaches operating temp (~82C -> 88C)
-    const idleK = IDLE_RPMK + Math.max(0, Math.min(1, (88 - coolantC) / 6)) * 0.5;
+    const idleK = IDLE_RPMK + Math.max(0, Math.min(1, (88 + warmShift - coolantC) / 6)) * 0.5;
 
     // real drag physics instead of an artificial speed governor: acceleration tapers naturally
     // toward the point where engine force = aerodynamic drag + rolling resistance
@@ -1959,8 +1974,11 @@
     const revLimiterHit = gearIdx>=0 && gearRpmNow >= REV_LIMIT_K - 0.1;
     // engine torque: the curve at the current rpm x boost x pedal; cut at the limiter; unfuelled, its friction brakes
     const rpmNow = Math.max(rpmK, idleK)*1000;
-    const tqFrac = (ignition && !revLimiterHit) ? throttlePct*(NA_TORQUE_FRAC + (1 - NA_TORQUE_FRAC)*boost01) : 0;
-    const engineTq = ignition ? engineTorqueAt(rpmNow)*tqFrac*wearPowerMul - engineFrictionNm(rpmNow)*Math.max(0, 1 - tqFrac/0.05) : 0; // the ECU fuels to cover friction as soon as the pedal asks for torque - only a closed pedal engine-brakes
+    // the tune: torque multiplier on the stock curve, its cuts (speed limiter, misfires), exhaust temp, fuel use
+    const tune = CarTune.tick({ dt, ignition, rpm: rpmNow, pedal: throttlePct, boost: boostBar, speed, gear: gearIdx, coolant: coolantC,
+      fuelCut: throttlePct < 0.02 && rpmK > idleK + 0.3 && gearIdx >= 0 && speed > 8 });
+    const tqFrac = (ignition && !revLimiterHit) ? throttlePct*(NA_TORQUE_FRAC + (1 - NA_TORQUE_FRAC)*boost01)*tune.cut : 0;
+    const engineTq = ignition ? engineTorqueAt(rpmNow)*tune.tqMul*tqFrac*wearPowerMul - engineFrictionNm(rpmNow)*Math.max(0, 1 - tqFrac/0.05) : 0; // the ECU fuels to cover friction as soon as the pedal asks for torque - only a closed pedal engine-brakes
 
     if(!ignition){
       speed = Math.max(0, speed - 40*dt);
@@ -1984,7 +2002,7 @@
       if(engineTq < 0 && gearIdx <= 1) a_ms2 *= Math.min(1, speed/(gearIdx === 0 ? 18 : 30));
       if(throttlePct < 0.02 && speed < CREEP_KMH) a_ms2 = Math.max(a_ms2, CREEP_A*(1 - speed/CREEP_KMH)); // idle creep
       if(a_ms2 > 0) a_ms2 = applyTraction(a_ms2, throttlePct);
-      if(upshiftCutT > 0 && a_ms2 > 0) a_ms2 *= 1 - 0.3*Math.sin(Math.PI*(1 - upshiftCutT/0.22)); // drive eases off slightly and back through the upshift
+      if(upshiftCutT > 0 && a_ms2 > 0) a_ms2 *= 1 - SHIFT_CUT[1]*Math.sin(Math.PI*(1 - upshiftCutT/SHIFT_CUT[0])); // drive eases off slightly and back through the upshift
       a_ms2 -= dragDecel_ms2 + rollA;
       speed = Math.max(0, speed + a_ms2*3.6*dt);
     } else {
@@ -2045,7 +2063,7 @@
         }
       } else if(shiftCooldown <= 0 && !CarDyno.hold){ // dyno run armed: hold the gear for the pull
         const curRpm = computeGearRpm(g, speed, throttlePct);
-        const upshiftThreshold = throttleRaw >= 0.97 ? AUTO_SHIFT_RPM_MAX : cfg.shiftBaseK + throttlePct*(cfg.shiftFullK-cfg.shiftBaseK); // floored: any mode holds to the shift point
+        const upshiftThreshold = throttleRaw >= 0.97 ? SHIFT_K[g] : Math.min(AUTO_SHIFT_RPM_MAX, cfg.shiftBaseK + throttlePct*(cfg.shiftFullK-cfg.shiftBaseK)); // floored: any mode holds to the shift point
         const holdGears = currentMode === 'sport';
         if(throttlePct > 0.02 && curRpm >= upshiftThreshold && g < GEAR_SPAN.length-1){
           g = g+1;
@@ -2066,11 +2084,7 @@
       newGearIdx = g;
     }
     if(newGearIdx !== gearIdx){
-      if(gearIdx >= 0 && newGearIdx > gearIdx){ upshiftCutT = 0.22; upshiftDropT = 0.5; } // gear-to-gear upshift: brief torque interruption, then the revs drop quickly into the new gear
-      const isUpshift = gearIdx >= 0 && newGearIdx > gearIdx; // real gear-to-gear upshift only, not engaging from P/N
-      const isDownshift = gearIdx >= 0 && newGearIdx < gearIdx; // real gear-to-gear downshift only, not disengaging to P/N
-      if(isUpshift) playUpshiftPop(computeGearRpm(gearIdx, speed, throttlePct), boostBar);
-      else if(isDownshift) playDownshiftCrackle(computeGearRpm(gearIdx, speed, throttlePct), boostBar);
+      if(gearIdx >= 0 && newGearIdx > gearIdx){ upshiftCutT = SHIFT_CUT[0]; upshiftDropT = 0.5; } // gear-to-gear upshift: brief torque interruption, then the revs drop quickly into the new gear
       gearIdx = newGearIdx;
       shiftCooldown = Math.max(shiftCooldown, 0.25); // every shift - D auto and M manual alike - gets the post-shift settle window
       // torque-interrupt boost dip on every shift - proportional, so it only bites when actually boosted
@@ -2142,7 +2156,7 @@
     const currentPowerW = ignition ? Math.max(0, engineTq)*rpmNow*Math.PI/30 : 0; // what the engine is actually making
     const currentPowerHp = currentPowerW/735.5;
     const rpmLossMul = 1 + Math.max(0, rpmK - 2)*0.08; // friction + pumping losses climb with revs - why ECO PRO's early shifts save fuel and Sport's held gears cost it
-    const fuelFlowLph = ignition ? (IDLE_FLOW_LPH + currentPowerHp*DIESEL_BSFC_LPH_PER_HP*rpmLossMul) * (1 + (wearPct/100)*0.06) : 0;
+    const fuelFlowLph = ignition ? (IDLE_FLOW_LPH + currentPowerHp*DIESEL_BSFC_LPH_PER_HP*rpmLossMul*tune.fuelMul) * (1 + (wearPct/100)*0.06) : 0;
     let consumptionL100;
     if(!ignition){ consumptionL100 = 0; }
     else if(speed < 2){
@@ -2201,10 +2215,10 @@
 
     // ---- coolant temperature: warms to a 92C operating point; only climbs toward the 120C max
     // through a slow heat-soak accumulator that builds up over sustained time spent at/past redline.
-    // Map 4 and above generate real heat - the more power unlocked, the much faster it climbs.
+    // A tune that makes more power generates real heat - the more power unlocked, the much faster it climbs.
     // Coasting (off throttle) under 3k rpm cools much faster and can dip below normal operating temp -
     // no combustion heat being generated, just airflow through the radiator. ----
-    const heatMul = currentMap >= 4 ? (2 + Math.max(0, MAP_POWER_MUL[currentMap-1]-1)*1.4) : 1.0;
+    const heatMul = heatTuneMul;
     // coast-cooling needs actual airflow through the radiator (moving, off throttle) AND an already-warm
     // engine - at a standstill idle there's no airflow, so the engine must warm to and hold 92C
     const isCoastCooling = throttlePct < 0.05 && rpmK < 3.0 && speed > 15 && coolantC > 88;
@@ -2240,6 +2254,7 @@
       coolantC += (20 - coolantC) * 0.0006; // cools slowly back to ambient once shut off
       overheatBuildup = Math.max(0, overheatBuildup - dt*0.003);
     }
+    if(tune.coolant != null) coolantC = tune.coolant; // car-tune.js's cooling: heat from the fuel burned, out through the radiator, pump + thermostat
     coolantC = Math.max(15, Math.min(170, coolantC)); // sanity ceiling only - the gauge itself pins at 120 (tempCToFrac clamps the needle), same pattern as the speedo/tach reading past their printed max
     updateFan();
     const coolantFrac = tempCToFrac(coolantC);
@@ -2250,25 +2265,25 @@
     if(ignition){
       const overRevAmount = Math.max(0, rpmK - AUTO_SHIFT_RPM_MAX); // 0 up to ~4.3k over
       const overheatAmount = Math.max(0, coolantC - 112); // 0 up to ~10C over
-      const wearRate = overRevAmount*0.03 + overheatAmount*0.01; // %/sec - even more reliable, very slow to actually wear now
+      const wearRate = overRevAmount*0.03 + overheatAmount*0.01 + tune.wear; // %/sec - plus whatever the tune takes out of it (car-tune.js)
       if(wearRate > 0){ wearPct = Math.min(100, wearPct + wearRate*CarService.oilMul()*dt); updateWearDisplay(); }
     }
     engTempReadout.textContent = '+' + coolantC.toFixed(1) + '\u00B0C';
 
     // ---- turbo boost gauge ----
-    boostNeedle.style.transform = `rotate(${angleFor(boostBar,BOOST_MIN,BOOST_MAX)}deg)`;
+    boostNeedle.style.transform = `rotate(${angleFor(Math.min(boostBar, BOOST_MAX*1.08),BOOST_MIN,BOOST_MAX)}deg)`;
     boostReadout.textContent = (boostBar>=0?'+':'') + boostBar.toFixed(2) + ' bar';
 
-    // ---- EGR/exhaust gas temp: rises with load (throttle+rpm) and boost, cools back to ambient
-    // once the engine's off. Real EGT has some thermal lag but responds much faster than coolant. ----
-    const egrTargetC = ignition ? (180 + throttlePct*(rpmK/REV_LIMIT_K)*420 + Math.max(0,boostBar)*35) : 23;
+    // ---- EGR/exhaust gas temp: cools back to ambient once the engine's off. Real EGT has some thermal
+    // lag but responds much faster than coolant. ----
+    const egrTargetC = ignition ? tune.egt : 23; // the tune's exhaust model: fuel vs air, injection timing, regeneration
     egrC += (egrTargetC - egrC) * (ignition ? 0.03 : 0.01);
     egrC = Math.max(23, Math.min(750, egrC));
 
     // ---- oil pressure: rpm-driven like a real oil pump, with a mild cold-oil bonus (thicker oil
     // when the coolant hasn't warmed up yet) and a wear penalty for a worn pump/bearings ----
     const oilTargetBar = ignition
-      ? Math.max(0, 0.8 + rpmK*0.62 + Math.max(0,(60-coolantC))*0.015) * (1 - (wearPct/100)*0.3)
+      ? Math.max(0, 0.8 + rpmK*0.62 + Math.max(0,(60-coolantC))*0.015) * (1 - (wearPct/100)*0.3) * tune.oilPress // a worn or uprated pump
       : 0;
     oilPressureBar += (oilTargetBar - oilPressureBar) * (ignition ? 0.15 : 0.08);
     oilPressureBar = Math.max(0, oilPressureBar);
@@ -2463,7 +2478,7 @@
       case 'n': case 'N':
         setTransmission('N');
         break;
-      case '1': case '2': case '3': case '4': case '5': case '6':
+      case '1': case '2':
         setMap(parseInt(e.key,10));
         break;
       case 'r': case 'R':
@@ -2538,7 +2553,8 @@
         break;
     }
   });
-  setMap(savedState.engineMap || 1); // apply the gauge scale for the loaded map; must run after cruiseActive etc. are declared above, since setMap() touches them
+  mapsReady = true;
+  setMap(currentMap); // apply the gauge scale for the loaded map; must run after cruiseActive etc. are declared above, since setMap() touches them
 
   // autosave: periodically and on tab close, so progress survives a refresh
   function currentSaveData(){
