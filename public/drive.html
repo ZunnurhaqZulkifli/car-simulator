@@ -227,6 +227,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ImprovedNoise } from 'three/addons/math/ImprovedNoise.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import NORDSCHLEIFE from './js/nordschleife.js';
+import KARAK from './js/karak.js?v=3';
 
 // The drivable cars (?car=, picked in the garage at home). Each runs on its own car page - engine, gearbox, gauges -
 // with a model of the same car as its body (?v= on its URL once the file is edited, past browsers' cached copy). A model's parts are found by matching "material|mesh|parent" names:
@@ -471,6 +472,8 @@ CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', grip: 2.2, page: 'bmw-530e'
 // ?car= takes a key above or the car page's slug (the main menu's Drive links); ?test_drive=1 runs the car page
 // without saving - for trying things out, the drive otherwise saves the car like its own page does
 const query = new URLSearchParams(location.search), TEST_DRIVE = query.has('test_drive');
+// the land round the Genting / Kuantan run, gzipped tiles of (height + 100) * 5 << 2 | flag (tools/karak/gen.mjs)
+const karakLandIn = fetch('/js/karak-terrain.bin?v=3').then(r => new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
 const CAR = CARS[query.get('car')] || Object.values(CARS).find(c => c.page === query.get('car')) || CARS.x1;
 
 // The car rolls on a kinematic bicycle model - no tyre slip, so it pivots like a real one when parking, and turns as
@@ -871,6 +874,45 @@ const W = makeRoad([[-412, 0, -600], [-414, 0, -750], [-428, 0, -900], [-470, 0,
 Object.assign(W, { iA: nearestSample(W, -5500, -950), iB: nearestSample(W, -37000, -1100), iS: nearestSample(W, -21000, -2400) }); // iS: the service area
 W.hw = i => i < W.iA || i >= W.iB; // the highway's samples, the autobahn's, and the tapers' between
 W.auto = i => i >= W.iA + 60 && i < W.iB - 60;
+// the run to the Genting Highlands and Kuantan (js/karak.js, from OpenStreetMap - tools/karak): off the city's ring
+// road north, the Gombak link (GB, 2+2) over the direct road and round onto the KL-Karak Expressway at Gombak's toll
+// plaza (KK: the real road and its heights, three lanes each way to past Genting Sempah and two on to Karak, through the
+// Genting Sempah tunnel), past Karak's plaza onto the East Coast Expressway (LP: the LPT shrunk to 0.3 of its size, two
+// lanes each way) to Kuantan's plaza and into the town (KU). At Genting Sempah, the slip off the eastbound carriageway
+// up to the junction over the tunnel (EX1) and the one back down onto the westbound over a bridge (EN1); from that
+// junction (a roundabout) the Genting Highlands road (GH, two lanes each way) up to Gohtong Jaya's roundabout and on
+// (GU) to where its ways part - the way up (GA), round the resort at the top (TL) and the way down (GD), one way each;
+// and east, the road over the tunnel to the rest area's roundabout (EC) and its slips off the westbound (EX2) and onto
+// the eastbound carriageway (EN2)
+const KR = KARAK.roads;
+const kRoad = (name, half, dip = 1.2) => Object.assign(makeRoad(KR[name], false, half, dip), { name });
+const GB = kRoad('GB', 10.5, 1.5), KK = kRoad('KK', 16.75, 1.5), LP = kRoad('LP', 13, 1.5), GH = kRoad('GH', 9.5), GU = kRoad('GU', 9.5),
+  GA = kRoad('GA', 5.5), TL = kRoad('TL', 5.5), GD = kRoad('GD', 5.5), EX1 = kRoad('EX1', 5), EN1 = kRoad('EN1', 5), EC = kRoad('EC', 6), EX2 = kRoad('EX2', 5), EN2 = kRoad('EN2', 5);
+// the roundabouts, laid out as the city's (their way: the island on the right): J over the tunnel, R by the rest area, Gohtong Jaya's
+const kRing = ({ x, z, r, y }, half, name) => Object.assign(makeRoad(Array.from({ length: 24 }, (_, k) => [x + r * Math.cos(k * Math.PI / 12), y, z + r * Math.sin(k * Math.PI / 12)]), true, half, 0.3), { name, c: { x, z, r, y } });
+const JR = kRing(KARAK.rings.J, 6, 'JR'), RR = kRing(KARAK.rings.R, 6, 'RR'), GRR = kRing(KARAK.rings.GR, 7.5, 'GRR');
+const KARAK_ROADS = [GB, KK, LP, GH, GU, GA, TL, GD, EX1, EN1, EC, EX2, EN2, JR, RR, GRR], kBy = Object.fromEntries(KARAK_ROADS.map(r => [r.name, r]));
+const kSpans = (r, spans = []) => { const at = spans.map(([a, b]) => [a * r.N, b * r.N]); return i => at.some(([a, b]) => i >= a && i <= b); };
+for (const r of KARAK_ROADS) r.bridge = kSpans(r, KARAK.bridges[r.name]);
+KK.tunnel = kSpans(KK, [KARAK.tunnel.slice(1)]);
+KK.three = kSpans(KK, KARAK.lanes3);
+for (const r of KARAK_ROADS) r.tunnel ??= () => false;
+const KASPH = { GB: 7.6, LP: 11.5, GH: 8.4, GU: 8.4, GA: 4.2, TL: 4.2, GD: 4.2, EX1: 3.6, EN1: 3.6, EC: 4.5, EX2: 3.6, EN2: 3.6 };
+for (const r of KARAK_ROADS) r.asph = r === KK ? i => KK.three(i) ? 16.75 : 13.75 : () => KASPH[r.name] ?? r.half - 1; // its asphalt's half-width (a ring's, either side of its line)
+// the places along it: [road, sample]
+const KP = Object.fromEntries(Object.entries(KARAK.places).map(([n, [road, f]]) => [n, { r: kBy[road], i: Math.round(f * kBy[road].N) }]));
+KP.gombakToll.i = Math.max(KP.gombakToll.i, 90); // (room before it to widen)
+// Kuantan, 2 x 1.5 km on the plain at the end of the run, by the sea (east of it, -x); the Kuantan home in its corner
+// block, laid out as the first; the safe house at the top of the Genting Highlands, off the loop round the resort on
+// its left, facing it
+const X5 = Array.from({ length: 9 }, (_, k) => -77600 + 250 * k), Z5 = Array.from({ length: 7 }, (_, k) => 41600 + 250 * k);
+const HOME3 = { x: X5[0] + 125, z: Z5[1] - 54 };
+const D3 = makeRoad([54, 33, 13, -5].map(z => [HOME3.x, 0, HOME3.z + z]), false, 3, 0.05);
+const Y3 = makeRoad([21, 2, -17].map(z => [HOME3.x + 9, 0, HOME3.z + z]), false, 10, 0.05);
+const HOME4 = (() => { const { r, i } = KP.safeHouse, L = r.L[i], p = r.P[i]; return { x: p.x + L.x * 44, y: p.y, z: p.z + L.z * 44, rot: Math.atan2(-L.x, -L.z) }; })();
+const homeAt = (H, lx, lz) => [H.x + lx * Math.cos(H.rot ?? 0) + lz * Math.sin(H.rot ?? 0), H.y ?? 0, H.z - lx * Math.sin(H.rot ?? 0) + lz * Math.cos(H.rot ?? 0)]; // a home's local spot in the world
+const D4 = makeRoad([39.5, 27, 13, -5].map(z => homeAt(HOME4, 0, z)), false, 3, 0.05), Y4 = makeRoad([21, 2, -17].map(z => homeAt(HOME4, 9, z)), false, 10, 0.05);
+HOMES.push(HOME3, HOME4);
 const grid = (X, Z) => [ringRoad(X[0], X.at(-1), Z[0], Z.at(-1)), // a town's streets: its ring, and right across it along every line between
   ...X.slice(1, -1).map(x => street([[x, Z[0]], [x, Z.at(-1)]])), ...Z.slice(1, -1).map(z => street([[X[0], z], [X.at(-1), z]]))];
 const BR = makeRoad([[2450, 0, -750], [2350, 0.3, -750], [2250, 2.6, -750], [2140, 5.6, -750], [2050, 7.3, -750], [1950, 7.3, -750], [1880, 5.4, -750],
@@ -930,6 +972,8 @@ const NW = ramp([[-388.1, -300], ...bez([-388.1, -300], [0, 1], [-355, -190], [0
   ...Array.from({ length: 13 }, (_, k) => [-400 + 45 * Math.cos(k * Math.PI / 12), -60 + 45 * Math.sin(k * Math.PI / 12)]), ...nwDown], [60, 240], [nwFall, nwFall - 240], 4.5);
 W.iC = 182;
 const CLOSED = [[K1, 150], [K3, 160], [W, W.iC]]; // [road, sample]: its way -1 lanes closed from there on (to sample 0)
+const KU = (() => { const e = LP.P[LP.N], t = unit([LP.P[LP.N - 4].x, LP.P[LP.N - 4].z], [e.x, e.z]);
+  return makeRoad([[e.x, e.y, e.z], ...bez([e.x, e.z], t, [X5.at(-1) + 7.5, Z5[3]], [-1, 0], 600, 16).map(([x, z], k) => [x, e.y * (1 - (k + 1) / 16), z])], false, 10.5, 0); })();
 // north of Midtown, off its x 1000 street carried on out of its ring: the drift park, a 390 x 120 m pad on its west side;
 // the drag strip, a loop off its east side - out along z 150, north up the strip (the start line at z 320, the finish
 // 402.3 m on), back along z 1250; and the mall at its end, its car park first
@@ -938,9 +982,10 @@ const DP = makeRoad([[992.5, 0, 600], [800, 0, 600], [600, 0, 600]], false, 60, 
 const DS = makeRoad([[1007.5, 0, 150], [1150, 0, 150], [1235, 0, 185], [1250, 0, 270], [1250, 0, DRAG.z0], [1250, 0, DRAG.z1], [1250, 0, 1080], [1250, 0, 1130],
   [1235, 0, 1215], [1150, 0, 1250], [1007.5, 0, 1250]], false, 9, 0.05);
 const MP = makeRoad([[1000, 0, 1300], [1000, 0, 1460]], false, 90, 0.05);
+const KUANTAN_STREETS = grid(X5, Z5);
 const STREETS = [AV, RING, RB, ...grid(X2, Z2), ...grid(X3, Z3), BR, BV, AR,
   street([[2950, -1000], [2950, -750], [2950, ROUND.z - ROUND.r]]), street([[2950, ROUND.z + ROUND.r], [2950, -250], [2950, 0]]),
-  street([[3200, -1000], [3200, -500], [3200, 0]]), street([[1000, 0], [1000, 650], [1000, 1300]]), ...grid(X4, Z4),
+  street([[3200, -1000], [3200, -500], [3200, 0]]), street([[1000, 0], [1000, 650], [1000, 1300]]), ...grid(X4, Z4), ...KUANTAN_STREETS,
   ...[-750, -250].map(z => street([[2450, z], [2950, z], [3450, z]])),
   street([[2450, -500], [2700, -500], [ROUND.x - ROUND.r, -500]]), street([[ROUND.x + ROUND.r, -500], [3200, -500], [3450, -500]])];
 // the car park: a multi-storey on the avenue's corner with the ring road, in the city's first block north of home
@@ -968,7 +1013,7 @@ const JUNCTIONS = [
   ...crossings(STREET_X, STREET_Z).filter(j => !(j.x === ROUND.x && j.z === ROUND.z)), ...crossings(X2, Z2), ...crossings(X3, Z3),
   ...[[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b]) => ({ x: ROUND.x + a * ROUND.r, z: ROUND.z + b * ROUND.r })),
   { x: 2700, z: -1232 }, { x: atK2.x, z: atK2.z }, { x: (CP.door + CP.x1) / 2, z: STREET_Z[0] }, ...[150, 600, 1250].map(z => ({ x: 1000, z })),
-  ...crossings(X4, Z4), { x: HOME2.x, z: Z4[1] }];
+  ...crossings(X4, Z4), { x: HOME2.x, z: Z4[1] }, ...crossings(X5, Z5), { x: HOME3.x, z: Z5[1] }, { x: 2580, z: 0 }, { x: X5.at(-1), z: Z5[3] }];
 // the racetrack: ~9 km on the plain south of the hills, laid out as straights and arcs from the start line, heading
 // east. Fast: the 1.5 km pit straight, then 300-500 m bends and esses down the east side. Slow: a left-right-left
 // chicane, another splitting the back straight, then the infield - a tight left, a quick right, a 150° near-hairpin,
@@ -1033,14 +1078,25 @@ const BP1 = makeRoad([edgeOf(K1, 3650, -1230, [3650, 0, 0]), [3650, 0, -1150], [
 const BP2 = makeRoad([edgeOf(K2, 3650, 243, [3650, 0, 1000]), [3645, 50, 500], [3625, 80, 900], [3615, 110, 1300], [3645, 140, 1700], [3800, 170, 2100],
   [4100, 200, 2450], [4400, 225, 2650], edgeOf(NA, 4700, 2750, [4400, 0, 2650])], false, 5.6);
 // roadside fuel stations and workshops, each on a flat apron straight out from the road's left (a fuel station's 46 m
-// deep and 40 wide, a workshop's 66 by 18): on the valley road past the track road, and on the Ring road by the loop
-const apron = (r, i, len, half) => makeRoad([0, 1, 2, 3].map(k => [r.P[i].x + r.L[i].x * len * k / 3, r.P[i].y, r.P[i].z + r.L[i].z * len * k / 3]), false, half, 0.05);
+// deep and 40 wide, a workshop's 66 by 18): on the valley road past the track road, on the Ring road by the loop, and
+// on the Genting Highlands road (fuel at Gohtong Jaya and the top, workshops up from the Sempah exit and at the top)
+const apron = (r, i, len, half, s = 1) => makeRoad([0, 1, 2, 3].map(k => [r.P[i].x + s * r.L[i].x * len * k / 3, r.P[i].y, r.P[i].z + s * r.L[i].z * len * k / 3]), false, half, 0.05);
 const SIDE = [[K1, 3900, -1230, true], [K1, 4010, -1225, false], [NA, 4548, 1835, true], [NA, 4548, 1925, false],
-  [W, -3000, -1120, true], [W, -43000, -1500, true], [W, -43200, -1520, false]].map(([r, x, z, fuel]) => {
+  [W, -3000, -1120, true], [W, -43000, -1500, true], [W, -43200, -1520, false],
+  ...[KP.gohtongFuel, KP.topFuel].map(({ r, i }) => [r, r.P[i].x, r.P[i].z, true]), ...[KP.sempahShop, KP.topShop].map(({ r, i }) => [r, r.P[i].x, r.P[i].z, false])].map(([r, x, z, fuel]) => {
   const i = nearestSample(r, x, z), half = fuel ? 20 : 9;
   return { r, i, fuel, half, apron: apron(r, i, fuel ? 46 : 66, half) };
 });
-const ROADS = [A, M, K1, K2, K3, RW, D, Y, V, S, ...STREETS, T, TR, PL, PG, ...UTURNS, CR, SL, VL, ON, NR, NPL, NPG, NA, BP1, BP2, DP, DS, MP, W, D2, Y2, ...SIDE.map(p => p.apron), ...CP_ROADS, XK, XW, KS, WS, NW];
+// the Genting Highlands' sights, each on a paved site out from its road on the side gen.mjs made level for it (a
+// margin inside): the Awana SkyWay's station on the way up, Chin Swee's temple, the lookout off the way down
+const SIGHTS = Object.fromEntries(['skyway', 'chinSwee', 'lookout'].map(n => {
+  const { r, i } = KP[n], [s, out, along] = KARAK.sites[n];
+  return [n, { r, i, s, len: out - 4, half: along - 2, apron: apron(r, i, out - 4, along - 2, s) }];
+}));
+const ROADS = [A, M, K1, K2, K3, RW, D, Y, V, S, ...STREETS, T, TR, PL, PG, ...UTURNS, CR, SL, VL, ON, NR, NPL, NPG, NA, BP1, BP2, DP, DS, MP, W, ...KARAK_ROADS, KU, D3, Y3, D4, Y4, ...['gombakToll', 'gentingToll', 'karakToll', 'kuantanToll'].map(n => {
+  const { r, i } = KP[n], w = r === GH ? 22 : 36; // (over its widest: the booths)
+  return Object.assign(makeRoad(Array.from({ length: 31 }, (_, k) => i - 60 + 4 * k).map(j => [r.P[j].x, r.P[j].y, r.P[j].z]), false, w, 0.05), { plaza: true });
+}), D2, Y2, ...SIDE.map(p => p.apron), ...Object.values(SIGHTS).map(p => p.apron), ...CP_ROADS, XK, XW, KS, WS, NW];
 
 // the autobahn's fuel stations, [sample, side]: northbound 650 m past the start on its keep-left side, and southbound
 // 650 m further north
@@ -1080,12 +1136,31 @@ function strip(r, o1, y1, o2, y2, color, on = () => true) {
   if (batch) {
     if (!batch.has(color)) batch.set(color, []);
     batch.get(color).push(g);
-  } else scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })));
+  } else squares(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
+}
+// geometry g (unindexed, positions) drawn in 6 km squares: its triangles by the square of their first corner, each
+// square a mesh of its own about its middle
+const SQ = 6000;
+function squares(g, material) {
+  const p = g.attributes.position.array, parts = new Map();
+  for (let t = 0; t < p.length; t += 9) {
+    const k = Math.floor(p[t] / SQ) * 1e5 + Math.floor(p[t + 2] / SQ);
+    if (!parts.has(k)) parts.set(k, []);
+    parts.get(k).push(t);
+  }
+  for (const [k, ts] of parts) {
+    const ox = (Math.floor(k / 1e5 + 0.5) + 0.5) * SQ, oz = (k - Math.floor(k / 1e5 + 0.5) * 1e5 + 0.5) * SQ, v = new Float32Array(ts.length * 9);
+    ts.forEach((t, n) => { for (let q = 0; q < 9; q += 3) v.set([p[t + q] - ox, p[t + q + 1], p[t + q + 2] - oz], n * 9 + q); });
+    const geo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(v, 3)), mesh = new THREE.Mesh(geo, material);
+    geo.computeVertexNormals();
+    mesh.position.set(ox, 0, oz);
+    scene.add(mesh);
+  }
 }
 // while batch is set (colour -> geometries), strips gather there, to be drawn by endBatch as one mesh per colour
 let batch;
 function endBatch() {
-  for (const [color, geos] of batch) scene.add(new THREE.Mesh(mergeGeometries(geos), new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })));
+  for (const [color, geos] of batch) squares(mergeGeometries(geos), new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
   batch = undefined;
 }
 const dashed = i => [1, 0.5, 0, 0][i % 4]; // 4.5 m dash, 7.5 m gap (JKR's broken lane line, Malaysia)
@@ -1168,14 +1243,14 @@ function twoLane(r, open = () => false, rails = () => true) {
     strip(r, s * 5.2, 0, s * 5.2, 0.75, 0x9aa0a6, i => rails(i) && !open(i, s));
   }
 }
-const sideSpots = r => SIDE.filter(p => p.r === r).map(p => spot(p.apron, 1, p.half + 4)); // its roadside aprons
+const sideSpots = r => [...SIDE, ...Object.values(SIGHTS)].filter(p => p.r === r).map(p => spot(p.apron, 1, p.half + 4)); // its roadside aprons
 twoLane(M, opens(M, [spot(K1, K1.N - 6, 24), spot(K2, 6, 24), spot(V, 5, 75), spot(CR, 6, 24), spot(CR, CR.N - 6, 24), spot(SL, SL.N - 6, 24), spot(NA, 6, 24)]));
 // the links have no rails where they run over the autobahn or into the loop
 twoLane(K1, opens(K1, [spot(BP1, 0, 14), spot(D, 3, 12), spot(S, 0, 14), spot(AV, 3, 12), spot(TR, 3, 12), spot(ON, 8, 60), spot(XK, 14, 60), ...sideSpots(K1)]), i => K1.P[i].x > 2170 && awayFrom(K1, K1.P[K1.N], 25)(i));
 twoLane(K2, opens(K2, [spot(AV, AV.N, 24), spot(BP1, BP1.N, 14), spot(BP2, 0, 14)]), i => K2.P[i].x > 2170 && awayFrom(K2, K2.P[0], 25)(i));
 twoLane(K3, opens(K3, [spot(KS, 12, 50)]), i => K3.P[i].x < 1830 && awayFrom(K3, K3.P[K3.N], 25)(i));
 twoLane(TR, undefined, i => awayFrom(TR, TR.P[0], 15)(i) && awayFrom(TR, TR.P[TR.N], 50)(i));
-for (const d of [D, D2]) strip(d, -3, 0.011, 3, 0.011, 0x77746e); // concrete drives
+for (const d of [D, D2, D3, D4]) strip(d, -3, 0.011, 3, 0.011, 0x77746e); // concrete drives
 strip(S, -9, 0.011, 9, 0.011, 0x77746e); // the mechanic's apron
 twoLane(NA, opens(NA, [...sideSpots(NA), spot(BP2, BP2.N, 14)]), i => awayFrom(NA, NA.P[0], 25)(i) && awayFrom(NA, NA.P[NA.N], 45)(i));
 for (const r of [BP1, BP2]) twoLane(r, undefined, i => awayFrom(r, r.P[0], 20)(i) && awayFrom(r, r.P[r.N], 20)(i)); // (no rails across the junctions' mouths)
@@ -1498,6 +1573,26 @@ function glowAt(g, list, white = true) {
     }
   });
   town(X4, Z4, 20261031, [10, 22], (k, j) => k === 0 && j === 0); // Westhaven
+  // Kuantan: its corner block the home's; the state mosque (Masjid Sultan Ahmad Shah) in its own block - the prayer
+  // hall under a great blue dome on a drum, four minarets
+  town(X5, Z5, 19530806, [10, 18], (k, j, x0, x1, z0, z1) => {
+    if (k === 0 && j === 0) return true;
+    if (k !== 3 || j !== 3) return false;
+    const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+    plaza(x0, x1, z0, z1, 0xd9d2c3);
+    slab(76, 14, 76, 0xf3f0e8).translate(mx, 0, mz);
+    fence(mx - 38, mx + 38, mz - 38, mz + 38);
+    drum(26, 26, 14, 24, mx, mz, 0xf3f0e8, 32);
+    piece(new THREE.SphereGeometry(27, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2).translate(mx, 24, mz), 0x2e6db4);
+    piece(new THREE.CylinderGeometry(0.4, 0.8, 9, 8).translate(mx, 55, mz), 0xd9c27a);
+    for (const [dx, dz] of [[-50, -50], [50, -50], [-50, 50], [50, 50]]) {
+      drum(3, 2.6, 0, 62, mx + dx, mz + dz, 0xf3f0e8, 12);
+      drum(3.6, 3.6, 46, 49, mx + dx, mz + dz, 0xe8e2d4, 12);
+      piece(new THREE.ConeGeometry(2.8, 9, 12).translate(mx + dx, 66.5, mz + dz), 0x2e6db4);
+      solid(mx + dx, mz + dz, mx + dx, mz + dz, 3);
+    }
+    return true;
+  });
   // the airfield, between its runway and Midtown: a concrete apron, the terminal with three jet bridges and an airliner
   // parked nose-in at the middle one, and north of the road in, two hangars and the control tower
   piece(new THREE.PlaneGeometry(120, 305).rotateX(-Math.PI / 2).translate(240, 0.011, -897.5), 0x9a9a94); // (out to the road)
@@ -1694,6 +1789,23 @@ turnFerris(0);
 
 // a group at (x, y, z) turned rot about the vertical, in the scene: a site things are built on in its own axes
 const site = (x, y, z, rot) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; scene.add(g); return g; };
+function mergeSite(g) { // its untextured meshes, by kind (lit or not), into one each - its own frame kept, its boxes solid as before
+  const kinds = new Map(), col = new THREE.Color();
+  g.updateMatrixWorld(true);
+  for (const m of [...g.children]) {
+    if (!m.isMesh || m.material.map || m.isInstancedMesh) continue;
+    if (m.geometry.type === 'BoxGeometry') boxSolid(m);
+    m.updateMatrix();
+    const geo = m.geometry.clone().applyMatrix4(m.matrix), n = geo.attributes.position.count, key = m.material.type + m.material.side;
+    col.copy(m.material.color);
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: n * 3 }, (_, k) => [col.r, col.g, col.b][k % 3]), 3));
+    for (const a of Object.keys(geo.attributes)) if (!['position', 'normal', 'color'].includes(a)) geo.deleteAttribute(a);
+    if (!kinds.has(key)) kinds.set(key, [m.material, []]);
+    kinds.get(key)[1].push(geo.index ? geo.toNonIndexed() : geo);
+    g.remove(m);
+  }
+  for (const [mat, geos] of kinds.values()) g.add(new THREE.Mesh(mergeGeometries(geos), new mat.constructor({ vertexColors: true, side: mat.side })));
+}
 const siteBox = (g, w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
   const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
   b.position.set(x, y, z);
@@ -1890,13 +2002,32 @@ function onRoad(x, z, near) {
 // Near a road it follows the road (a ditch alongside, so the coarse grid never pokes through the asphalt); away from
 // it, the roads' general height plus peaks and valleys that grow with distance; valley floors stop at the plain
 const LAND = { x0: 2100, x1: 9705, z0: -2000, z1: 7405 };
-const coarse = ROADS.filter(r => r !== T && r !== W && ![XK, XW, KS, WS, NW].includes(r) && !UTURNS.includes(r) && !STREETS.includes(r) && !CP_ROADS.includes(r)).flatMap(r => r.P.filter((_, i) => i % 50 === 0)), noise = new ImprovedNoise(); // (the flat city and track, and the flyover, don't shape the hills; every 150 m keeps the bigger land quick to build)
+// the run's land (js/karak-terrain.bin): 20 m grid points in 960 m tiles, each height and flag (1 under a road, 2 over
+// the tunnel, 3 the hills' own land); bilinear between them. Undefined off its tiles
+const KT = KARAK.terrain, KT_N = KT.tile + 1, KT_W = KT.cell * KT.tile, ktIndex = new Map(KT.tiles.map(([i, j], t) => [i + ',' + j, t]));
+const KARAK_LAND = new Uint16Array(await karakLandIn);
+function ktAt(gi, gj) { // the grid point's [height, flag], or undefined (on a tile's edge, either tile's)
+  const ti = Math.floor(gi / KT.tile), tj = Math.floor(gj / KT.tile);
+  for (const [a, b] of [[ti, tj], [ti - 1, tj], [ti, tj - 1], [ti - 1, tj - 1]]) {
+    const t = ktIndex.get(a + ',' + b), u = gi - KT.tile * a, v = gj - KT.tile * b;
+    if (t === undefined || u < 0 || v < 0 || u > KT.tile || v > KT.tile) continue;
+    const h = KARAK_LAND[t * KT_N * KT_N + v * KT_N + u];
+    return [(h >> 2) / 5 - 100, h & 3];
+  }
+}
+function karakLand(x, z) {
+  const fi = (x - KT.x0) / KT.cell, fj = (z - KT.z0) / KT.cell, i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j;
+  const a = ktAt(i, j), b = ktAt(i + 1, j), c = ktAt(i, j + 1), d = ktAt(i + 1, j + 1);
+  if (!a || !b || !c || !d) return;
+  return a[0] * (1 - u) * (1 - v) + b[0] * u * (1 - v) + c[0] * (1 - u) * v + d[0] * u * v;
+}
+const coarse = ROADS.filter(r => r !== T && r !== W && (!r.name || r === GB) && !r.plaza && ![KU, D3, Y3, D4, Y4].includes(r) && ![XK, XW, KS, WS, NW].includes(r) && !UTURNS.includes(r) && !STREETS.includes(r) && !CP_ROADS.includes(r)).flatMap(r => r.P.filter((_, i) => i % 50 === 0)), noise = new ImprovedNoise(); // (the flat city and track, and the flyover, don't shape the hills; every 150 m keeps the bigger land quick to build)
 function terrainAt(x, z) {
   const edge = Math.min(x - LAND.x0, LAND.x1 - x, z - LAND.z0, LAND.z1 - z);
-  if (edge <= 0) return -0.1; // the plain
+  if (edge <= 0) return karakLand(x, z) ?? -0.1; // the plain, or the run's land
   let near = Infinity, sw = 0, sy = 0; // the road's height near here, weighted 1/d^4 (so: the road's own height on it)
   eachNear(x, z, 2, (r, i) => {
-    if (r === BR || r === XK) return; // (on piers)
+    if (r === BR || r === XK || (r === GB && GB.bridge(i))) return; // (on piers)
     const d2 = (r.P[i].x - x) ** 2 + (r.P[i].z - z) ** 2, w = 1 / (d2 * d2 + 1e-6);
     near = Math.min(near, d2); sw += w; sy += w * (r.P[i].y - r.dip);
   });
@@ -1954,14 +2085,52 @@ for (let k = 0; k < trees.count; k++) {
 }
 scene.add(trees);
 
+// the Genting Highlands resort and Gohtong Jaya (OSM's footprints and storeys, on the land): walls in window bays as
+// the towns', flat roofs; First World's in its bands of colour. None where a road runs
+{
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  c.width = c.height = 64;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#56616c'; g.fillRect(9, 14, 46, 34);
+  const windows = Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace, wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping });
+  const parts = [], col = new THREE.Color(), tint = (geo, color) => { col.setHex(color); geo.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: geo.attributes.position.count }, () => [col.r, col.g, col.b]).flat(), 3)); parts.push(geo); };
+  const WALLS = [0xd8cfc0, 0xc9c2b6, 0xe6e1d8, 0xb9a48c, 0xa7aeb5, 0xcfd6db, 0x9c8f80], GLASS = [0x9fb6c8, 0x8ea3b5, 0xbfc9d1, 0x7f95a8];
+  KARAK.buildings.forEach(([foot, storeys, name], n) => {
+    if (foot.some(([x, z]) => onRoad(x, z).out < 1)) return;
+    const base = Math.min(...foot.map(([x, z]) => karakLand(x, z) ?? terrainAt(x, z))) - 1.5, top = base + 1.5 + storeys * 3.5;
+    const cx = foot.reduce((a, p) => a + p[0], 0) / foot.length, cz = foot.reduce((a, p) => a + p[1], 0) / foot.length;
+    const BANDS = [0xe74c3c, 0xf1c40f, 0x3498db, 0x2ecc71, 0xe67e22, 0x9b59b6], first = /First World/i.test(name), grand = /Genting Grand|Highlands Hotel|Resort|RW /i.test(name);
+    const color = first ? 0 : grand ? 0xf0ece4 : (storeys > 8 ? GLASS : WALLS)[n % (storeys > 8 ? GLASS.length : WALLS.length)];
+    let u = 0;
+    foot.forEach(([ax, az], k) => {
+      let [bx, bz] = foot[(k + 1) % foot.length], [px, pz] = [ax, az];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 0.5) return;
+      if (-(bz - az) * ((ax + bx) / 2 - cx) + (bx - ax) * ((az + bz) / 2 - cz) < 0) [px, pz, bx, bz] = [bx, bz, ax, az]; // (faces out)
+      const wall = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([px, base, pz, bx, base, bz, bx, top, bz, px, top, pz], 3))
+        .setAttribute('uv', new THREE.Float32BufferAttribute([u / 4, 0, (u + len) / 4, 0, (u + len) / 4, (top - base) / 3.5, u / 4, (top - base) / 3.5], 2));
+      wall.setIndex([0, 1, 2, 0, 2, 3]);
+      wall.computeVertexNormals();
+      tint(wall, first ? BANDS[k % BANDS.length] : color);
+      solid(ax, az, bx, bz, 0, base, top);
+      u += len;
+    });
+    const roof = new THREE.ShapeGeometry(new THREE.Shape(foot.map(([x, z]) => new THREE.Vector2(x, -z)))).rotateX(-Math.PI / 2).translate(0, top, 0);
+    for (let v = 0; v < roof.attributes.uv.count; v++) roof.attributes.uv.setXY(v, 0.05, 0.05);
+    tint(roof, first ? 0xd9d6cf : 0x8d8a85);
+  });
+  scene.add(new THREE.Mesh(mergeGeometries(parts), new THREE.MeshLambertMaterial({ map: windows, vertexColors: true })));
+}
+
 // self-checks: the car rests exactly on the mountain and link roads, the drive and the lay-by, the village's roads, the
 // Nordschleife and its roads, the aprons, the runway, the flyovers and the bridge and the autobahn and on-ramp under
 // them, the car park's decks and ramps, and no climb is steeper than 12%
-for (const r of [M, K1, K2, K3, BP1, BP2, D, V, S, ...STREETS.filter(r => r !== BR), T, TR, CR, SL, VL, NR, NPL, NA, RW, ...SIDE.map(p => p.apron)]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z) - r.P[i].y) < 0.05, 'the car should rest on the road', i);
+for (const r of [M, K1, K2, K3, BP1, BP2, D, V, S, ...STREETS.filter(r => r !== BR), T, TR, CR, SL, VL, NR, NPL, NA, RW, ...SIDE.map(p => p.apron), ...Object.values(SIGHTS).map(p => p.apron)]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z) - r.P[i].y) < 0.05, 'the car should rest on the road', i);
 for (const r of [...UTURNS, A, BR, ON, ...CP_ROADS, XK, XW, KS, WS, NW]) for (let i = 0; i < r.N; i++) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z, r.P[i].y) - r.P[i].y) < 0.05, 'the car should rest on the road, not the one over or under it', i);
 let steepest = 0;
 for (const r of [M, K2, AV, BR, CR, SL, NA, BP1, BP2]) for (let i = 0; i < r.N; i++) steepest = Math.max(steepest, Math.abs(r.P[i + 1].y - r.P[i].y) / Math.hypot(r.P[i + 1].x - r.P[i].x, r.P[i + 1].z - r.P[i].z));
 console.assert(steepest < 0.12, 'mountain grades should stay under 12%', steepest);
+for (const r of [...KARAK_ROADS, KU, D3, D4]) for (let i = 0; i < r.N; i += 37) console.assert(Math.abs(surfaceAt(r.P[i].x, r.P[i].z, r.P[i].y) - r.P[i].y) < 0.05, 'the car should rest on the run', r.name, i);
 
 // fuel stations: canopy, two pump islands, a shop and a sign, on a site o m out from road r's sample i on side s
 // (local +Z along the road, +X away from it): the autobahn's, and the roadside ones on their aprons
@@ -1984,6 +2153,7 @@ function fuelStation(r, i, s, o) {
   floodlit(station, [[9, -13, 0, -13], [9, 13, 0, 13], ...(o > 30 ? [[-13, -42, 0, -42], [-13, 42, 0, 42]] : [])],
     [[0, 0, 22, 32], [2, -14, 16, 12], [2, 14, 16, 12], ...(o > 30 ? [[-6, -42, 18, 26], [-6, 42, 18, 26]] : [])]);
   glowAt(station, [[-4, 4.7, -7, 120, 18], [4, 4.7, -7, 120, 18], [-4, 4.7, 7, 120, 18], [4, 4.7, 7, 120, 18]]); // under the canopy
+  mergeSite(station);
   STATIONS.push(station.position);
 }
 for (const [i, s] of A_STATIONS) fuelStation(A, i, s, 31);
@@ -1992,7 +2162,8 @@ for (const p of SIDE) if (p.fuel) fuelStation(p.r, p.i, 1, 24);
 // home: the garage, open to the drive (north), with the house beside it. Local +Z is north, +X east
 for (const H of HOMES) {
   const home = new THREE.Group();
-  home.position.set(H.x, 0, H.z);
+  home.position.set(H.x, H.y ?? 0, H.z);
+  home.rotation.y = H.rot ?? 0;
   const hBox = (w, h, d, color, x, y, z, Mat = THREE.MeshLambertMaterial) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new Mat({ color }));
     b.position.set(x, y, z);
@@ -2016,6 +2187,7 @@ for (const H of HOMES) {
   // garden lamps down the drive and by the front door, and the garage lit
   floodlit(home, [[-3.8, 44, 0, 44], [-3.8, 22, 0, 22], [13.6, 7, 8, 7]], [[0, 42, 10, 16], [0, 22, 10, 18], [6, 9, 16, 9], [0, 0, 5, 8]], 0.5, 1.1, false);
   glowAt(home, [[0, 2.9, 0, 20, 7]]);
+  mergeSite(home);
 }
 
 // workshops: one wide bay open to the road, a lift, a tool chest and a sign, on a site with local +Z away from the
@@ -2046,6 +2218,7 @@ function workshop(x, y, z, rot) {
   shop.add(sign);
   floodlit(shop, [[-8.5, -7, -4, -14], [8.5, -7, 4, -14]], [[0, -14, 20, 14], [0, 0, 13, 11]]); // the apron, and the bay
   glowAt(shop, [[0, 4.9, 0, 100, 14]]);
+  mergeSite(shop);
   SHOPS.push({ x, z, rot });
 }
 workshop(SHOP.x, 0, SHOP.z, 0);
@@ -2153,6 +2326,555 @@ for (const p of SIDE) if (!p.fuel) workshop(p.r.P[p.i].x + p.r.L[p.i].x * 58, p.
   }
 }
 
+// the run to the Genting Highlands and Kuantan: its land and its roads are drawn tile by tile (960 m, the land's), only
+// near the car (karakTiles, below) - each stripe a spec now, [road, offset 1, height 1, offset 2, height 2, colour, on,
+// lit] (offsets m left of the centre line, or by sample), walls solid everywhere from the start
+const KSTRIPS = [];
+const kOff = o => typeof o === 'function' ? o : () => o;
+function kStrip(r, o1, y1, o2, y2, color, on = () => true, lit = false) {
+  const O1 = kOff(o1), O2 = kOff(o2);
+  KSTRIPS.push([r, O1, y1, O2, y2, color, on, lit]);
+  if (o1 === o2 && Math.max(y1, y2) > 0.3) for (let i = 0; i < r.N; i++) if (on(i)) { // (a wall)
+    const o = O1(i), a = r.P[i], b = r.P[i + 1];
+    solid(a.x + r.L[i].x * o, a.z + r.L[i].z * o, b.x + r.L[i + 1].x * o, b.z + r.L[i + 1].z * o, 0, Math.min(a.y, b.y) + Math.min(y1, y2), Math.max(a.y, b.y) + Math.max(y1, y2));
+  }
+}
+const kPaint = (r, o, w, on) => { const O = kOff(o); kStrip(r, i => O(i) - w / 2, 0.022, i => O(i) + w / 2, 0.022, 0xeeeeee, on); };
+const ASPH = 0x3a3a3c, GRAVEL = 0x77706a, SKIRT = 0x5f574d, RAIL = 0x9aa0a6, CONC = 0xb8b5ad, BARRIER = 0xc9c6bf;
+// the toll plazas: the road widening to the booths (w, m out each side, against sample i)
+const PLAZAS = ['gombakToll', 'gentingToll', 'karakToll', 'kuantanToll'].map(n => {
+  const { r, i } = KP[n], w = r === GH ? 18.6 : 34.5;
+  return { n, r, i, w, wide: j => r.half + (w - r.half) * ease((60 - Math.abs(j - i)) / 40), near: j => Math.abs(j - i) < 62 };
+});
+const plazaAt = (r, i) => PLAZAS.some(p => p.r === r && p.near(i));
+// the rest-and-service areas: fuel either side, a workshop 120 m on each side (as the west road's)
+const RNR = ['sempahRR', 'bentongRR', 'temerlohRR', 'gambangRR'].map(n => ({ n, ...KP[n] }));
+const atRnr = (r, i) => RNR.some(p => p.r === r && Math.abs(i - p.i - 18) <= 44);
+// where something joins - a roadside apron, or another of the run's roads running onto this one's edge at its level (a
+// slip's taper, a leg into a roundabout; not one over or under it, nor one beside it): no edge line or rail on that side
+// there, and only there. out: how far out that side's rail stands
+const kJoins = (r, i, o) => {
+  const memo = r.joins ??= new Map(), key = i * 2 + (o > 0); // (one out each side)
+  if (memo.has(key)) return memo.get(key);
+  const x = r.P[i].x + r.L[i].x * o, z = r.P[i].z + r.L[i].z * o;
+  let hit = false;
+  eachNear(x, z, 1, (q, j) => { if (!hit && q !== r && q.asph && Math.abs(q.P[j].y - r.P[i].y) < 1.5 && Math.hypot(q.P[j].x - x, q.P[j].z - z) < q.asph(j) + 0.5) hit = true; });
+  memo.set(key, hit);
+  return hit;
+};
+const kOpen = (r, spots, out) => { const side = opens(r, [...spots, ...sideSpots(r)]); return (i, s) => side(i, s) || kJoins(r, i, s * out); };
+const kEnds = (r, m) => i => awayFrom(r, r.P[0], m)(i) && awayFrom(r, r.P[r.N], m)(i);
+{
+  // KK, the KL-Karak: the 3+3 like the autobahn, the 2+2 its two inner lanes, the third a hard shoulder; a concrete
+  // median barrier, guardrails, gravel and a skirt down into the ditch (12 m: a wall where the land beside is a road's
+  // lower down); open where the slips' tapers leave and join, at the plazas and rest areas; a tunnel (walls, the bores'
+  // divide, the roof, lights) through Genting Sempah
+  const open = kOpen(KK, [], 17.5);
+  const out = i => !KK.tunnel(i) && !plazaAt(KK, i), road = i => out(i) && !atRnr(KK, i), dry = i => road(i) && !KK.bridge(i);
+  kStrip(KK, -13.75, 0.01, 13.75, 0.01, ASPH, i => !plazaAt(KK, i));
+  for (const s of [1, -1]) {
+    kStrip(KK, s * 13.75, 0.01, s * 16.75, 0.01, ASPH, i => KK.three(i) || KK.tunnel(i));
+    kStrip(KK, s * 13.75, 0.008, s * 16.75, 0.008, GRAVEL, i => !KK.three(i) && out(i) && !atRnr(KK, i));
+    kPaint(KK, s * 2.5, 0.3, i => !plazaAt(KK, i));
+    kPaint(KK, s * 6.25, 0.15, i => dashed(i) && !plazaAt(KK, i));
+    kPaint(KK, s * 10, 0.15, i => KK.three(i) && dashed(i) && !plazaAt(KK, i));
+    kPaint(KK, s * 10, 0.3, i => !KK.three(i) && out(i) && !open(i, s));
+    kPaint(KK, s * 13.75, 0.3, i => KK.three(i) && out(i) && !open(i, s));
+    kStrip(KK, s * 17.5, 0, s * 17.5, 0.75, RAIL, i => road(i) && !open(i, s) && i > 6 && i < KK.N - 6);
+    kStrip(KK, s * 16.75, 0.008, s * 17.9, 0.008, GRAVEL, dry);
+    kStrip(KK, s * 17.9, -12, s * 17.9, 0.008, SKIRT, dry);
+    kStrip(KK, s * 17.5, -1.5, s * 17.5, 0.9, CONC, i => KK.bridge(i) && !KK.tunnel(i)); // (the parapet over a bridge)
+    kStrip(KK, s * 16.75, 0.012, s * 46, 0.012, 0x4a4a4c, i => atRnr(KK, i)); // forecourts
+    kStrip(KK, s * 17.6, 0, s * 17.6, 7.5, 0xd9d6cc, KK.tunnel); // the tunnel's walls, a kerb along them
+    kStrip(KK, s * 16.75, 0.2, s * 17.6, 0.2, 0xa9a69e, KK.tunnel);
+    kStrip(KK, s * 16.75, 0.01, s * 16.75, 0.2, 0xa9a69e, KK.tunnel);
+    kStrip(KK, s * 6, 7.45, s * 6.5, 7.45, 0xfff6dc, i => KK.tunnel(i) && i % 3 === 0, true); // its lights
+    kStrip(KK, s * 12, 7.45, s * 12.5, 7.45, 0xfff6dc, i => KK.tunnel(i) && i % 3 === 0, true);
+  }
+  kStrip(KK, 0, 0, 0, 0.9, BARRIER, i => !KK.tunnel(i)); // the median barrier
+  kStrip(KK, 0, 0.9, 0, 7.5, 0xd9d6cc, KK.tunnel); // the bores' divide
+  kStrip(KK, -17.6, 7.5, 17.6, 7.5, 0x8d8a83, KK.tunnel); // the roof
+  kStrip(KK, -17.5, -1.5, 17.5, -1.5, CONC, KK.bridge); // under a bridge
+  // LP, the LPT: 2+2 either side of a grass median and its guardrail, hard shoulders, guardrails
+  const lpOpen = kOpen(LP, [], 12.3), lpRoad = i => !plazaAt(LP, i) && !atRnr(LP, i);
+  for (const s of [1, -1]) {
+    kStrip(LP, s * 1.6, 0.01, s * 11.5, 0.01, ASPH, i => !plazaAt(LP, i));
+    kPaint(LP, s * 2.0, 0.2, i => !plazaAt(LP, i));
+    kPaint(LP, s * 5.75, 0.15, i => dashed(i) && !plazaAt(LP, i));
+    kPaint(LP, s * 9.5, 0.2, i => lpRoad(i) && !lpOpen(i, s));
+    kStrip(LP, s * 12.3, 0, s * 12.3, 0.75, RAIL, i => lpRoad(i) && !lpOpen(i, s) && i > 6 && i < LP.N - 6);
+    kStrip(LP, s * 11.5, 0.008, s * 13.2, 0.008, GRAVEL, i => lpRoad(i) && !LP.bridge(i));
+    kStrip(LP, s * 13.2, -12, s * 13.2, 0.008, SKIRT, i => lpRoad(i) && !LP.bridge(i));
+    kStrip(LP, s * 12.3, -1.5, s * 12.3, 0.9, CONC, LP.bridge);
+    kStrip(LP, s * 13, 0.012, s * 42, 0.012, 0x4a4a4c, i => atRnr(LP, i));
+    kStrip(LP, s * 0.75, 0, s * 0.75, 0.75, RAIL, i => !plazaAt(LP, i));
+  }
+  kStrip(LP, -1.6, 0.006, 1.6, 0.006, 0x587a3c, i => !plazaAt(LP, i)); // (the median's grass)
+  kStrip(LP, -13, -1.5, 13, -1.5, CONC, LP.bridge);
+  // GB, the Gombak link: as the west road's highway (2+2 either side of a double line), over the direct road on a bridge
+  const gbOpen = kOpen(GB, [], 10), gbRail = i => kEnds(GB, 30)(i) && !gbOpen(i, 1) && !GB.bridge(i);
+  kStrip(GB, -7.6, 0.013, 7.6, 0.013, ASPH);
+  for (const s of [1, -1]) {
+    kPaint(GB, s * 0.2, 0.15);
+    kPaint(GB, s * 3.7, 0.15, dashed);
+    kPaint(GB, s * 7.3, 0.2, kEnds(GB, 12));
+    kStrip(GB, s * 7.6, 0.009, s * 9.6, 0.009, GRAVEL, i => !GB.bridge(i));
+    kStrip(GB, s * 9.6, -12, s * 9.6, 0.009, SKIRT, i => !GB.bridge(i) && kEnds(GB, 12)(i));
+    kStrip(GB, s * 10, 0, s * 10, 0.75, RAIL, gbRail);
+    kStrip(GB, s * 7.8, -1.5, s * 7.8, 0.9, CONC, GB.bridge);
+  }
+  kStrip(GB, -7.8, -1.5, 7.8, -1.5, CONC, GB.bridge);
+  // the Genting Highlands road (GH, GU): two lanes each way either side of a concrete barrier; open at Gohtong Jaya's
+  // fuel, its plaza; the ways up and down and round the top (GA, GD, TL) two lanes one way; the slips one lane (up to J
+  // and down from it, its legs as GH and EC are), the road to R one each way; the roundabouts
+  for (const r of [GH, GU]) {
+    const open = kOpen(r, [], 9), road = i => !plazaAt(r, i);
+    kStrip(r, -8.4, 0.01, 8.4, 0.01, ASPH, road);
+    kStrip(r, 0, 0, 0, 0.8, BARRIER, i => i > 10 && (kEnds(r, 30)(i) || r === GU && i > r.N / 2));
+    for (const s of [1, -1]) {
+      kPaint(r, s * 0.6, 0.15, road);
+      kPaint(r, s * 4.15, 0.15, i => dashed(i) && road(i));
+      kPaint(r, s * 7.7, 0.15, i => road(i) && !open(i, s));
+      kStrip(r, s * 9.0, 0, s * 9.0, 0.75, RAIL, i => road(i) && !open(i, s) && kEnds(r, 35)(i) && !r.bridge(i));
+      kStrip(r, s * 8.4, 0.008, s * 9.5, 0.008, GRAVEL, i => road(i) && !r.bridge(i));
+      kStrip(r, s * 9.5, -12, s * 9.5, 0.008, SKIRT, i => road(i) && !r.bridge(i));
+      kStrip(r, s * 8.8, -1.5, s * 8.8, 0.9, CONC, r.bridge);
+    }
+    kStrip(r, -8.8, -1.5, 8.8, -1.5, CONC, r.bridge);
+  }
+  for (const [r, half, lanes] of [[GA, 4.2, 2], [GD, 4.2, 2], [TL, 4.2, 2], [EX1, 3.6, 1], [EN1, 3.6, 1], [EX2, 3.6, 1], [EN2, 3.6, 1], [EC, 4.5, 2]]) {
+    const open = kOpen(r, r === TL ? [spot(D4, 0, 12)] : [], half + 0.6), slip = half < 4, far = kEnds(r, slip ? 8 : 25); // (TL: open at the safe house's drive)
+    kStrip(r, -half, 0.014, half, 0.014, ASPH);
+    if (lanes === 2) kPaint(r, 0, r === EC ? 0.2 : 0.15, r === EC ? undefined : dashed);
+    for (const s of [1, -1]) {
+      const edge = i => far(i) && !(slip && open(i, s)); // (a slip's edges but where it's on the road it leaves or joins)
+      kPaint(r, s * (half - 0.35), 0.15, i => edge(i) && !open(i, s));
+      kStrip(r, s * half, 0.008, s * (half + 1), 0.008, GRAVEL, i => !r.bridge(i) && edge(i));
+      kStrip(r, s * (half + 1), -12, s * (half + 1), 0.008, SKIRT, i => !r.bridge(i) && edge(i));
+      kStrip(r, s * (half + 0.6), 0, s * (half + 0.6), 0.75, RAIL, i => !r.bridge(i) && edge(i) && !open(i, s));
+      kStrip(r, s * (half + 0.3), -1.5, s * (half + 0.3), 0.9, CONC, r.bridge);
+    }
+    kStrip(r, -half - 0.3, -1.5, half + 0.3, -1.5, CONC, r.bridge);
+  }
+  for (const r of [JR, RR, GRR]) {
+    const h = r.half - 1;
+    kStrip(r, -h, 0.016, h, 0.016, ASPH);
+    kPaint(r, h - 0.4, 0.15); // (its outer edge, + being out from its middle; the island's kerb inside)
+    kStrip(r, -h, 0.016, -h, 0.25, 0xd4d2cc);
+    kStrip(r, -h, 0.25, -r.c.r, 0.25, 0x5f8f4a); // the island
+  }
+  // the plazas: the asphalt out to the booths, edge rails round it
+  for (const p of PLAZAS) {
+    kStrip(p.r, j => -p.wide(j), 0.016, j => p.wide(j), 0.016, ASPH, p.near);
+    for (const s of [1, -1]) { const edge = j => s * (p.wide(j) + 0.8); kStrip(p.r, edge, 0, edge, 0.75, RAIL, j => p.near(j) && Math.abs(j - p.i) > 8); }
+  }
+}
+// the bridges' piers: every ~24 m under each, one under a narrow deck, two under a wide one, down to the land
+{
+  const piers = [];
+  for (const r of KARAK_ROADS) for (let i = 4; i < r.N; i += 8) {
+    if (!r.bridge(i) || !r.bridge(i - 4) || !r.bridge(i + 4)) continue;
+    for (const o of r.half > 10 ? [-r.half * 0.55, r.half * 0.55] : [0]) {
+      const x = r.P[i].x + r.L[i].x * o, z = r.P[i].z + r.L[i].z * o, top = r.P[i].y - 1.5, bottom = (karakLand(x, z) ?? terrainAt(x, z)) - 1;
+      let clear = true; // (not on a road under it)
+      eachNear(x, z, 1, (q, j) => { if (q !== r && Math.hypot(q.P[j].x - x, q.P[j].z - z) < q.half + 1.5 && q.P[j].y < top - 2) clear = false; });
+      if (top - bottom < 2 || !clear) continue;
+      piers.push(new THREE.BoxGeometry(2.2, top - bottom, 2.2).translate(0, (top + bottom) / 2, 0).rotateY(Math.atan2(r.L[i].x, r.L[i].z)).translate(x, 0, z));
+      solid(x, z, x, z, 1.1, bottom, top);
+    }
+  }
+  if (piers.length) scene.add(new THREE.Mesh(mergeGeometries(piers), new THREE.MeshLambertMaterial({ color: CONC })));
+}
+// a sign: white words on a board (expressway green; or blue, the plazas'), on its posts or under the canopy, facing
+// the way along road r at i it's read from (way: 1 along it, -1 back)
+function kBoard(lines, w, h, bg = '#0b6b3a') {
+  const c = document.createElement('canvas'), g = c.getContext('2d'), px = 64;
+  c.width = Math.round(w * px); c.height = Math.round(h * px);
+  g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height);
+  g.strokeStyle = '#fff'; g.lineWidth = 6; g.strokeRect(8, 8, c.width - 16, c.height - 16);
+  g.fillStyle = '#fff'; g.textBaseline = 'middle';
+  lines.forEach(([text, size = 0.55, align = 'left'], k) => {
+    g.font = `bold ${size * px}px system-ui, sans-serif`; g.textAlign = align;
+    g.fillText(text, align === 'center' ? c.width / 2 : align === 'right' ? c.width - 30 : 30, (k + 0.5) * c.height / lines.length);
+  });
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: Object.assign(new THREE.CanvasTexture(c), { colorSpace: THREE.SRGBColorSpace }) }));
+}
+function kSign(r, i, way, side, lines, w = 7, h = 3) { // side: m left of the centre line, for the way it's read
+  const p = r.P[i], L = r.L[i], o = side * way, x = p.x + L.x * o, z = p.z + L.z * o, g = site(x, p.y, z, Math.atan2(-L.z * way, L.x * way)); // (local +z the way it's read)
+  const board = kBoard(lines, w, h);
+  board.position.y = 2.6 + h / 2;
+  board.rotation.y = Math.PI; // (its face back down the road)
+  g.add(board);
+  for (const px of [-w / 2 + 0.6, w / 2 - 0.6]) siteBox(g, 0.18, 2.6 + h, 0.18, 0x8c9096, px, (2.6 + h) / 2, 0.08);
+  mergeSite(g);
+  solid(x, z, x, z, 0.5);
+}
+{ // the plazas' booths and canopies, their names, lit
+  for (const p of PLAZAS) {
+    const { r, i, w } = p, t = r.curve.getTangentAt(i / r.N), g = site(r.P[i].x, r.P[i].y, r.P[i].z, Math.atan2(t.x, t.z)); // local +z along the road, +x its left
+    const islands = [];
+    for (let o = (r === GH ? 4.6 : 6.5); o < w - 1; o += 4) islands.push(o, -o);
+    for (const o of islands) {
+      siteBox(g, 1.2, 0.3, 14, 0xd4d2cc, o, 0.15, 0);
+      siteBox(g, 1.6, 2.6, 3, 0xe9e6dd, o, 1.6, 0);                // the booth
+      siteBox(g, 1.65, 0.5, 3.05, 0x1c4f8a, o, 2.9, 0);            // its band
+      siteBox(g, 0.12, 2.6, 0.12, 0xd0302a, o - Math.sign(o) * 0.45, 1.6, -4.5); // the barrier arm, raised
+      for (const z of [-7, 7]) siteBox(g, 0.5, 0.9, 0.5, 0xf2c200, o, 0.45, z); // bollards
+      const a = g.localToWorld(new THREE.Vector3(o, 0, -7)), b = g.localToWorld(new THREE.Vector3(o, 0, 7));
+      solid(a.x, a.z, b.x, b.z, 0.8, r.P[i].y - 1, r.P[i].y + 6);
+    }
+    siteBox(g, 2 * w + 2, 0.8, 20, 0xeeeeea, 0, 6.6, 0, THREE.MeshBasicMaterial); // the canopy (lit by its own lights)
+    siteBox(g, 2 * w + 2.4, 0.3, 20.4, 0x1c4f8a, 0, 6.15, 0);
+    const name = { gombakToll: 'PLAZA TOL GOMBAK', gentingToll: 'GENTING HIGHLANDS', karakToll: 'PLAZA TOL KARAK', kuantanToll: 'PLAZA TOL KUANTAN' }[p.n];
+    for (const way of [1, -1]) {
+      const sign = kBoard([[name, 0.9, 'center'], ["Touch 'n Go  ·  SmartTAG  ·  RFID", 0.45, 'center']], 16, 2.6, '#1c4f8a');
+      sign.position.set(0, 8.4, -way * 10.25);
+      sign.rotation.y = way > 0 ? Math.PI : 0;
+      g.add(sign);
+    }
+    floodlit(g, [[-w - 4, -30, 0, -30], [w + 4, -30, 0, -30], [-w - 4, 30, 0, 30], [w + 4, 30, 0, 30]], [[0, 0, 2 * w, 24], [0, -32, 2 * w, 26], [0, 32, 2 * w, 26]], 1.4, 1.3);
+    glowAt(g, islands.filter((_, k) => k % 2 === 0).map(o => [o, 6.1, 0, 140, 18]));
+    mergeSite(g);
+  }
+}
+{ // the tunnel's portals: a concrete face round both bores, named; dimming the light inside (karakTick)
+  const ends = [0, 1].map(e => { let i = e ? KK.N : 0; if (e) { while (i > 0 && !KK.tunnel(i)) i--; } else { while (i < KK.N && !KK.tunnel(i)) i++; } return i; });
+  for (const [k, i] of ends.entries()) {
+    const t = KK.curve.getTangentAt(i / KK.N), g = site(KK.P[i].x, KK.P[i].y, KK.P[i].z, Math.atan2(t.x, t.z));
+    for (const s of [1, -1]) siteBox(g, 14, 24, 3, CONC, s * 24.6, 10, 0);
+    siteBox(g, 35.2, 16, 3, CONC, 0, 15.5, 0);
+    siteBox(g, 0.8, 7.5, 3, CONC, 0, 3.75, 0);
+    const plate = kBoard([['TEROWONG GENTING SEMPAH', 0.7, 'center']], 14, 1.4, '#3a3d42');
+    plate.position.set(0, 9.6, k ? 1.55 : -1.55);
+    plate.rotation.y = k ? 0 : Math.PI;
+    g.add(plate);
+    mergeSite(g);
+  }
+  KK.tunnelEnds = ends;
+}
+// the rest-and-service areas, and the signs on the way
+for (const p of RNR) for (const s of [1, -1]) {
+  fuelStation(p.r, p.i, s, p.r === KK ? 31 : 27);
+  const j = p.i + 40, o = p.r === KK ? 32 : 28;
+  workshop(p.r.P[j].x + p.r.L[j].x * s * o, p.r.P[j].y, p.r.P[j].z + p.r.L[j].z * s * o, away(p.r, j, s));
+}
+{
+  const km = (r, a, b) => Math.round(Math.abs(b - a) * 3 / 1000), rr = { sempahRR: 'Genting Sempah', bentongRR: 'Bentong', temerlohRR: 'Temerloh', gambangRR: 'Gambang' };
+  for (const p of RNR) for (const way of [1, -1]) {
+    const i = p.i - way * 360 + (way > 0 ? 0 : 36), off = p.r === KK ? 19 : 14;
+    if (i > 10 && i < p.r.N - 10) kSign(p.r, i, way, off, [[`R&R ${rr[p.n]}`, 0.75], ['Petrol · Servis · Rehat   1 km', 0.5]], 7.5, 2.8);
+  }
+  const ex = nearestSample(KK, EX1.P[0].x, EX1.P[0].z);
+  for (const [d, label] of [[330, '1 km'], [130, '400 m']]) kSign(KK, ex - d, 1, 19, [['Genting Highlands', 0.75], [`Genting Sempah  ↖  ${label}`, 0.55]], 8, 3);
+  kSign(KK, KP.gombakToll.i + 140, 1, 19, [[`Genting Sempah  ${km(KK, KP.gombakToll.i, ex)} km`, 0.55], [`Bentong  ${km(KK, KP.gombakToll.i, KP.bentongRR.i)} km`, 0.55], [`Karak  ${km(KK, KP.gombakToll.i, KP.karakToll.i)} km`, 0.55]], 7, 3.4);
+  kSign(LP, 120, 1, 14, [[`Temerloh  ${km(LP, 0, KP.temerlohRR.i)} km`, 0.55], [`Gambang  ${km(LP, 0, KP.gambangRR.i)} km`, 0.55], [`Kuantan  ${km(LP, 0, LP.N)} km`, 0.55]], 7, 3.4);
+  kSign(GH, 40, 1, 10.5, [[`Gohtong Jaya  ${km(GH, 0, GH.N)} km`, 0.55], [`Genting Highlands  ${Math.round((GH.N + GU.N + GA.N) * 3 / 1000)} km`, 0.55]], 7, 2.6);
+}
+// the Genting Highlands' sights: their sites paved (asphalt, Chin Swee's court past its car park in stone). Chin Swee's
+// temple on its terrace below the way up - a gate where its car park meets the road, a nine-storey pagoda and Qing
+// Shui's statue either side of its court, the SkyWay's middle station at its back between them; the lookout off the
+// way down - a kerb and a rail round its edge over the valley, coin binoculars, its board; lit at night
+const sightSite = n => { const p = SIGHTS[n], q = p.r.P[p.i]; return site(q.x, q.y, q.z, away(p.r, p.i, p.s)); }; // (local +z out from its road)
+for (const [n, p] of Object.entries(SIGHTS)) {
+  strip(p.apron, -p.half, 0.012, p.half, 0.012, 0x4a4a4c, i => i >= 2 && (n !== 'chinSwee' || i < 10));
+  if (n === 'chinSwee') strip(p.apron, -p.half, 0.012, p.half, 0.012, 0xc9c1b1, i => i >= 10);
+}
+{
+  const t = sightSite('chinSwee'), RED = 0xa8231b, GOLD = 0xc9a03a, STONE = 0xd5cdbd, part = (geo, color, x, y, z) => { const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color })); m.position.set(x, y, z); t.add(m); };
+  for (const x of [-6.5, 6.5]) siteBox(t, 1, 7, 1, RED, x, 3.5, 12);         // the gate: its posts, beam and green-tiled roof
+  siteBox(t, 15, 1.2, 1.4, RED, 0, 7.4, 12);
+  siteBox(t, 17, 0.6, 2.8, 0x2e7a55, 0, 8.3, 12);
+  const board = kBoard([['CHIN SWEE CAVES TEMPLE', 0.6, 'center'], ['清水岩廟', 0.75, 'center']], 9, 1.9, '#8c1c13');
+  board.position.set(0, 5.6, 11.25);
+  board.rotation.y = Math.PI; // (facing the road)
+  t.add(board);
+  siteBox(t, 12, 0.8, 12, STONE, -18, 0.4, 46);                               // the pagoda: nine storeys, each a little narrower
+  for (let k = 0; k < 9; k++) { const w = 8.6 - k * 0.6, y = 0.8 + k * 3.1; siteBox(t, w, 2.7, w, 0xf1ede2, -18, y + 1.35, 46); siteBox(t, w + 2.4, 0.4, w + 2.4, 0xc0512e, -18, y + 2.75, 46); }
+  part(new THREE.ConeGeometry(1.4, 6, 8), GOLD, -18, 0.8 + 9 * 3.1 + 3, 46);
+  siteBox(t, 8, 3, 8, STONE, 18, 1.5, 48);                                    // Qing Shui on his plinth: a lotus, gold robes, a dark face
+  part(new THREE.CylinderGeometry(3.2, 3.6, 1.2, 16), 0xd9a6a0, 18, 3.6, 48);
+  part(new THREE.CylinderGeometry(1.5, 3.1, 6.5, 16), GOLD, 18, 7.45, 48);
+  part(new THREE.SphereGeometry(1.25, 16, 12), 0x3a2a20, 18, 11.9, 48);
+  part(new THREE.CylinderGeometry(0.9, 1.1, 1.1, 12), GOLD, 18, 13.4, 48);
+  floodlit(t, [[-26, 20, -18, 28], [26, 20, 18, 28], [-26, 40, -18, 46], [26, 40, 18, 46]], [[0, 18, 52, 26], [0, 44, 52, 26]], 1, 1.1, false);
+  mergeSite(t);
+}
+{
+  const p = SIGHTS.lookout, l = sightSite('lookout'), e = p.len, h = p.half;
+  siteBox(l, 2 * h, 0.5, 0.5, CONC, 0, 0.25, e - 0.25);                       // the kerb round its edge, a rail along the front
+  for (const x of [-h + 0.25, h - 0.25]) siteBox(l, 0.5, 0.5, e - 8, CONC, x, 0.25, (e + 8) / 2);
+  siteBox(l, 2 * h, 0.08, 0.08, RAIL, 0, 1.15, e - 0.25);
+  for (let x = -h + 0.5; x < h; x += 2.5) siteBox(l, 0.08, 0.7, 0.08, RAIL, x, 0.85, e - 0.25);
+  for (const x of [-5, 5]) { siteBox(l, 0.14, 1.1, 0.14, 0x555a60, x, 0.55, e - 1.6); siteBox(l, 0.3, 0.3, 0.7, 0x2f3338, x, 1.25, e - 1.5); } // coin binoculars
+  const board = kBoard([['GENTING HIGHLANDS', 0.75, 'center'], [`Lookout  ·  ${Math.round(p.r.P[p.i].y + 60)} m`, 0.6, 'center']], 7, 2.2);
+  board.position.set(-h + 4, 3.2, 8);
+  board.rotation.y = Math.PI; // (facing the road)
+  l.add(board);
+  for (const x of [-h + 1.2, -h + 6.8]) siteBox(l, 0.14, 4.3, 0.14, 0x8c9096, x, 2.15, 8.1);
+  floodlit(l, [[-h + 1, e - 3, -h + 8, e - 10], [h - 1, e - 3, h - 8, e - 10]], [[0, e / 2 + 2, 2 * h, e - 6]], 1, 1.1, false);
+  mergeSite(l);
+}
+// the Awana SkyWay: gondolas from its station at the end of its car park on the way up, by Chin Swee's temple (its
+// middle station) to SkyAvenue at the top, ~2.2 km. The rope 9 m up through the stations (30 m at the top: in over the
+// theme park's rides), on towers where it would come within 12 m of the land (none on a road), up on one side and back
+// down the other; a cabin every ~75 m at 6 m/s (turnSkyway, each frame)
+const SKYWAY = (() => {
+  const ground = (x, z) => karakLand(x, z) ?? terrainAt(x, z), at = (n, o) => { const p = SIGHTS[n], q = p.r.P[p.i], L = p.r.L[p.i]; return new THREE.Vector3(q.x + L.x * p.s * o, q.y + 9, q.z + L.z * p.s * o); };
+  const TOP = { x: -7631, z: 25682 }; // (a corner of SkyAvenue's footprint the rope comes into clear of the resort's other buildings)
+  const stops = [at('skyway', SIGHTS.skyway.len - 10), at('chinSwee', 44), new THREE.Vector3(TOP.x, ground(TOP.x, TOP.z) + 30, TOP.z)];
+  const tower = (x, z, a, b) => { const l = Math.hypot(b.x - a.x, b.z - a.z), ux = (b.x - a.x) / l, uz = (b.z - a.z) / l; for (const d of [0, 12, -12, 24, -24]) if (onRoad(x + d * ux, z + d * uz).out > 4) return [x + d * ux, z + d * uz]; return [x, z]; }; // (slid along a to b off any road)
+  const sup = [{ p: stops[0], station: true }];
+  for (let k = 0; k < 2; k++) {
+    const a = stops[k], b = stops[k + 1], n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 250);
+    for (let j = 1; j < n; j++) { const [x, z] = tower(a.x + (b.x - a.x) * j / n, a.z + (b.z - a.z) * j / n, a, b); sup.push({ p: new THREE.Vector3(x, Math.max(a.y + (b.y - a.y) * j / n, ground(x, z) + 22), z) }); }
+    sup.push({ p: b, station: true });
+  }
+  for (let pass = 0; pass < 60; pass++) { // where the rope comes closest to the land under 12 m (out past the stations' own
+    let worst = { short: 0 };                // ground), another tower 22 m tall - or the tower within 30 m of it taller
+    for (let k = 0; k + 1 < sup.length; k++) {
+      const a = sup[k].p, b = sup[k + 1].p, len = Math.hypot(b.x - a.x, b.z - a.z);
+      for (let d = sup[k].station ? 45 : 15; d < len - (sup[k + 1].station ? 45 : 15); d += 10) { const t = d / len, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, short = ground(x, z) + 12 - (a.y + (b.y - a.y) * t); if (short > worst.short) worst = { short, k, x, z, d, len }; }
+    }
+    if (worst.short < 0.1) break;
+    const near = [[worst.k, worst.d], [worst.k + 1, worst.len - worst.d]].find(([k, d]) => d < 30 && !sup[k].station);
+    if (near) { sup[near[0]].p.y += worst.short + 1; continue; }
+    const [x, z] = tower(worst.x, worst.z, sup[worst.k].p, sup[worst.k + 1].p);
+    sup.splice(worst.k + 1, 0, { p: new THREE.Vector3(x, ground(x, z) + 22, z) });
+  }
+  const dir = k => { const a = sup[Math.max(k - 1, 0)].p, b = sup[Math.min(k + 1, sup.length - 1)].p; return Math.atan2(b.x - a.x, b.z - a.z); }; // the rope's heading through support k
+  const parts = [];
+  sup.forEach(({ p, station }, k) => {
+    const y0 = ground(p.x, p.z), h = p.y + 0.6 - y0;
+    if (station) { // a hall it runs through, its name on both sides
+      const st = site(p.x, p.y - (k === sup.length - 1 ? 30 : 9), p.z, dir(k)), H = k === sup.length - 1 ? 30 : 9, name = ['AWANA SKYWAY', 'CHIN SWEE STATION', 'SKYAVENUE STATION'][stops.indexOf(p)];
+      siteBox(st, 14, 1, 28, CONC, 0, 0.5, 0);
+      siteBox(st, 12, H - 4, 26, 0xd9dcdf, 0, (H - 4) / 2 + 1, 0);
+      siteBox(st, 12.2, 6, 26.2, 0x6f93ad, 0, H, 0);
+      siteBox(st, 15, 1.2, 30, 0xeef0f2, 0, H + 3.6, 0);
+      for (const s of [1, -1]) { const b = kBoard([[name, 0.85, 'center']], 11, 1.6, '#b5122e'); b.position.set(s * 6.12, H - 4.2, 0); b.rotation.y = s * Math.PI / 2; st.add(b); }
+      mergeSite(st);
+      return;
+    }
+    parts.push(new THREE.CylinderGeometry(0.7, 1.5, h, 4).rotateY(Math.PI / 4).translate(0, h / 2, 0), new THREE.BoxGeometry(8.4, 0.7, 1.2).translate(0, h, 0));
+    for (const g of parts.slice(-2)) g.rotateY(dir(k)).translate(p.x, y0, p.z);
+    solid(p.x, p.z, p.x, p.z, 1.6, y0 - 1, y0 + h);
+  });
+  if (parts.length) scene.add(new THREE.Mesh(mergeGeometries(parts), new THREE.MeshLambertMaterial({ color: 0xdfe3e6 })));
+  const off = (k, o) => { const a = dir(k); return new THREE.Vector3(sup[k].p.x + Math.cos(a) * o, sup[k].p.y, sup[k].p.z - Math.sin(a) * o); };
+  const up = sup.map((_, k) => off(k, 3.2)), down = sup.map((_, k) => off(k, -3.2)).reverse(), loop = [...up, ...down];
+  const rope = new THREE.LineBasicMaterial({ color: 0x2b2e33 });
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(up), rope), new THREE.Line(new THREE.BufferGeometry().setFromPoints(down), rope));
+  const s = [0];
+  for (let j = 0; j < loop.length; j++) s.push(s[j] + loop[j].distanceTo(loop[(j + 1) % loop.length]));
+  const total = s.at(-1), n = Math.round(total / 75), col = new THREE.Color();
+  const cabin = mergeGeometries([[2.3, 2.3, 2.3, 0xf2f2ef, 0], [2.36, 0.9, 2.36, 0x2b3a48, 0.25], [2.5, 0.3, 2.5, 0xc8102e, 1.3], [0.16, 2.4, 0.16, 0x9aa0a6, 2.6]].map(([w, h, d, c, y]) => {
+    const b = new THREE.BoxGeometry(w, h, d).translate(0, y, 0);
+    col.setHex(c);
+    return b.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: b.attributes.position.count }, () => [col.r, col.g, col.b]).flat(), 3));
+  }));
+  const cabins = new THREE.InstancedMesh(cabin, new THREE.MeshLambertMaterial({ vertexColors: true }), n);
+  cabins.frustumCulled = false; // (they move: the bounds made at the start don't hold)
+  scene.add(cabins);
+  return { sup, stops, loop, s, total, n, cabins, at: 0, m: new THREE.Matrix4(), q: new THREE.Quaternion(), v: new THREE.Vector3(), one: new THREE.Vector3(1, 1, 1), yAxis: new THREE.Vector3(0, 1, 0) };
+})();
+function turnSkyway(dt) {
+  const w = SKYWAY, { loop, s } = w;
+  w.at = (w.at + dt * 6) % w.total;
+  for (let k = 0, j = 0; k < w.n; k++) {
+    const u = (w.at + k * w.total / w.n) % w.total;
+    j = 0;
+    while (s[j + 1] < u) j++;
+    const a = loop[j], b = loop[(j + 1) % loop.length];
+    w.v.lerpVectors(a, b, (u - s[j]) / (s[j + 1] - s[j])).y -= 3.9; // (hanging under it)
+    w.cabins.setMatrixAt(k, w.m.compose(w.v, w.q.setFromAxisAngle(w.yAxis, Math.atan2(b.x - a.x, b.z - a.z)), w.one));
+  }
+  w.cabins.instanceMatrix.needsUpdate = true;
+}
+turnSkyway(0);
+{ // the SkyWay's car park lit
+  const p = SIGHTS.skyway, g = sightSite('skyway');
+  floodlit(g, [[-p.half + 1, 14, -p.half + 8, 22], [p.half - 1, 14, p.half - 8, 22], [-p.half + 1, 40, -p.half + 8, 46], [p.half - 1, 40, p.half - 8, 46]], [[0, 18, 2 * p.half, 26], [0, 44, 2 * p.half, 26]], 1, 1.1, false);
+}
+
+// the sea at Kuantan, east of the town (-x), and its beach
+{
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(12000, 60000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2b6f8c, roughness: 0.12, metalness: 0.1 }));
+  sea.position.set(X5[0] - 700 - 6000, 0.03, 42000);
+  const sand = new THREE.Mesh(new THREE.PlaneGeometry(320, 60000).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xe3d3a6 }));
+  sand.position.set(X5[0] - 700 + 160, 0.02, 42000);
+  scene.add(sea, sand);
+}
+{ // Kuantan's road in, from the LPT's end: as the west road's highway
+  batch = new Map([[ASPH, []]]);
+  strip(KU, -7.6, 0.013, 7.6, 0.013, ASPH);
+  for (const s of [1, -1]) {
+    paint(KU, s * 0.2, 0.15);
+    paint(KU, s * 3.7, 0.15, dashed);
+    paint(KU, s * 7.3, 0.2, i => i < KU.N - 6);
+    strip(KU, s * 7.6, 0.009, s * 9.6, 0.009, GRAVEL, i => i < KU.N - 4);
+    strip(KU, s * 10, 0, s * 10, 0.75, RAIL, i => i > 8 && i < KU.N - 10);
+  }
+  endBatch();
+}
+
+// the run's tiles, drawn near the car only: its land (the grid's triangles - under the roads too, gen.mjs keeps it under
+// their asphalt - but not those mixing a road and the tunnel, its mouths, nor on the hills' own land, nor down on the
+// plain), its roads' stripes and its trees - rainforest, and an oil palm estate along the LPT - built within 2 km of the
+// camera, two a frame (their trees shown within ~1.4 km), and let go past 3 km. Each in its tile's own frame (its
+// corner the origin), so they hold steady even 75 km out
+const kTileKey = (x, z) => Math.floor((x - KT.x0) / KT_W) * 4096 + Math.floor((z - KT.z0) / KT_W);
+const kSamples = new Map(); // tile -> road -> its samples there
+for (const r of KARAK_ROADS) for (let i = 0; i < r.N; i++) {
+  const k = kTileKey(r.P[i].x, r.P[i].z);
+  if (!kSamples.has(k)) kSamples.set(k, new Map());
+  const m = kSamples.get(k);
+  if (!m.has(r)) m.set(r, []);
+  m.get(r).push(i);
+}
+const kTiles = [...new Set([...KT.tiles.map(([i, j]) => i * 4096 + j), ...kSamples.keys()])];
+const kMats = new Map(), kMat = (color, lit) => {
+  const key = color + (lit ? 'lit' : '');
+  if (!kMats.has(key)) kMats.set(key, lit ? new THREE.MeshBasicMaterial({ color }) : new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
+  return kMats.get(key);
+};
+for (const [, , , , , color, , lit] of KSTRIPS) kMat(color, lit); // (all made now, for the weather to find)
+const kLandMat = new THREE.MeshLambertMaterial({ vertexColors: true }), kTreeMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+const kTint = (geo, hex) => { const c = new THREE.Color(hex), n = geo.attributes.position.count; geo.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: n * 3 }, (_, k) => [c.r, c.g, c.b][k % 3]), 3)); return geo; };
+const kBare = g => { g = g.index ? g.toNonIndexed() : g; for (const a of Object.keys(g.attributes)) if (!['position', 'normal', 'color'].includes(a)) g.deleteAttribute(a); return g; };
+// a rainforest tree: a straight trunk, a broad crown of two lumps; an oil palm: its trunk and a drooping crown of fronds
+const kTreeGeo = mergeGeometries([kTint(new THREE.CylinderGeometry(0.25, 0.4, 9, 5, 1, true).translate(0, 4.5, 0), 0x5b4632),
+  kTint(new THREE.IcosahedronGeometry(1, 0).scale(4.6, 2.6, 4.6).translate(0, 10, 0), 0xffffff), kTint(new THREE.IcosahedronGeometry(1, 0).scale(3, 2, 3).translate(1.6, 12, -1), 0xe6e6e6)].map(kBare));
+const kPalmGeo = mergeGeometries([kTint(new THREE.CylinderGeometry(0.3, 0.38, 5.5, 5, 1, true).translate(0, 2.75, 0), 0x6b5a44),
+  kTint(new THREE.ConeGeometry(4.2, 2.6, 7, 1, true).rotateX(Math.PI).translate(0, 5.9, 0), 0xffffff), kTint(new THREE.ConeGeometry(1.2, 2, 5, 1, true).translate(0, 7, 0), 0xffffff)].map(kBare));
+const JUNGLE = [0x2f5a29, 0x26502a, 0x3b6630, 0x1f4622, 0x45703a].map(h => new THREE.Color(h)), PALMS = [0x4d7a2f, 0x58873a, 0x436d2a].map(h => new THREE.Color(h));
+// where no tree grows: the plazas, the rest areas, the homes and drives, round the resort's and Gohtong Jaya's buildings
+const kClear = [
+  ...PLAZAS.map(p => [p.r.P[p.i].x, p.r.P[p.i].z, p.w + 40]),
+  ...RNR.flatMap(p => [1, -1].map(s => { const j = p.i + 20; return [p.r.P[j].x + p.r.L[j].x * s * 35, p.r.P[j].z + p.r.L[j].z * s * 35, 90]; })),
+  [HOME4.x, HOME4.z, 45], [HOME3.x, HOME3.z, 60],
+  ...KARAK.buildings.map(([foot]) => { const x = foot.reduce((a, p) => a + p[0], 0) / foot.length, z = foot.reduce((a, p) => a + p[1], 0) / foot.length; return [x, z, Math.max(...foot.map(p => Math.hypot(p[0] - x, p[1] - z))) + 10]; }),
+];
+const kRnd = seed => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+const kBuilt = new Map(), kSolids = new Set();
+function kBuild(key) {
+  const ti = Math.floor(key / 4096), tj = key - ti * 4096, ox = KT.x0 + ti * KT_W, oz = KT.z0 + tj * KT_W, g = new THREE.Group(), c = new THREE.Color();
+  g.position.set(ox, 0, oz);
+  const t = ktIndex.get(ti + ',' + tj), estate = ox + KT_W / 2 < LP.P[0].x; // (past Karak: the LPT's)
+  if (t !== undefined) { // the land
+    const N = KT_N, pos = new Float32Array(N * N * 3), nrm = new Float32Array(N * N * 3), col = new Float32Array(N * N * 3), flag = new Uint8Array(N * N), low = new Uint8Array(N * N), index = [];
+    const h = (gi, gj) => ktAt(gi, gj)?.[0];
+    const near = new Uint8Array(N * N); // within ~40 m of a road (2 grid steps from one): a cut or a fill there, not a hillside
+    for (let b = 0; b < N; b++) for (let a = 0; a < N; a++) if ((KARAK_LAND[t * N * N + b * N + a] & 3) === 1) for (let db = -2; db <= 2; db++) for (let da = -2; da <= 2; da++) { const bb = b + db, aa = a + da; if (bb >= 0 && aa >= 0 && bb < N && aa < N) near[bb * N + aa] = 1; }
+    for (let b = 0; b < N; b++) for (let a = 0; a < N; a++) {
+      const k = b * N + a, v = KARAK_LAND[t * N * N + k], y = (v >> 2) / 5 - 100, gi = ti * KT.tile + a, gj = tj * KT.tile + b;
+      pos.set([a * KT.cell, y, b * KT.cell], k * 3);
+      flag[k] = v & 3; low[k] = y < -0.08;
+      const nx = ((h(gi - 1, gj) ?? y) - (h(gi + 1, gj) ?? y)) / (2 * KT.cell), nz = ((h(gi, gj - 1) ?? y) - (h(gi, gj + 1) ?? y)) / (2 * KT.cell), l = Math.hypot(nx, 1, nz);
+      nrm.set([nx / l, 1 / l, nz / l], k * 3);
+      // rainforest green, mottled; montane higher up, lighter in the estates; bare red laterite or rock on the cuts
+      const x = ox + a * KT.cell, z = oz + b * KT.cell, mott = noise.noise(x / 90, z / 90, 3.1) * 0.5 + 0.5, up = 1 / l;
+      c.setHex(estate ? 0x557f37 : y > 1250 ? 0x35603a : 0x2c5726).lerp(c.clone().setHex(estate ? 0x6a8f45 : 0x3d6b2e), mott);
+      if (up < 0.85 && near[k]) c.lerp(c.clone().setHex(0x7d5a40), 0.6 * THREE.MathUtils.smoothstep(0.85 - up, 0, 0.25)); // red laterite on the cuts
+      else if (up < 0.6) c.lerp(c.clone().setHex(0x5f5e4c), 0.5 * THREE.MathUtils.smoothstep(0.6 - up, 0, 0.2)); // rock on the steepest
+      col.set([c.r, c.g, c.b], k * 3);
+    }
+    const skip = (...ks) => ks.some(k => flag[k] === 3) || ks.every(k => low[k]) || (ks.every(k => flag[k]) && ks.some(k => flag[k] === 1) && ks.some(k => flag[k] === 2));
+    for (let b = 0; b < KT.tile; b++) for (let a = 0; a < KT.tile; a++) {
+      const k00 = b * N + a, k10 = k00 + 1, k01 = k00 + N, k11 = k01 + 1;
+      if (!skip(k00, k01, k10)) index.push(k00, k01, k10);
+      if (!skip(k10, k01, k11)) index.push(k10, k01, k11);
+    }
+    if (index.length) {
+      const geo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(pos, 3)).setAttribute('normal', new THREE.BufferAttribute(nrm, 3)).setAttribute('color', new THREE.BufferAttribute(col, 3));
+      geo.setIndex(index);
+      g.add(new THREE.Mesh(geo, kLandMat));
+    }
+  }
+  const samples = kSamples.get(key); // the roads' stripes, by colour
+  if (samples) {
+    const parts = new Map();
+    for (const [r, O1, y1, O2, y2, color, on, lit] of KSTRIPS) {
+      const list = samples.get(r);
+      if (!list) continue;
+      const v = [], at = (i, o, y) => [r.P[i].x + r.L[i].x * o - ox, r.P[i].y + y, r.P[i].z + r.L[i].z * o - oz];
+      for (const i of list) {
+        const f = on(i);
+        if (!f) continue;
+        const a = at(i, O1(i), y1), b = at(i, O2(i), y2);
+        let p = at(i + 1, O1(i + 1), y1), q = at(i + 1, O2(i + 1), y2);
+        if (f < 1) p = p.map((w, k) => a[k] + (w - a[k]) * f), q = q.map((w, k) => b[k] + (w - b[k]) * f);
+        v.push(...a, ...b, ...p, ...b, ...q, ...p);
+      }
+      if (!v.length) continue;
+      const m = kMat(color, lit);
+      if (!parts.has(m)) parts.set(m, []);
+      parts.get(m).push(v);
+    }
+    for (const [m, vs] of parts) {
+      const geo = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(vs.flat(), 3));
+      geo.computeVertexNormals();
+      g.add(new THREE.Mesh(geo, m));
+    }
+  }
+  if (t !== undefined) { // the trees: rainforest, or the estate's palms in rows (blocks of them, some fallow) by the LPT
+    const rnd = kRnd(key + 7), list = [], solids = !kSolids.has(key);
+    const clear = kClear.filter(([x, z, r]) => x + r > ox && x - r < ox + KT_W && z + r > oz && z - r < oz + KT_W), cleared = (x, z) => clear.some(([cx, cz, r]) => (x - cx) ** 2 + (z - cz) ** 2 < r * r);
+    const lp = []; // the LPT's line nearby (for the estate's rows along it)
+    if (estate) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const i of kSamples.get((ti + a) * 4096 + tj + b)?.get(LP) ?? []) if (i % 6 === 0) lp.push(LP.P[i]);
+    const plant = (x, z, palm, s) => {
+      const y = karakLand(x, z), r = onRoad(x, z);
+      if (y === undefined || y < 0.3 || r.out < (palm ? 9 : 7) || cleared(x, z)) return;
+      const gi = Math.round((x - KT.x0) / KT.cell), gj = Math.round((z - KT.z0) / KT.cell), f = ktAt(gi, gj)?.[1];
+      if (f) return;
+      list.push([x - ox, y - 0.3, z - oz, s, palm]);
+      if (solids && r.out < 40) solid(x, z, x, z, palm ? 0.5 : 0.6);
+    };
+    if (estate) {
+      for (let bz = 0; bz < KT_W; bz += 120) for (let bx = 0; bx < KT_W; bx += 120) { // blocks within 220 m of the road; a quarter fallow
+        const mx = ox + bx + 60, mz = oz + bz + 60;
+        if (rnd() < 0.25 || !lp.some(p => Math.hypot(p.x - mx, p.z - mz) < 220)) continue;
+        for (let z = bz + 5; z < bz + 120; z += 10) for (let x = bx + 5 + (Math.round(z / 10) % 2) * 5; x < bx + 120; x += 10) if (list.length < 3000) plant(ox + x, oz + z, true, 0.85 + rnd() * 0.3);
+      }
+      for (let n = 0; n < 60; n++) plant(ox + rnd() * KT_W, oz + rnd() * KT_W, false, 0.8 + rnd() * 0.6);
+    } else for (let n = 0; n < 420; n++) plant(ox + rnd() * KT_W, oz + rnd() * KT_W, false, 0.75 + rnd() * 0.8);
+    for (const palm of [false, true]) {
+      const these = list.filter(p => p[4] === palm);
+      if (!these.length) continue;
+      const trees = new THREE.InstancedMesh(palm ? kPalmGeo : kTreeGeo, kTreeMat, these.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+      these.forEach(([x, y, z, s], n) => {
+        trees.setMatrixAt(n, m4.compose(new THREE.Vector3(x, y, z), q.setFromEuler(e.set(0, rnd() * 6.28, 0)), new THREE.Vector3(s, s * (0.85 + rnd() * 0.3), s)));
+        trees.setColorAt(n, (palm ? PALMS : JUNGLE)[Math.floor(rnd() * (palm ? 3 : 5))]);
+      });
+      g.add(trees);
+      (g.userData.trees ??= []).push(trees);
+    }
+    kSolids.add(key);
+  }
+  scene.add(g);
+  kBuilt.set(key, g);
+}
+function kDrop(key) {
+  const g = kBuilt.get(key);
+  scene.remove(g);
+  g.traverse(o => o.geometry?.dispose());
+  kBuilt.delete(key);
+}
+// each frame: the tiles within 2.7 km of the camera (x the Settings' view distance) built, nearest first (two a frame, or all at once after a jump),
+// those past 3 km let go
+let kJump = true;
+function karakTick() {
+  const cx = camera.position.x, cz = camera.position.z, want = [];
+  for (const key of kTiles) {
+    const ti = Math.floor(key / 4096), tj = key - ti * 4096, d = Math.hypot(KT.x0 + (ti + 0.5) * KT_W - cx, KT.z0 + (tj + 0.5) * KT_W - cz);
+    if (d < 2700 * gfx.view && !kBuilt.has(key)) want.push([d, key]);
+    else if (d > 3700 * gfx.view && kBuilt.has(key)) kDrop(key);
+    else if (kBuilt.has(key)) for (const m of kBuilt.get(key).userData.trees ?? []) m.visible = d < 1900 * gfx.view; // (the trees of the far tiles lost in the haze anyway)
+  }
+  want.sort((a, b) => a[0] - b[0]);
+  for (const [, key] of want.slice(0, kJump ? Infinity : 2)) kBuild(key);
+  kJump = false;
+}
+
 // the village's buildings, the same every drive (a seeded random): stone houses along its lanes, one or two
 // storeys, each turned to face its lane with a door and small windows front and back, a chimney and a gabled roof of
 // old tiles or slate; the church on the square's far side from the road, its bell tower by the south lane; the
@@ -2240,14 +2962,14 @@ for (const p of SIDE) if (!p.fuel) workshop(p.r.P[p.i].x + p.r.L[p.i].x * 58, p.
 // every box built above that stands at bumper height is solid round its four sides: the garages' and the workshop's
 // walls, the lift, pumps, canopy legs, the gantry's legs, the grandstand, benches (not floors, roofs or lintels)
 scene.updateMatrixWorld();
-scene.traverse(o => {
-  if (o.geometry?.type !== 'BoxGeometry') return;
+scene.traverse(o => { if (o.geometry?.type === 'BoxGeometry') boxSolid(o); });
+function boxSolid(o) { // (and any merged into a site's mesh, before it was)
   const b = new THREE.Box3().setFromObject(o), ground = surfaceAt((b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2, b.min.y);
   if (b.min.y - ground > 1.2 || b.max.y - ground < 0.3) return;
   const { width: w, depth: d } = o.geometry.parameters;
   const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => new THREE.Vector3(sx * w / 2, 0, sz * d / 2).applyMatrix4(o.matrixWorld));
   c.forEach((p, k) => solid(p.x, p.z, c[(k + 1) % 4].x, c[(k + 1) % 4].z, 0, b.min.y, b.max.y));
-});
+}
 // the car's three circles, each pushed out of whatever it overlaps - the deepest overlap first, then again for what's
 // left (a corner), so the joints along a wall can't tilt its push. Driven in steeper than 30° the car stops dead; a
 // glancing blow turns it along the wall with the part of its speed that was along it
@@ -3204,14 +3926,17 @@ const startBay = CP_BAYS[/^bay(\d+)$/.exec(query.get('at'))?.[1]];
 let garageClosed = !!startBay; // closed for this visit (and in the bay a swap started in); reopens after driving out and back in
 garageEl.addEventListener('click', e => {
   const b = e.target.closest('button');
-  if (b?.dataset.car && b.dataset.car !== CAR.page) swapCar(b.dataset.car, inBay() ?? (atHome() > 0 ? 'home2' : undefined));
+  if (b?.dataset.car && b.dataset.car !== CAR.page) swapCar(b.dataset.car, inBay() ?? (atHome() > 0 ? 'home' + (atHome() + 1) : undefined));
   else if (b) { garageClosed = true; garageEl.hidden = true; }
 });
 const inBay = () => { // its ?at=, parked (roughly) in a car park bay
   const n = CP_BAYS.findIndex(b => Math.abs(state.x - b.x) < 2 && Math.abs(state.z - b.z) < 1 && Math.abs(state.y - b.y) < 1);
   return n < 0 ? undefined : 'bay' + n;
 };
-const atHome = () => HOMES.findIndex(h => Math.abs(state.x - h.x) < 2.4 && Math.abs(state.z - h.z) < 4); // which home's garage it's in (-1: none)
+const atHome = () => HOMES.findIndex(h => { // which home's garage it's in (-1: none), in its own axes
+  const dx = state.x - h.x, dz = state.z - h.z, c = Math.cos(h.rot ?? 0), sn = Math.sin(h.rot ?? 0);
+  return Math.abs(dx * c - dz * sn) < 2.4 && Math.abs(dx * sn + dz * c) < 4 && Math.abs(state.y - (h.y ?? 0)) < 3;
+});
 const inGarage = () => atHome() >= 0 || !!inBay();
 // the mechanic: stop in its bay and its menu opens the car menu on the car's own servicing, tuning or dyno tab.
 // Servicing and engine repairs only show in the car menu here - the mechanic is where the car gets fixed
@@ -3385,7 +4110,7 @@ else frame.src = `/car/${CAR.page}/raw${TEST_DRIVE ? '?test_drive=1' : ''}`;
 const credit = ([title, page, licence = 'by-nc-sa', author = 'Ddiaz Design', authorPage = 'https://sketchfab.com/ddiaz-design']) => `<a href="${page}" target="_blank">${title}</a>
   by <a href="${authorPage}" target="_blank">${author}</a>, <a href="http://creativecommons.org/licenses/${licence}/4.0/" target="_blank">CC ${licence.toUpperCase()} 4.0</a>`;
 document.getElementById('credit').innerHTML = `${CAR.name.replace('BMW ', '')} model: ${credit(CAR.credit)}${CAR.steering.from ? ` · steering wheel: ${credit(CARS[CAR.steering.from].credit)}` : ''}${CAR.wheelsCredit ? ` · wheels: ${credit(CAR.wheelsCredit)}` : ''}
-  · Nordschleife: <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>
+  · Nordschleife, KL–Karak, Genting &amp; LPT: <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>, land: <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank">AWS Terrain Tiles</a> (SRTM)
   <br>Traffic: ${[['2008 Audi RS4', 'https://sketchfab.com/3d-models/2008-audi-rs4-14024864a643497497e11163151a0eb2'], ['2013 Audi RS4 Avant', 'https://sketchfab.com/3d-models/2013-audi-rs4-avant-09c0c62808364c1e9381b2363dc76916'],
     ['2018 Audi RS3 Sportback', 'https://sketchfab.com/3d-models/2018-audi-rs3-sportback-20fdc17a5b2f4afab096337b5822c170'], ['2024 Volkswagen Polo 170 TSI', 'https://sketchfab.com/3d-models/2024-volkswagen-polo-170-tsi-ec0f4dfd1ca84a859725e4002e9cf120']]
     .map(([t, u]) => `<a href="${u}" target="_blank">${t}</a>`).join(', ')} by <a href="https://sketchfab.com/ddiaz-design" target="_blank">Ddiaz Design</a>, <a href="http://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a>
@@ -3402,10 +4127,10 @@ addEventListener('resize', () => {
 // every drive starts at home, on the drive just out of the garage, facing down it to the valley road - or, after a
 // swap in a pit garage, on the pit lane outside it (16 m along its site's z), pointing to the exit; in the car park, in the
 // bay, facing out
-const HOME_SPOT = { x: HOME.x, y: 0, z: HOME.z + 14, heading: 0 }, HOME2_SPOT = { x: HOME2.x, y: 0, z: HOME2.z + 14, heading: 0 };
+const HOME_SPOTS = HOMES.map(h => { const [x, y, z] = homeAt(h, 0, 14); return { x, y, z, heading: h.rot ?? 0 }; }), [HOME_SPOT, HOME2_SPOT, HOME3_SPOT, HOME4_SPOT] = HOME_SPOTS;
 const pitSpot = p => ({ x: p.x + 16 * Math.sin(p.rot), y: p.y ?? 0, z: p.z + 16 * Math.cos(p.rot), heading: Math.PI / 2 + p.rot });
 const startPit = PITS.find(p => p.at === query.get('at'));
-const state = { ...(startPit ? pitSpot(startPit) : query.get('at') === 'home2' ? HOME2_SPOT : HOME_SPOT), speed: 0, steer: 0 };
+const state = { ...(startPit ? pitSpot(startPit) : HOME_SPOTS[/^home(\d)$/.exec(query.get('at'))?.[1] - 1] ?? HOME_SPOT), speed: 0, steer: 0 };
 if (startBay) Object.assign(state, { x: startBay.x, y: startBay.y, z: startBay.z, heading: startBay.out });
 
 // mini map, heading-up: the car's arrow always points up and the world turns round it (+X drawn on the left of +Z, as
@@ -3416,10 +4141,10 @@ if (startBay) Object.assign(state, { x: startBay.x, y: startBay.y, z: startBay.z
 const mapEl = document.getElementById('map'), map = mapEl.getContext('2d'), MW = mapEl.clientWidth, MH = mapEl.clientHeight;
 mapEl.width = MW * devicePixelRatio;
 mapEl.height = MH * devicePixelRatio;
-const MAP_ROADS = [A, M, K1, K2, K3, RW, ...STREETS, T, TR, PL, CR, SL, VL, ON, NR, NPL, NA, BP1, BP2, DS, W, XK, XW, KS, WS, NW];
+const MAP_ROADS = [A, M, K1, K2, K3, RW, ...STREETS, T, TR, PL, CR, SL, VL, ON, NR, NPL, NA, BP1, BP2, DS, W, XK, XW, KS, WS, NW, ...KARAK_ROADS, KU];
 // its marked spots, by kind (the names are the phone pad map's legend)
-const MARKER_KINDS = [['Fuel', '#2ecc71', STATIONS], ['Home & car park', '#4fa8ff', [HOME, HOME2, { x: CP.x1, z: (CP.z0 + CP.z1) / 2 }]],
-  ['Mechanic & pits', '#ff8c1a', [...SHOPS, ...PITS]], ['Viewpoint', '#ffd23f', [V.P[Math.round(V.N / 2)]]], ['Start lines', '#ffffff', [T.P[ISF], NR.P[RIG]]], ['Village', '#c08a5a', [VIL]],
+const MARKER_KINDS = [['Fuel', '#2ecc71', STATIONS], ['Home & car park', '#4fa8ff', [...HOMES, { x: CP.x1, z: (CP.z0 + CP.z1) / 2 }]],
+  ['Mechanic & pits', '#ff8c1a', [...SHOPS, ...PITS]], ['Sights & views', '#ffd23f', [V.P[Math.round(V.N / 2)], ...Object.values(SIGHTS).map(p => p.apron.P[p.apron.N])]], ['Start lines', '#ffffff', [T.P[ISF], NR.P[RIG]]], ['Village', '#c08a5a', [VIL]],
   ['Drift, drag & mall', '#c27bff', [{ x: 800, z: 600 }, { x: DRAG.x, z: DRAG.z0 }, { x: 1000, z: 1505 }]]];
 const MARKERS = MARKER_KINDS.flatMap(([, color, spots]) => spots.map(p => [p, color]));
 { // the mini map's legend, and the lap timer moved down below it
@@ -3438,11 +4163,21 @@ const roadsPath = roads => { // in metres: a point every 18 m, and the last (the
   return path;
 };
 const roadPath = roadsPath(MAP_ROADS);
+// and the same in 2 km squares, so the mini map strokes only the squares round what it shows
+const MAP_TILES = [...MAP_ROADS.reduce((m, r) => {
+  for (let i = 0; i < r.N; i += 6) {
+    const a = r.P[i], b = r.P[Math.min(i + 6, r.N)], k = Math.floor(a.x / 2000) + ',' + Math.floor(a.z / 2000);
+    if (!m.has(k)) m.set(k, [Math.floor(a.x / 2000) * 2000 + 1000, Math.floor(a.z / 2000) * 2000 + 1000, new Path2D()]);
+    m.get(k)[2].moveTo(a.x, a.z); m.get(k)[2].lineTo(b.x, b.z);
+  }
+  return m;
+}, new Map()).values()];
 const corners = (x0, x1, z0, z1) => [{ x: x0, z: z0 }, { x: x1, z: z1 }];
 const PLACES = [['City', corners(CITY.x0, CITY.x1, CITY.z0, CITY.z1)], ['Midtown', corners(X2[0], X2.at(-1), Z2[0], Z2.at(-1))],
   ['Southgate', corners(X3[0], X3.at(-1), Z3[0], Z3.at(-1))], ['Airfield', corners(90, 500, -2980, -420)],
   ['Village', corners(VIL.x - VIL.r, VIL.x + VIL.r, VIL.z - VIL.r, VIL.z + VIL.r)],
-  ['Drift park', corners(600, 992, 540, 660)], ['Drag strip', corners(1007, 1260, 140, 1260)], ['North Mall', corners(890, 1110, 1300, 1545)], ['Westhaven', corners(X4[0], X4.at(-1), Z4[0], Z4.at(-1))],
+  ['Drift park', corners(600, 992, 540, 660)], ['Drag strip', corners(1007, 1260, 140, 1260)], ['North Mall', corners(890, 1110, 1300, 1545)], ['Westhaven', corners(X4[0], X4.at(-1), Z4[0], Z4.at(-1))], ['Kuantan', corners(X5[0], X5.at(-1), Z5[0], Z5.at(-1))],
+  ['Genting Highlands', [...TL.P, ...GA.P.slice(-120), ...GD.P.slice(0, 120)]], ['Gohtong Jaya', corners(GRR.c.x - 450, GRR.c.x + 450, GRR.c.z - 450, GRR.c.z + 450)],
   ['Circuit', [...T.P, ...PL.P], [T, PL]], ['Nordschleife', [...NR.P, ...NPL.P], [NR, NPL]], ['Mountain', M.P, [M]]].map(([name, P, loop]) => {
   const xs = P.map(p => p.x), zs = P.map(p => p.z), x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
   // r: round its middle, so it fits whichever way the map has turned
@@ -3461,6 +4196,7 @@ const spotOn = (roads, x, z, toward, side = 0) => {
   return { x: r.P[i].x + L.x * s, y: r.P[i].y, z: r.P[i].z + L.z * s, heading: back ? h + Math.PI : h };
 };
 const roof = CP_BAYS[(CP.levels - 1) * CP_BAYS.length / CP.levels];
+const kTo = (r, i, side = 0) => { const t = r.P[i + 1].clone().sub(r.P[i]); return spotOn([r], r.P[i].x, r.P[i].z, Math.atan2(t.x, t.z), side); }; // on road r at i, facing along it
 const TELEPORTS = [ // name, where, the spot
   ['Racetrack', 'the start / finish line', spotOn([T], T.P[ISF].x, T.P[ISF].z, pitSpot(PITS[0]).heading)],
   ['Racetrack pits', 'outside the team garage', pitSpot(PITS[0])],
@@ -3484,6 +4220,22 @@ const TELEPORTS = [ // name, where, the spot
   ['West service area', 'on the autobahn, 21 km out', spotOn([W], W.P[W.iS - 70].x, W.P[W.iS - 70].z, -Math.PI / 2, 11.9)],
   ['Westhaven', 'the city, 50 km west', spotOn(STREETS, -50000, -1850, 0, 2.25)],
   ['Westhaven home', 'the drive outside the garage', HOME2_SPOT],
+  ['Gombak toll', 'the KL-Karak, short of the plaza', kTo(KK, KP.gombakToll.i - 70, 8.1)],
+  ['Genting Sempah', 'its rest area, eastbound', kTo(KK, KP.sempahRR.i - 60, 8.1)],
+  ['Genting Highlands road', 'up from Genting Sempah', kTo(GH, 40, 2.4)],
+  ['Genting Sempah mechanic', 'the workshop on the way up', kTo(SIDE.find(p => p.r === GH && !p.fuel).apron, 8)],
+  ['Gohtong Jaya', 'the fuel station on the way up', kTo(GH, KP.gohtongFuel.i - 30, 2.4)],
+  ['Awana SkyWay', 'its car park, by the station', kTo(SIGHTS.skyway.apron, 6)],
+  ['Chin Swee Temple', 'its car park, by the gate', kTo(SIGHTS.chinSwee.apron, 2)],
+  ['Genting Highlands', 'the resort, at the top', kTo(TL, KP.topFuel.i - 30, 1.75)],
+  ['Genting mechanic', 'the workshop at the top', kTo(SIDE.find(p => p.r === TL && !p.fuel).apron, 8)],
+  ['Genting lookout', 'over the valley, on the way down', kTo(SIGHTS.lookout.apron, 4)],
+  ['Genting safe house', 'the drive outside its garage', HOME4_SPOT],
+  ['Bentong', 'its rest area on the KL-Karak', kTo(KK, KP.bentongRR.i - 60, 8.1)],
+  ['Karak toll', 'the end of the KL-Karak', kTo(KK, KP.karakToll.i - 70, 8.1)],
+  ['Temerloh', 'its rest area on the LPT', kTo(LP, KP.temerlohRR.i - 60, 7.6)],
+  ['Kuantan', 'the town, by the sea', spotOn(KUANTAN_STREETS, -76600, Z5[3], -Math.PI / 2, 2.25)],
+  ['Kuantan home', 'the drive outside the garage', HOME3_SPOT],
 ];
 const teleportEl = document.getElementById('teleport');
 document.getElementById('teleport-places').innerHTML = TELEPORTS.map(([name, where], n) => `<button data-to="${n}">${name}<small>${where}</small></button>`).join('');
@@ -3534,9 +4286,9 @@ const ovPath = parts => { // whole roads, or [road, which samples] - each 6th sa
   return path;
 };
 const OV_KINDS = [ // [legend, colour, roads, width (m), at least (px)], drawn in this order
-  ['Runway', '#5d636b', [RW], 60, 4], ['Streets', '#878d94', STREETS, 9, 1.2], ['Links & mountain roads', '#d4d4d4', [K1, K2, K3, TR, BP1, BP2, NA, M, CR, SL, VL, DS], 11, 1.6],
-  ['Highway', '#2ec4b6', [[W, W.hw]], 16, 2.2], ['Autobahn', '#3d8bfd', [A, [W, i => !W.hw(i)]], 34, 3], ['Racetracks', '#ff4f4f', [T, PL, NR, NPL], 14, 2.2],
-  ['Ramps & flyovers', '#ffb020', [ON, ...UTURNS, XK, XW, KS, WS, NW], 9, 1.6]].map(([name, color, roads, m, px]) => ({ name, color, m, px, path: ovPath(roads) }));
+  ['Runway', '#5d636b', [RW], 60, 4], ['Streets', '#878d94', STREETS, 9, 1.2], ['Links & mountain roads', '#d4d4d4', [K1, K2, K3, TR, BP1, BP2, NA, M, CR, SL, VL, DS, GH, GU, GA, TL, GD, EC], 11, 1.6],
+  ['Highway', '#2ec4b6', [[W, W.hw], GB, KU], 16, 2.2], ['Autobahn & expressways', '#3d8bfd', [A, [W, i => !W.hw(i)], KK, LP], 34, 3], ['Racetracks', '#ff4f4f', [T, PL, NR, NPL], 14, 2.2],
+  ['Ramps & flyovers', '#ffb020', [ON, ...UTURNS, XK, XW, KS, WS, NW, EX1, EN1, EX2, EN2, JR, RR, GRR], 9, 1.6]].map(([name, color, roads, m, px]) => ({ name, color, m, px, path: ovPath(roads) }));
 const ovEl = document.getElementById('overview'), ovCv = document.getElementById('ov-map'), ovG = ovCv.getContext('2d');
 const ov = { x: 0, z: 0, s: 0, drag: null }; // its middle, px per metre (0: fit it all on opening)
 const OV_BOX = MAP_ROADS.reduce((b, r) => { for (const p of r.P) b.x0 = Math.min(b.x0, p.x), b.x1 = Math.max(b.x1, p.x), b.z0 = Math.min(b.z0, p.z), b.z1 = Math.max(b.z1, p.z); return b; },
@@ -3773,7 +4525,8 @@ function drawMap(dt) {
   map.lineJoin = map.lineCap = 'round';
   map.lineWidth = 4 / mapView.s;
   map.strokeStyle = '#8a8a8a';
-  map.stroke(roadPath);
+  const seen = Math.hypot(MW, MH) / mapView.s + 1500; // (each square's middle within this of the map's)
+  for (const [x, z, p] of MAP_TILES) if (Math.abs(x - mapView.x) < seen && Math.abs(z - mapView.z) < seen) map.stroke(p);
   if (at?.loop) { // the track or the loop itself, picked out
     map.lineWidth = 2.5 / mapView.s;
     map.strokeStyle = '#f2f2f2';
@@ -4261,6 +5014,12 @@ const clearOf = (x, z, r, o, m = 1) => {
 };
 for (const [roads, every, first, sides, out, [reach, w, d], size = 1, k = 1, white = false, m = 1, on = () => true] of [
   [[A], 16, 8, [1, -1], 0, [7.5, 14, 48], 1.4, 1.1, false, 3],
+  [[KK], 16, 8, [1, -1], 0, [7.5, 14, 48], 1.4, 1.1, false, 3, i => !KK.tunnel(i)], // the expressways: twin-arm masts down the median, all the way
+  [[LP], 16, 8, [1, -1], 0, [7.5, 14, 48], 1.4, 1.1, false, 3],
+  [[EX1, EN1, EX2, EN2], 12, 6, [1], 4.6, [2.6, 9, 12], 0.9, 0.9], [[EC], 14, 6, [1, -1], 5.3, [3, 9, 12], 0.8, 0.85], // (and Genting Sempah's slips)
+  [[GH], 14, 6, [1, -1], 9.4, [3, 9, 12], 0.8, 0.85, false, 1, i => plazaAt(GH, i) || GH.P[i].distanceTo(GRR.P[0]) < 450],
+  [[GU], 14, 6, [1, -1], 9.4, [3, 9, 12], 0.8, 0.85, false, 1, i => GU.P[i].distanceTo(GRR.P[0]) < 450],
+  [[TL], 10, 4, [1, -1], 5.3, [2.6, 9, 12], 0.8, 0.9], [[JR, RR, GRR], 4, 2, [1], 6.6, [2.5, 8, 10], 0.8, 0.9],
   [[W], 16, 8, [1, -1], 0, [7.5, 14, 48], 1.4, 1.1, false, 3, W.auto], // the west road: masts down the autobahn's median,
   [[W], 20, 6, [1], 10.4, [4.5, 12, 20], 1, 1, false, 1, W.hw], [[W], 20, 16, [-1], 10.4, [4.5, 12, 20], 1, 1, false, 1, i => W.hw(i) && i >= W.iC], // the highway's either side
   [[K1, K2, K3, TR, ON, BP1, BP2, KS, WS], 12, 6, [1], 5.4, [3, 12, 16]],
@@ -4287,7 +5046,8 @@ for (const [roads, every, first, sides, out, [reach, w, d], size = 1, k = 1, whi
 const REFLECTOR_POSTS = [], REFLECTOR_PLATES = [], RED_LENS = new THREE.Color(0xd01005), WHITE_LENS = new THREE.Color(0xffffff);
 for (const [roads, every, out, ways, white, on = () => true] of [
   [[NR], 12, 8.2, () => [1], true], [[M, K1, K2, K3, TR, NA, BP1, BP2], 16, 5.45, () => [1, -1]], [[CR, SL], 16, 3.95, () => [1, -1]],
-  [[ON, KS, WS], 12, 4.95, () => [1]], [[A], 16, 17.7, s => [s]], [[W], 16, 17.7, s => [s], false, W.auto], [[W], 16, 10.2, () => [1, -1], false, (i, s) => W.hw(i) && (s > 0 || i >= W.iC)],
+  [[ON, KS, WS], 12, 4.95, () => [1]], [[A], 16, 17.7, s => [s]], [[KK], 16, 17.7, s => [s], false, i => !KK.tunnel(i) && !plazaAt(KK, i) && !atRnr(KK, i)],
+  [[GH, GU], 16, 9.2, s => [s], false, i => !plazaAt(GH, i)], [[GA, GD, TL], 12, 4.95, () => [1]], [[W], 16, 17.7, s => [s], false, W.auto], [[W], 16, 10.2, () => [1, -1], false, (i, s) => W.hw(i) && (s > 0 || i >= W.iC)],
 ]) for (const r of roads) for (let i = 3; i < r.N; i += every) for (const s of [1, -1]) {
   const p = r.P[i], x = p.x + r.L[i].x * s * out, z = p.z + r.L[i].z * s * out, yaw = Math.atan2(r.L[i].z, -r.L[i].x); // local +z back down the road
   if (!on(i, s) || !clearOf(x, z, r, s * out, 0.5)) continue;
@@ -4299,12 +5059,15 @@ for (const [roads, every, out, ways, white, on = () => true] of [
     col.setHex(hex);
     return geo.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: geo.attributes.position.count }, () => [col.r, col.g, col.b]).flat(), 3));
   };
-  const posts = new THREE.InstancedMesh(mergeGeometries([tint(new THREE.BoxGeometry(0.1, 1.05, 0.12).translate(0, 0.525, 0), 0xe8e8e2), tint(new THREE.BoxGeometry(0.104, 0.26, 0.124).translate(0, 0.89, 0), 0x1d1d1f)]),
-    new THREE.MeshLambertMaterial({ vertexColors: true }), REFLECTOR_POSTS.length);
-  REFLECTOR_POSTS.forEach((at, n) => posts.setMatrixAt(n, at));
-  const plates = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.07, 0.18).translate(0, 0.89, 0.063), new THREE.MeshLambertMaterial(), REFLECTOR_PLATES.length);
-  REFLECTOR_PLATES.forEach(([at, c], n) => { plates.setMatrixAt(n, at); plates.setColorAt(n, c); });
-  scene.add(posts, plates);
+  const postGeo = mergeGeometries([tint(new THREE.BoxGeometry(0.1, 1.05, 0.12).translate(0, 0.525, 0), 0xe8e8e2), tint(new THREE.BoxGeometry(0.104, 0.26, 0.124).translate(0, 0.89, 0), 0x1d1d1f)]);
+  const postMat = new THREE.MeshLambertMaterial({ vertexColors: true }), plateGeo = new THREE.PlaneGeometry(0.07, 0.18).translate(0, 0.89, 0.063), plateMat = new THREE.MeshLambertMaterial();
+  const bySquare = list => list.reduce((m, it) => { const at = it[0] ?? it, k = Math.floor(at.elements[12] / SQ) + ',' + Math.floor(at.elements[14] / SQ); if (!m.has(k)) m.set(k, []); m.get(k).push(it); return m; }, new Map());
+  for (const [geo, mat, list] of [[postGeo, postMat, REFLECTOR_POSTS], [plateGeo, plateMat, REFLECTOR_PLATES]]) for (const [k, items] of bySquare(list)) { // (6 km squares, about their middles)
+    const [i, j] = k.split(',').map(Number), mesh = new THREE.InstancedMesh(geo, mat, items.length), to = new THREE.Matrix4().makeTranslation(-(i + 0.5) * SQ, 0, -(j + 0.5) * SQ);
+    mesh.position.set((i + 0.5) * SQ, 0, (j + 0.5) * SQ);
+    items.forEach((it, n) => { mesh.setMatrixAt(n, to.clone().multiply(it[0] ?? it)); if (it[1]) mesh.setColorAt(n, it[1]); });
+    scene.add(mesh);
+  }
 }
 // a lit diffuse plate can't outshine the white post round it, so each reflector also has a glint over its lens, as
 // bright as the headlights' beam on it (inside the cone, within reach, the lens turned towards the car), each frame
@@ -4394,6 +5157,15 @@ scene.add(streetLamps, lampHeads, lampPools, runwayLights);
 // (npcNear), though not each other's at crossings
 const TRAFFIC = [ // [roads, lanes fast to slow (m left of the centre line, for the road's way; or by sample), both ways,
   // km/h, cars per km each way, grip in bends (m/s² sideways)]
+  [[GB, KU], [1.95, 5.45], true, 80, 0.8, 2.5],
+  [[KK], i => plazaAt(KK, i) ? [4.5, 8.5, 12.5] : KK.three(i) ? [4.4, 8.1, 11.9] : [4.4, 8.1], true, 110, 0.6, 2.5],
+  [[LP], i => plazaAt(LP, i) ? [4.5, 8.5] : [3.9, 7.6], true, 110, 0.45, 2.5],
+  [[GH, GU], i => plazaAt(GH, i) ? [2.6, 6.6] : [2.4, 5.9], true, 60, 0.5, 3],
+  [[GA, TL, GD], [-1.75, 1.75], false, 50, 0.6, 3],
+  [[EX1, EN1, EX2, EN2], [0], false, 60, 0.3, 3],
+  [[EC], [1.9], true, 50, 0.3, 3],
+  [[JR, RR, GRR], [0], false, 30, 0.6, 3],
+  [KUANTAN_STREETS, [2.25], true, 45, 1, 3],
   [[A], [4.4, 8.1, 11.9], true, 130, 4, 2.5],
   [[W], i => i < W.iA + 30 || i >= W.iB - 30 ? [1.95, 5.45] : [4.4, 8.1, 11.9], true, 120, 2.5, 2.5],
   [[NR], [-2.4, 2.4], false, 110, 2, 6],
@@ -4401,7 +5173,7 @@ const TRAFFIC = [ // [roads, lanes fast to slow (m left of the centre line, for 
   [[K1, K2, K3, TR, BP1, BP2], [2.25], true, 80, 2.5, 3],
   [[M, NA, CR, SL], [2.25], true, 65, 1.2, 3],
   [[ON, ...UTURNS, XK, XW, KS, WS, NW], [0], false, 70, 1, 3],
-  [STREETS.filter(r => r !== RB), [2.25], true, 45, 4, 3],
+  [STREETS.filter(r => r !== RB && !KUANTAN_STREETS.includes(r)), [2.25], true, 45, 4, 3],
   [[RB], [0], false, 30, 3, 3], // (its way: the island on the right)
 ];
 const NPC_MODELS = [['audi-rs4-b7', 4.589], ['audi-rs4-avant', 4.719], ['audi-rs3', 4.335], ['vw-polo-gti', 4.074], ['vw-polo-sedan', 4.39], ['mercedes-v8', 4.8]];
@@ -4721,6 +5493,13 @@ const greens = [], asphalt = [];
   }
   o.children.forEach(sort);
 })(scene);
+for (const m of kMats.values()) { // (the run's tiles, built later)
+  const hsl = {};
+  if (!m.isMeshLambertMaterial || m.userData.dry) continue;
+  m.color.getHSL(hsl, THREE.SRGBColorSpace);
+  const green = hsl.h > 0.2 && hsl.h < 0.42 && hsl.s > 0.12 && hsl.s < 0.45, grey = hsl.s < 0.12 && hsl.l > 0.15 && hsl.l < 0.31;
+  if (green || grey) (green ? greens : asphalt).push(m), m.userData.dry = m.color.clone();
+}
 const hash = k => { const x = Math.sin(k * 12.9898) * 43758.5453; return x - Math.floor(x); }; // the same tree takes the same colour
 let groundKey = '';
 function groundCover() {
@@ -4964,11 +5743,22 @@ kWarm.forEach(kBuild);
   scene.traverse(o => { if (o.frustumCulled || !o.visible) { off.push([o, o.frustumCulled, o.visible]); o.frustumCulled = false; o.visible = true; } });
   renderer.render(scene, camera);
   for (const [o, culled, visible] of off) Object.assign(o, { frustumCulled: culled, visible });
+  kWarm.forEach(kDrop);
 }
-const clock = new THREE.Clock();
+// in the Genting Sempah tunnel: the road's height there (undefined outside); the light inside, eased in and out
+const kTunnelAt = (x, z, y) => { let h; eachNear(x, z, 1, (r, i) => { if (r === KK && KK.tunnel(i) && Math.hypot(r.P[i].x - x, r.P[i].z - z) < 18 && Math.abs(r.P[i].y - y) < 6) h = r.P[i].y; }); return h; };
+let kDim = 0;
+const clock = new THREE.Clock(), meter = { n: 0, t: 0, cpu: 0 };
+let frameDue = 0, padShown = 0;
 renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const t0 = performance.now();
+  if (gfx.fps) { // the FPS cap: this refresh of the display skipped until the next frame is due
+    if (t0 < frameDue - 2) return;
+    frameDue = (t0 - frameDue > 1000 / gfx.fps ? t0 : frameDue) + 1000 / gfx.fps;
+  }
+  const raw = clock.getDelta(), dt = Math.min(raw, 0.05);
   turnFerris(dt);
+  turnSkyway(dt);
   // on the rollers - in Dyno mode, or with the car menu open on its dyno or performance tab - the wheels turn at the
   // car page's speed but the car stays put, so a pull or a timed run doesn't drive it off unseen
   const roll = carPage.speed / 3.6 * (carPage.reverse ? -1 : 1), w = frame.contentWindow;
@@ -5066,9 +5856,17 @@ renderer.setAnimationLoop(() => {
     const flat = Math.cos(camPitch) * dist, cx = state.x - Math.sin(camYaw) * flat, cz = state.z - Math.cos(camYaw) * flat;
     camera.up.set(0, 1, 0);
     const over = inCarPark(state.x, state.z) && onRoad(cx, cz, car.position.y + CP.h); // the deck or ramp over the car
-    camera.position.set(cx, Math.min(Math.max(car.position.y + 1 + Math.sin(camPitch) * dist * (1 - 0.18 * rush), terrainAt(cx, cz) + 0.5), over?.on ? over.y - 0.6 : Infinity), cz); // never under a hillside, or up through a deck - and lower at speed
+    const roofed = kTunnelAt(state.x, state.z, car.position.y); // (in the tunnel: under its roof, not over the hill)
+    camera.position.set(cx, Math.min(Math.max(car.position.y + 1 + Math.sin(camPitch) * dist * (1 - 0.18 * rush), roofed ?? terrainAt(cx, cz) + 0.5), over?.on ? over.y - 0.6 : roofed !== undefined ? roofed + 6.8 : Infinity), cz); // never under a hillside, or up through a deck - and lower at speed
     camera.lookAt(state.x, car.position.y + 1, state.z);
     camera.rotateX(-Math.atan((hudAnchor.position.y + clusterH * 0.00081 / 2) / -hudAnchor.position.z + CHASE_GAP)); // tipped down over a taller panel
+  }
+  if (shake > 0.01) { // a jolt through the car: the engine letting go
+    const a = shake * (inCar ? 0.012 : 0.06);
+    camera.position.x += jit() * a; camera.position.y += jit() * a; camera.position.z += jit() * a;
+    camera.rotateZ(jit() * shake * 0.03);
+    camera.rotateX(jit() * shake * 0.02);
+    shake *= Math.exp(-dt * 5);
   }
   // the cluster (and its hole) follows the dash from the seat, or the camera as a bottom panel; the car menu sits
   // where the CSS3D camera's perspective is exactly 1:1, so it's as sharp as a flat page
@@ -5088,15 +5886,23 @@ renderer.setAnimationLoop(() => {
   cssCam.projectionMatrix.copy(camera.projectionMatrix);
 
   skyTick(dt);
+  kDim += ((kTunnelAt(state.x, state.z, state.y) !== undefined ? 1 : 0) - kDim) * (1 - Math.exp(-dt * 2.5)); // in the tunnel: the daylight left outside
+  if (kDim > 0.001) { sun.intensity *= 1 - 0.9 * kDim; hemi.intensity *= 1 - 0.55 * kDim; scene.environmentIntensity *= 1 - 0.6 * kDim; }
   glintTick();
   trafficTick(dt);
   lapTimer(dt);
   dragTimer(dt);
+  karakTick();
   drawMap(dt);
   if (!ovEl.hidden) drawOverview();
   drawTele(frame.contentWindow, dt);
   renderer.render(scene, camera);
   cssRenderer.render(cssScene, panelOpen ? panelCam : cssCam);
+  if (!settingsEl.hidden && setTab === 'pad' && t0 - padShown > 250) padShown = t0, drawPadStatus();
+  if (gfx.meter) { // the FPS meter, every half second: frames, the time between them, this page's own work in one
+    meter.n++; meter.t += raw; meter.cpu += performance.now() - t0;
+    if (meter.t >= 0.5) fpsEl.textContent = `${Math.round(meter.n / meter.t)} fps · ${(meter.t / meter.n * 1000).toFixed(1)} ms · cpu ${(meter.cpu / meter.n).toFixed(1)} ms`, meter.n = meter.t = meter.cpu = 0;
+  }
 });
 </script>
 </body>
