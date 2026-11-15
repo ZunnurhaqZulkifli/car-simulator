@@ -1,7 +1,7 @@
 # Setup guide
 
-Everything you need to get the simulator running on a Mac. That covers the garage and car pages, the 3D drive page, and the
-phone as a steering wheel. Each part builds on the one before. Stop
+Everything you need to get the simulator running on a Mac. That covers the garage and car pages, the 3D drive page, the
+phone as a steering wheel, and the phone as the Mac's trackpad and keyboard. Each part builds on the one before. Stop
 after step 6 if you only want to drive with the keyboard.
 
 ---
@@ -10,7 +10,7 @@ after step 6 if you only want to drive with the keyboard.
 
 | | Needed for | Check |
 |---|---|---|
-| **macOS** | everything (Herd and the relay's login agent are Mac-only) | |
+| **macOS** | everything (Herd, the relay's login agent and the mouse helper are Mac-only) | |
 | **PHP 8.3+** and **Composer** | the Laravel app | `php -v`, `composer -V` |
 | **Node 20+** and **npm** | the front-end build and the phone pad's relay | `node -v`, `npm -v` |
 | **[Laravel Herd](https://herd.laravel.com)** | serving the app at `http://sim-app.test` | `herd --version` |
@@ -19,6 +19,7 @@ after step 6 if you only want to drive with the keyboard.
 | **MySQL** *(optional)* | only if you'd rather not use the default SQLite | |
 | **[Tailscale](https://tailscale.com)** on the Mac and the phone *(optional)* | the phone pad (step 7) | `tailscale status` |
 | A phone with motion sensors *(optional)* | tilt steering. Built and tested on iPhone Safari | |
+| **Xcode Command Line Tools** *(optional)* | the phone pad's mouse and keyboard (step 8) | `swiftc --version` |
 
 Without PHP or Composer, the quickest route is `/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.5)"`, then
 restart the terminal. Herd also ships PHP and Composer.
@@ -235,10 +236,50 @@ phone, the relay and the drive page. Useful commands:
   - **Map:** the whole world, your car, a legend, and tap-to-teleport. Drag to move it, pinch to zoom, twist with two fingers to turn it; double-tap for the whole of it, north up.
   - **Weather:** the time & weather menu.
   - **Sound:** Mute and every sound layer's slider. They appear once the engine has been started.
+  - **Mouse** (step 8).
 
 ---
 
-## 8. Troubleshooting
+## 8. The phone as the Mac's trackpad and keyboard *(optional)*
+
+The relay can move and click the Mac's pointer and type for you, through a small Swift helper
+(`scripts/pad-mouse.swift`). The relay builds it on first use with `swiftc`, into `storage/app/pad-mouse`.
+
+1. **Install the Xcode Command Line Tools** if `swiftc --version` doesn't answer: `xcode-select --install`.
+2. **Give the relay Accessibility access:** System Settings › Privacy & Security › **Accessibility**. Press **+**,
+   then add whatever runs the relay:
+   - **The login agent:** its `node`. Run `which node` in the shell you installed it from, for example
+     `~/.nvm/versions/node/v24.18.0/bin/node`. In the file picker, ⌘⇧G lets you type that path.
+   - **`npm run pad` in a terminal:** Terminal (or iTerm).
+3. **On the pad:** Extras › **Mouse** › **Turn on**. The Mac asks *"Let the phone pad move and click this Mac's
+   pointer…?"*. Click **Allow**.
+   - **Mouse on:** you're set.
+   - **Needs Accessibility:** finish step 2, then Turn on again. It won't ask the Allow question twice.
+   - **Restarting the relay:** this appears once, when access was granted while the relay was running. Turn on again
+     a moment later.
+
+Permission lasts for that phone connection only. If the phone reconnects (after its screen locks, for example), the
+Mac asks again, and **Turn off** ends it at any time. The relay only takes mouse and keyboard input from the phone.
+
+| On the touchpad | Does |
+|---|---|
+| 1 finger: drag / tap | move the pointer (further the faster you swipe) / click |
+| 2 fingers: drag / tap | scroll / right-click |
+| 3 fingers: drag / tap | drag (Three Finger Drag) / Look up |
+| 4 fingers: swipe ← → | the next / previous Space |
+| 4 fingers: swipe ↑ / ↓ | Mission Control / App Exposé |
+| 4 fingers: pinch / spread | Apps / Show Desktop |
+
+Buttons beside the touchpad: **Click**, **Right-click**, **Hold to drag**, and **Keyboard**. The keyboard types
+characters whatever the Mac's keyboard layout is. ⇧ ⌃ ⌥ ⌘ apply to the next key (⌘ then C copies), and ⌫ and the
+arrows repeat while held.
+
+The 3- and 4-finger gestures press the Mac's own shortcuts: ⌃← / ⌃→, ⌃↑, ⌃↓, F11 and ⌃⌘D, plus opening Apps. If you've
+changed those in System Settings › Keyboard › Keyboard Shortcuts › Mission Control, the matching gestures won't work.
+
+---
+
+## 9. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -250,6 +291,7 @@ phone, the relay and the drive page. Useful commands:
 | Pad: *Open the drive page on the Mac* | The relay is up, but no drive page is open at `http://sim-app.test` |
 | Pad drops mid-drive | `]` › **Pad** on the drive page: the log shows whether the phone went to the background (`hidden`), lost the network (`offline`, `ws-close` 1006), went silent (`stale`, `client-timeout`) or the drive page did. The ms readout beside the pad's status dot shows the link's lag live |
 | Pad: *Tilt steering is off* | Open the https link (not http), and allow Motion & Orientation for Safari in Settings |
+| Mouse: *Needs Accessibility* or nothing moves | Step 8.2 for the right process, then Turn on again; the relay's log shows each step (`pad mouse: …`) |
 | *Couldn't save this car* after updating | Run `php artisan migrate` (new columns, such as `handling`) and reload the car |
 | Self-check failures | The drive page and the shared scripts check themselves on load; failures show in the browser's console |
 | The Genting / Kuantan run is bare (no hills or roads past Gombak) | Its land and roads come from `public/js/karak.js` and `karak-terrain.bin`: hard-reload. Rebuilding them from OpenStreetMap is optional (`tools/karak/README.md`: Node, curl and ImageMagick) |

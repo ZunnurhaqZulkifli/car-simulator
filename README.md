@@ -29,7 +29,7 @@ Genting Highlands and Kuantan: the real KL–Karak Expressway from Gombak's toll
 real Genting Highlands road up to the resort (a safe house at the top), and the East Coast Expressway to Kuantan by the
 sea (a third home there) - with traffic on every road, by day or night, in any season and any weather. The in-car view shows the car's own live instrument cluster in the dash.
 Press **Tab** and the whole car page opens over the road: every control, live data, the tuning maps, the dyno and the
-diagnostics, while the car keeps rolling. Your phone can be the steering wheel.
+diagnostics, while the car keeps rolling. Your phone can be the steering wheel, and even the Mac's trackpad.
 
 There is no engine audio sample anywhere. Firing pulses, exhaust drone, turbo whistle, blow-off, intake and gear
 whine are all generated with the Web Audio API from the current rpm, boost and load, in each engine's real firing
@@ -152,7 +152,13 @@ Settings › Pad log.
 | **Lights** | Lights, high beam, headlight brightness |
 | **View** | A touchpad to look around, chase / in-car, Reset view |
 | **Settings** (gear, header) | The drive page's `]` Settings menu; lit while it's open |
-| **Extras** | Tab and Esc, and: **Map** (the whole world with your car on it, a legend, and every teleport spot - tap to go; drag to move it, pinch to zoom, twist to turn it, double-tap for the whole of it north up), **Weather** (the time & weather menu), **Sound** (Mute and every sound layer's slider) |
+| **Extras** | Tab and Esc, and: **Map** (the whole world with your car on it, a legend, and every teleport spot - tap to go; drag to move it, pinch to zoom, twist to turn it, double-tap for the whole of it north up), **Weather** (the time & weather menu), **Sound** (Mute and every sound layer's slider), **Mouse** (below) |
+
+**Mouse** turns the phone into the Mac's trackpad and keyboard: one finger moves and taps to click, two scroll and
+tap to right-click, three drag and tap to look up, four swipe between Spaces / up for Mission Control / down for App
+Exposé, pinch for Apps and spread for the desktop; a keyboard with one-shot ⇧ ⌃ ⌥ ⌘. The relay does it through
+`scripts/pad-mouse.swift` (built on first use), only for the phone, only after you click **Allow** on the Mac, and
+once macOS has given the relay Accessibility access. [docs/SETUP.md](docs/SETUP.md) walks through it.
 
 ### 🗂️ The garage (Laravel)
 
@@ -257,7 +263,7 @@ dyno, perf, rename, restore), `summary`, and a `snapshot` of the car's state, wh
 ## 🚀 Quick start
 
 **[docs/SETUP.md](docs/SETUP.md)** has the full step-by-step: prerequisites, the database, every car, Herd, the phone
-pad over Tailscale, and a tour of the features. In short:
+pad over Tailscale, the Mac mouse, and a tour of the features. In short:
 
 ```sh
 git clone <this-repo> && cd sim-app
@@ -315,7 +321,7 @@ built-in car through the editor.
 - **SQLite** by default
 - **three.js r182** for the drive world (from the jsDelivr CDN), **Web Audio** for every sound
 - **Vite + Tailwind 4** for the garage; no frontend framework
-- **Node + ws** for the phone pad relay
+- **Node + ws** for the phone pad relay, a small **Swift** helper (macOS) for its mouse and keyboard
 
 ## ✅ Tests
 
