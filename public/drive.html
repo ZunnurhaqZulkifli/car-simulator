@@ -2924,6 +2924,59 @@ function padTap({ key, code, shiftKey }, toDrive) {
   for (const type of ['keydown', 'keyup']) w.dispatchEvent(new w.KeyboardEvent(type, init));
 }
 const padSend = m => padWs?.readyState === WebSocket.OPEN && padWs.send(JSON.stringify(m));
+// the link's health (Settings, Pad): the phone's pings (once a second, with the round trip it last timed by this page's
+// pongs), its last input, and whether it went quiet mid-drive; and a log of what went on - this page's, the relay's and
+// the phone's own events, newest last, the last 1,000 kept by this browser (drive.padLog), to find out why it drops
+const padLink = { rtt: null, rtts: [], pingAt: 0, inAt: 0, lost: false, openAt: 0, down: false };
+let padLog = [], padCleared = 0;
+try { padLog = JSON.parse(localStorage.getItem('drive.padLog')) || []; padCleared = +localStorage.getItem('drive.padLogCleared') || 0; } catch {}
+if (!Array.isArray(padLog)) padLog = [];
+const padKey = e => `${e.src}|${e.t}|${e.ev}|${e.origin || ''}`, padSeen = new Set(padLog.map(padKey)); // (the relay sends its last 100 again on every connect)
+function padLogAdd(src, list) {
+  let n = 0;
+  for (const x of list) {
+    if (!x || typeof x !== 'object' || typeof x.ev !== 'string') continue;
+    const e = { ...x, t: Math.round(+x.t) || Date.now(), src }, key = padKey(e);
+    if (e.t < padCleared || padSeen.has(key)) continue;
+    padSeen.add(key);
+    padLog.push(e);
+    n++;
+  }
+  if (!n) return;
+  padLog.sort((a, b) => a.t - b.t).splice(0, padLog.length - 1000);
+  try { localStorage.setItem('drive.padLog', JSON.stringify(padLog)); } catch {}
+  if (!settingsEl.hidden && setTab === 'pad') drawSettings();
+}
+const padEv = (ev, d) => padLogAdd('drive', [{ t: Date.now(), ev, ...d }]);
+function padPing(rtt) {
+  padLink.pingAt = performance.now();
+  if (typeof rtt !== 'number' || !(rtt >= 0 && rtt < 6e4)) return;
+  padLink.rtt = Math.round(rtt);
+  padLink.rtts.push(padLink.rtt);
+  if (padLink.rtts.length > 60) padLink.rtts.shift(); // the last minute's
+}
+function padIn(m) { // its 30 Hz input; after it went quiet, back
+  const now = performance.now();
+  if (padLink.lost) { padLink.lost = false; padEv('pad-back', { gap: Math.round(now - padLink.inAt) }); notice('Phone pad back'); }
+  padLink.inAt = now;
+  padInput(m);
+}
+function padSilent() { // half a second without its input (locked, out of range, the link gone): let go of everything
+  const now = performance.now();
+  padEv('pad-silent', { kmh: Math.round(Math.abs(state.speed) * 3.6), gear: carPage.gear, rtt: padLink.rtt, sincePing: padLink.pingAt ? Math.round(now - padLink.pingAt) : null });
+  padInput({});
+  pad.at = 0;
+  padLink.lost = true;
+  notice('Phone pad lost - inputs released');
+}
+const noticeEl = document.getElementById('notice');
+let noticeOff;
+function notice(text) { // a short line at the top of the view
+  noticeEl.textContent = text;
+  noticeEl.hidden = false;
+  clearTimeout(noticeOff);
+  noticeOff = setTimeout(() => noticeEl.hidden = true, 3000);
+}
 // the car page's stability control, whichever switch it has (a TC / DSC / PSM button, or the E90's and X1's DSC
 // segment): [1 on, 0.5 DTC / MDM / PSM Sport, 0 off; its name, for the phone pad]
 function traction(doc) {
@@ -2978,8 +3031,15 @@ function showPadLink(url) { // the relay copies the phone's link to the clipboar
 }
 (function padConnect() {
   padWs = new WebSocket('ws://localhost:8765');
+  padWs.onopen = () => { padLink.openAt = performance.now(); padLink.down = false; padEv('relay-open'); };
   padWs.onmessage = e => {
-    const m = JSON.parse(e.data);
+    let m;
+    try { m = JSON.parse(e.data); } catch { return; } // (a broken message is dropped)
+    if (!m || typeof m !== 'object') return;
+    if ('ping' in m) return padSend({ pong: m.ping }), padPing(m.rtt); // first: the phone times the round trip by it
+    if (Array.isArray(m.padLog)) return padLogAdd('phone', m.padLog);
+    if (Array.isArray(m.padEvents)) return padLogAdd('relay', m.padEvents);
+    audioOn();
     if (m.tap) padTap(m.tap, m.drive);
     else if (m.mode) [...frame.contentDocument.querySelectorAll('.mode-btn')].find(b => b.dataset.mode === m.mode)?.click();
     else if (m.traction) cycleTraction();
@@ -2991,10 +3051,16 @@ function showPadLink(url) { // the relay copies the phone's link to the clipboar
     else if (Array.isArray(m.weather)) pickWeather(String(m.weather[0]), m.weather[1]), padSend({ wx: wxMenu() }); // (straight back, so the pad lights it)
     else if (m.mute) frame.contentDocument?.querySelector('.mute-fab')?.click();
     else if (m.teleport != null) { const to = Number.isInteger(m.teleport) && TELEPORTS[m.teleport]; if (to) teleport(to[2]), teleportEl.hidden = true; }
-    else if ('t' in m) padInput(m);
+    else if ('t' in m) padIn(m);
     else if ('phone' in m) showPadLink(m.phone);
   };
-  padWs.onclose = () => setTimeout(padConnect, 3000); // keeps trying, so the relay can start after this page (each miss logs a console line)
+  padWs.onclose = e => { // keeps trying, so the relay can start after this page (each miss logs a console line); logged once
+    if (padLink.openAt) padEv('relay-close', { code: e.code, up: Math.round((performance.now() - padLink.openAt) / 1000) });
+    else if (!padLink.down) padEv('relay-down', { code: e.code });
+    padLink.openAt = 0;
+    padLink.down = true;
+    setTimeout(padConnect, 3000);
+  };
 })();
 
 // Its live cluster is a web page, so a CSS3D layer under the WebGL canvas draws it in 3D. A transparent "hole" mesh
@@ -3343,23 +3409,23 @@ teleportEl.addEventListener('click', e => {
   teleportEl.hidden = true;
   frame.contentWindow.focus(); // its keys work natively again
 });
-// the whole map, north up, for the phone pad's Map tab: a picture of the roads and markers, its middle and scale (px
+// the whole map, north up, for the phone pad's Map tab: a picture of the roads and markers (2048 px across, for its pinch zoom), its middle and scale (px
 // per metre; +x is west, so both axes flip, as on the mini map), the places' names, the teleport list and the legend
 function mapOverview() {
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
   for (const r of MAP_ROADS) for (const p of r.P) x0 = Math.min(x0, p.x), x1 = Math.max(x1, p.x), z0 = Math.min(z0, p.z), z1 = Math.max(z1, p.z);
-  const s = 480 / Math.max(x1 - x0, z1 - z0), w = Math.ceil((x1 - x0) * s) + 16, h = Math.ceil((z1 - z0) * s) + 16, x = (x0 + x1) / 2, z = (z0 + z1) / 2;
+  const s = 2048 / Math.max(x1 - x0, z1 - z0), w = Math.ceil((x1 - x0) * s) + 16, h = Math.ceil((z1 - z0) * s) + 16, x = (x0 + x1) / 2, z = (z0 + z1) / 2;
   const c = Object.assign(document.createElement('canvas'), { width: w, height: h }), g = c.getContext('2d');
   g.translate(w / 2, h / 2);
   g.scale(-s, -s);
   g.translate(-x, -z);
   g.lineJoin = g.lineCap = 'round';
-  g.lineWidth = 3 / s;
+  g.lineWidth = 4 / s;
   g.strokeStyle = '#8a8a8a';
   g.stroke(roadPath);
   for (const [p, color] of MARKERS) {
     g.fillStyle = color;
-    g.beginPath(); g.arc(p.x, p.z, 4 / s, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(p.x, p.z, 9 / s, 0, Math.PI * 2); g.fill();
   }
   return { img: c.toDataURL(), x, z, s, w, h, places: PLACES.map(p => [p.name, Math.round(p.x), Math.round(p.z)]), to: TELEPORTS.map(([name, where]) => [name, where]),
     legend: MARKER_KINDS.map(([name, color]) => [name, color]) };
@@ -4703,7 +4769,7 @@ renderer.setAnimationLoop(() => {
   const dyno = !!w.CarDyno?.on, rollers = dyno || tab === 'dyno' || tab === 'perf';
   state.speed = rollers ? 0 : roll;
   rollersEl.hidden = !dyno || panelOpen;
-  if (pad.at && performance.now() - pad.at > 500) padInput({}), pad.at = 0; // the phone went quiet (locked, out of range): let go
+  if (pad.at && performance.now() - pad.at > 500) padSilent(); // the phone went quiet (locked, out of range): let go
   HD = w.CarHandling?.hd || HD0; // its Handling tab (as delivered while its page loads)
   steerIn = steerInput(steerIn, (keys.has('KeyA') - keys.has('KeyD')) || pad.s, dt);
   pull += ((dt > 0 ? (Math.abs(roll) - Math.min(Math.abs(lastRoll), handedBack)) / dt : 0) - pull) * (1 - Math.exp(-dt * 8));

@@ -74,6 +74,12 @@
   #dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
   #car { flex: 1; min-width: 0; color: var(--dim); font-weight: 600; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #dot.live ~ #car { color: var(--text); }
+  /* the round trip to the drive page and back, coloured by how it drives: tucked by the dot, as small as the header's
+     labels, so the car's name keeps what room it can */
+  #ms { flex: none; min-width: 4ch; margin-left: -4px; color: var(--faint); font: 400 11px var(--num); white-space: nowrap; }
+  #ms.good { color: var(--green); }
+  #ms.fair { color: var(--amber); }
+  #ms.bad { color: var(--m-red); }
   /* the M tricolour, by an M car's name */
   .stripes { display: none; gap: 2px; flex: none; transform: skewX(-20deg); }
   .stripes i { width: 4px; height: 13px; }
@@ -86,7 +92,8 @@
   header > button svg { width: 14px; height: 14px; fill: currentColor; }
   main > header { container-type: inline-size; }
   @container (max-width: 420px) { #extras-open { padding: 0 11px; } #extras-open span { display: none; } } /* a small phone: the car's name keeps its room */
-  #menu.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  #set-open { padding: 0 9px; } #set-open svg { width: 16px; height: 16px; } /* the gear alone: the car's name keeps its room */
+  #menu.on, #set-open.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
   /* engine start / stop: its LED red while the engine runs */
   #ign::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #3a3f47; }
   #ign.on { border-color: color-mix(in srgb, var(--m-red) 70%, transparent); }
@@ -195,7 +202,7 @@
   /* the map: the whole of it, north up, with the car on it; the places to teleport to beside it (scrolls) */
   #tab-map { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
   .mapcol { display: flex; flex-direction: column; gap: 5px; min-height: 0; }
-  #mapc { flex: 1; width: 100%; min-height: 0; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+  #mapc { flex: 1; width: 100%; min-height: 0; touch-action: none; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
   #legend { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11px; line-height: 14px; color: var(--dim); }
   #legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
   #legend i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px #000; }
@@ -263,8 +270,9 @@
 </section>
 <main>
   <header>
-    <span id="dot"></span><span class="stripes" aria-hidden="true"><i></i><i></i><i></i></span><span id="car">Connecting to the Mac</span>
+    <span id="dot"></span><span id="ms" title="Round trip to the drive page">-- ms</span><span class="stripes" aria-hidden="true"><i></i><i></i><i></i></span><span id="car">Connecting to the Mac</span>
     <button id="extras-open" aria-label="Extras: Tab, Esc, map, sound, mouse"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1h6v6H1zM9 1h6v6H9zM1 9h6v6H1zM9 9h6v6H9z"/></svg><span>Extras</span></button>
+    <button id="set-open" aria-label="The drive page's settings" title="Settings (])"><svg viewBox="0 0 24 24" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg></button>
     <button id="ign">Start / stop</button>
   </header>
   <div class="cluster" id="cluster">
@@ -319,7 +327,7 @@
   </header>
   <div class="tab" id="tab-map" role="tabpanel">
     <div class="mapcol">
-      <canvas id="mapc" aria-label="Map of the whole world, north up, with the car on it"></canvas>
+      <canvas id="mapc" aria-label="Map of the whole world with the car on it: drag to move, pinch to zoom, twist to turn it, double-tap for the whole of it north up"></canvas>
       <div id="legend" aria-label="Map legend"></div>
     </div>
     <div id="places" role="list" aria-label="Teleport"><p class="empty">Open the drive page on the Mac</p></div>
@@ -349,6 +357,7 @@ const pad = { s: 0, t: 0, b: 0, h: 0 }; // s: -1-1, + = left (as A on the drive 
 const $ = id => document.getElementById(id);
 let ws, car = null, carJson = '', lastTele = 0, pressed = { label: '', at: 0 }, gearMode = '', driftOn = false;
 let world = null, worldImg = null, worldAsked = 0, pos = null; // the map overview (from the drive page) and where the car is
+const mapView = { x: 0, y: 0, z: 1, r: 0 }; // moved (CSS px), zoomed, turned (rad, clockwise) about the canvas's middle
 const send = m => ws?.readyState === WebSocket.OPEN && ws.send(JSON.stringify(m));
 
 // how far the phone is turned clockwise, like a wheel, from level in landscape (held either way round): world "up"
@@ -449,6 +458,7 @@ hook($('down'), { key: 'q' });
 hook($('up'), { key: 'e' });
 hook($('ign'), { key: 'i' });
 hook($('menu'), { drive: { key: 'Tab', code: 'Tab' } }); // the drive page's car menu
+hook($('set-open'), { drive: { key: ']', code: 'BracketRight' } }); // its Settings (])
 hook($('esc'), { drive: { key: 'Escape', code: 'Escape' } }); // closes what's open there, else reaches the car page
 hook($('cam'), { drive: { key: 'c', code: 'KeyC' } });
 hook($('cam-reset'), { msg: { look: 'reset' } });
@@ -534,7 +544,7 @@ function build() {
 
 const SEGS = 15;
 $('revs').append(...Array.from({ length: SEGS }, () => document.createElement('b')));
-function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift, pos: p, muted: mu, slot }) {
+function showTele({ g, v, r, on, dm, tc, hl, beam, menu, set, drift, pos: p, muted: mu, slot }) {
   const redline = car?.redline || 7000, cl = $('cluster'), tcWarn = /off|dtc|mdm|sport/i.test(tc || '');
   $('gear').textContent = g || '–';
   $('speed').textContent = v;
@@ -543,6 +553,7 @@ function showTele({ g, v, r, on, dm, tc, hl, beam, menu, drift, pos: p, muted: m
   $('revs').classList.toggle('flash', r >= redline * 0.97);
   $('ign').classList.toggle('on', on);
   $('menu').classList.toggle('on', !!menu);
+  $('set-open').classList.toggle('on', !!set);
   $('drift')?.classList.toggle('on', !!drift);
   driftOn = !!drift;
   if ($('hb-row') && $('hb-row').hidden === driftOn) { // drift mode switched: the handbrake row shows or goes (let go)
@@ -804,8 +815,13 @@ function drawWorld() {
   g.clearRect(0, 0, W, H);
   if (!world || !worldImg?.complete) return askWorld();
   const k = Math.min((W - 12) / world.w, (H - 12) / world.h), ox = (W - world.w * k) / 2, oy = (H - world.h * k) / 2;
-  const at = (x, z) => [ox + (world.w / 2 - (x - world.x) * world.s) * k, oy + (world.h / 2 - (z - world.z) * world.s) * k];
+  const cos = Math.cos(mapView.r), sin = Math.sin(mapView.r), view = (x, y) => { x -= W / 2; y -= H / 2; return [W / 2 + mapView.x + mapView.z * (cos * x - sin * y), H / 2 + mapView.y + mapView.z * (sin * x + cos * y)]; };
+  const at = (x, z) => view(ox + (world.w / 2 - (x - world.x) * world.s) * k, oy + (world.h / 2 - (z - world.z) * world.s) * k);
+  g.save();
+  g.setTransform(dpr * mapView.z * cos, dpr * mapView.z * sin, -dpr * mapView.z * sin, dpr * mapView.z * cos, ...view(0, 0).map(v => v * dpr)); // (the view: zoomed and turned)
+  g.imageSmoothingQuality = 'high';
   g.drawImage(worldImg, ox, oy, world.w * k, world.h * k);
+  g.restore();
   g.font = '600 9px Barlow, system-ui, sans-serif';
   g.textAlign = 'center';
   g.fillStyle = 'rgba(238, 241, 245, .6)';
@@ -818,16 +834,70 @@ function drawWorld() {
   }
   if (!pos) return;
   g.translate(...at(pos[0], pos[1]));
-  g.rotate(-pos[2]); // (heading grows turning left: anticlockwise, north up)
+  g.rotate(mapView.r - pos[2]); // (heading grows turning left: anticlockwise, north up - then the map's own turn)
   g.fillStyle = '#ff5a3c';
   g.strokeStyle = '#000';
   g.lineWidth = 1.5;
   g.beginPath(); g.moveTo(0, -8); g.lineTo(5.5, 6); g.lineTo(-5.5, 6); g.closePath(); g.fill(); g.stroke();
 }
 addEventListener('resize', () => extrasOpen() && !$('tab-map').hidden && drawWorld());
+// its view: one finger drags it, two pinch, twist and drag it about their middle; a double tap goes back to all of it,
+// north up. The names stay upright (only where they sit turns)
+{
+  const c = $('mapc'), fingers = new Map();
+  let tapAt = 0, moved = 0;
+  c.onpointerdown = e => {
+    c.setPointerCapture(e.pointerId);
+    fingers.set(e.pointerId, [e.offsetX, e.offsetY]); // (offsets stay the canvas's own, turned round or not)
+    if (fingers.size === 1) moved = 0;
+  };
+  c.onpointermove = e => {
+    const was = fingers.get(e.pointerId);
+    if (!was) return;
+    const now = [e.offsetX, e.offsetY], other = [...fingers].find(([id]) => id !== e.pointerId)?.[1];
+    fingers.set(e.pointerId, now);
+    moved += Math.hypot(now[0] - was[0], now[1] - was[1]);
+    let m0 = was, m1 = now, f = 1, d = 0;
+    if (other) { // the pair: its middle, its spread and its angle, before and after this finger moved
+      m0 = [(was[0] + other[0]) / 2, (was[1] + other[1]) / 2]; m1 = [(now[0] + other[0]) / 2, (now[1] + other[1]) / 2];
+      // (12x: the 2048 px picture only blurs past that)
+      const a = [was[0] - other[0], was[1] - other[1]], b = [now[0] - other[0], now[1] - other[1]];
+      f = Math.min(12, Math.max(1, mapView.z * Math.hypot(...b) / (Math.hypot(...a) || 1))) / mapView.z;
+      d = Math.atan2(b[1], b[0]) - Math.atan2(a[1], a[0]);
+    }
+    // the point under m0 lands under m1: v' = m1 - mid + f R(d) (mid + v - m0)
+    const W = c.clientWidth / 2, H = c.clientHeight / 2, px = W + mapView.x - m0[0], py = H + mapView.y - m0[1], cos = Math.cos(d), sin = Math.sin(d);
+    Object.assign(mapView, { x: m1[0] - W + f * (cos * px - sin * py), y: m1[1] - H + f * (sin * px + cos * py), z: mapView.z * f, r: mapView.r + d });
+    drawWorld();
+  };
+  c.onpointerup = c.onpointercancel = e => {
+    fingers.delete(e.pointerId);
+    if (fingers.size || e.type !== 'pointerup' || moved > 10) return;
+    if (Date.now() - tapAt < 350) Object.assign(mapView, { x: 0, y: 0, z: 1, r: 0 }), drawWorld(), tapAt = 0;
+    else tapAt = Date.now();
+  };
+}
 
-const wake = () => navigator.wakeLock?.request('screen').catch(() => {}); // the screen sleeping mid-drive would drop the pad
-document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && wake());
+// the pad's log of its connection, to find out why it drops: sent on as { padLog } - to the relay's log and the drive
+// page's Settings › Pad - and kept here ('pad.log', the last 300) while there's no connection to take it
+const queued = () => { try { const q = JSON.parse(localStorage.getItem('pad.log')); return Array.isArray(q) ? q : []; } catch { return []; } };
+function padLog(ev, o) {
+  const e = { t: Date.now(), ev, ...o };
+  if (ws?.readyState === WebSocket.OPEN) return send({ padLog: [e] });
+  try { localStorage.setItem('pad.log', JSON.stringify([...queued(), e].slice(-300))); } catch {}
+}
+padLog('boot', { ua: navigator.userAgent });
+for (const ev of ['online', 'offline']) addEventListener(ev, () => padLog(ev));
+for (const ev of ['pagehide', 'pageshow']) addEventListener(ev, e => padLog(ev, { persisted: e.persisted }));
+
+// the screen sleeping mid-drive would drop the pad (and iOS lets go of the lock in the background: asked again on return)
+const wake = () => navigator.wakeLock?.request('screen').then(l => l.addEventListener('release', () => padLog('wakelock-lost')))
+  .catch(e => padLog('wakelock-fail', { msg: String(e?.message ?? e) }));
+document.addEventListener('visibilitychange', () => {
+  const on = document.visibilityState === 'visible';
+  padLog(on ? 'visible' : 'hidden');
+  if (on) { wake(); if (ws.readyState !== WebSocket.OPEN) connect(); } // (iOS often drops it in the background)
+});
 $('go').onclick = async () => {
   wake();
   $('intro').hidden = true;
@@ -838,10 +908,50 @@ $('go').onclick = async () => {
   else toast('Tilt steering is off', 'Allow Motion & Orientation Access for Safari in Settings', 5000);
 };
 
-(function connect() {
-  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
-  ws.onmessage = e => {
-    const m = JSON.parse(e.data);
+// the round trip: a ping a second that the drive page answers ({ pong }), smoothed, beside the dot. And a connection
+// gone 3 s without a word - the relay's heartbeat comes every second - is let go for a fresh one (only once that
+// heartbeat has been heard: an older relay sends none)
+const pings = new Set();
+let retry, fails = 0, heard = 0, hbHeard = false, rtt = null, pongAt = 0, spikeAt = 0;
+setInterval(() => {
+  if (ws.readyState !== WebSocket.OPEN) return;
+  const silent = Date.now() - heard;
+  if (hbHeard && silent > 3000) return connect(), padLog('stale', { silent }); // (logged once the dead one's gone, so it's kept)
+  const now = Math.round(performance.now());
+  for (const p of pings) if (now - p > 5000) pings.delete(p);
+  pings.add(now);
+  send({ ping: now, rtt: rtt && Math.round(rtt) });
+}, 1000);
+function gotPong(p) {
+  if (!pings.delete(p)) return; // (not ours: another pad's, through the relay)
+  const ms = performance.now() - p;
+  rtt = rtt == null ? ms : rtt + (ms - rtt) * 0.3;
+  pongAt = Date.now();
+  if (ms >= 150 && pongAt - spikeAt > 10000) spikeAt = pongAt, padLog('rtt-spike', { ms: Math.round(ms) }); // (one in 10 s at most)
+}
+
+// the link to the Mac, again a second after it closes. connect() also lets go of one gone quiet or still trying
+// (its close is ignored), so there's only ever the one
+function connect() {
+  clearTimeout(retry);
+  ws?.close();
+  showMouse('off'); // (a new connection asks the Mac again)
+  const s = ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
+  let openAt = 0;
+  s.onopen = () => {
+    openAt = heard = Date.now();
+    fails = 0;
+    const q = queued(); // what happened while there was none
+    if (q.length) { send({ padLog: q }); try { localStorage.removeItem('pad.log'); } catch {} }
+    padLog('ws-open');
+  };
+  s.onmessage = e => {
+    heard = Date.now();
+    let m;
+    try { m = JSON.parse(e.data); } catch {}
+    if (!m) return; // (one that won't parse is dropped)
+    if (m.hb) hbHeard = true;
+    if (typeof m.pong === 'number') gotPong(m.pong);
     if (m.car && JSON.stringify(m.car) !== carJson) { carJson = JSON.stringify(m.car); car = m.car; build(); }
     if (m.tele) { lastTele = Date.now(); showTele(m.tele); }
     if (m.map) gotWorld(m.map);
@@ -851,8 +961,16 @@ $('go').onclick = async () => {
     // the set-up pop-ups for engine, chassis... have no title on the cluster: name the button just pressed instead
     if (m.toast) toast(m.toast.title || (Date.now() - pressed.at < 1000 ? pressed.label : ''), m.toast.text);
   };
-  ws.onclose = () => { showMouse('off'); setTimeout(connect, 1000); }; // (a new connection asks the Mac again)
-})();
+  // (of a run of tries that never open, only the first is logged: an outage would push all else out of the 300)
+  s.onerror = () => s === ws && !fails && padLog('ws-error');
+  s.onclose = e => {
+    if (s !== ws) return;
+    if (openAt || !fails++) padLog('ws-close', { code: e.code, reason: e.reason, clean: e.wasClean, up: openAt && Date.now() - openAt });
+    showMouse('off');
+    retry = setTimeout(connect, 1000);
+  };
+}
+connect();
 // a steady 30 Hz: the drive page lets go of everything when it hears nothing for half a second. Look-around drags
 // ride along, turned to the Mac trackpad's sense (fingers left, deltaX +) and doubled for the smaller pad
 setInterval(() => {
@@ -867,6 +985,9 @@ setInterval(() => {
   const open = ws.readyState === WebSocket.OPEN, live = open && Date.now() - lastTele < 1500;
   $('dot').className = live ? 'live' : open ? 'wait' : '';
   $('car').textContent = live ? car?.name || 'Connected' : open ? 'Open the drive page on the Mac' : "Can't reach the Mac";
+  if (Date.now() - pongAt > 3000) rtt = null; // (no answer of late: nothing to show)
+  $('ms').textContent = rtt == null ? '-- ms' : Math.round(rtt) + ' ms';
+  $('ms').className = rtt == null ? '' : rtt < 50 ? 'good' : rtt < 120 ? 'fair' : 'bad';
 }, 500);
 </script>
 </body>
