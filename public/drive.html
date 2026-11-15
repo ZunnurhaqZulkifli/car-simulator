@@ -198,12 +198,15 @@ import NORDSCHLEIFE from './js/nordschleife.js';
 
 // The drivable cars (?car=, picked in the garage at home). Each runs on its own car page - engine, gearbox, gauges -
 // with a model of the same car as its body (?v= on its URL once the file is edited, past browsers' cached copy). A model's parts are found by matching "material|mesh|parent" names:
-// paint (repainted Black Sapphire, or paintColor), glass (tinted), cabin (mirrored to right-hand drive), wheels and tyre (hung on
+// paint (repainted Black Sapphire, or paintColor), glass (its windows made clear), wheels and tyre (hung on
 // pivots that spin and steer), steering (searched for its rim, from `near` if it hides inside a bigger mesh; with
 // no `re`, the built wheel goes at `near`; `look`: how high over its centre the eye looks for the cluster; `inset`: how far short of what it sees there the cluster
-// goes, for dials deep in tubes; `size`: how wide it looks, 0.36 m at 1 m, smaller where the wheel hides more; `depth`: how far behind the rim what turns reaches, 0.05 m; `from`: the car whose model it came from, credited too), tail (its rear half glows when braking), head/tail/mirror lamps (where the
-// amber signals go), credit (title, page, licence if not by-nc-sa, author if not Ddiaz Design and their page), stiff (its
-// springs and anti-roll bars: 1 = an everyday saloon, 3.2° of body roll per g; 2 = half that, a third less pitch, quicker)
+// goes, for dials deep in tubes; `size`: how wide it looks, 0.36 m at 1 m, smaller where the wheel hides more; `eye`: the driver's eye off the wheel's centre, [0, 0.3, -0.55] m; `depth`: how far behind the rim what turns reaches, 0.05 m; `from`: the car whose model it came from, credited too), tail (its rear half glows when braking), head/tail/mirror lamps (where the
+// amber signals go; reverse: the reversing lamps, lit in R), engine (where it sits, 'mid' or 'rear' - front if not given -
+// for the smoke and fire when it blows), wind (dB more wind noise: its page mixes its engine loud), credit (title, page, licence if not by-nc-sa, author if not Ddiaz Design and their page), stiff (its
+// springs and anti-roll bars: 1 = an everyday saloon, 3.2° of body roll per g; 2 = half that, a third less pitch, quicker).
+// Every model keeps the side its maker built it with: the left-hand-drive cars are driven from the left, the JDM ones
+// from the right - nothing is mirrored
 const CARS = {
   x1: {
     name: 'BMW X1 xDrive20d', page: 'bmw-x1-xdrive20d', model: '/models/bmw-x1-e84.glb?v=2', length: 4.477, wheelbase: 2.76, redline: 4850, // rpm, for the phone pad's shift lights
@@ -211,9 +214,9 @@ const CARS = {
     wheelsCredit: ['2020 BMW X1 xDrive 18d', 'https://sketchfab.com/3d-models/2020-bmw-x1-xdrive-18d-4ca3a2247af44e51919074565ed93486'], // its M Y-spoke wheels
     // the E84 LCI: its parts named by role in prep (the wheels and the steering wheel cut out of merged meshes, the
     // wheel scaled up to a real one's size), on black M Y-spoke wheels off the F48's model
-    paint: /^x1_paint\|/, glass: /^x1_glass\|/, cabin: /^cabin_/,
+    paint: /^x1_paint\|/, glass: /^x1_glass\|/,
     wheels: /^x1_(tyre|rim|disc|cap)/, tyre: /^x1_tyre/,
-    steering: { re: /^cabin_steering\|/, near: [-0.361, 1.038, 0.336] }, // (the rim's centre, by a circle fit)
+    steering: { re: /^cabin_steering\|/, near: [0.361, 1.038, 0.336], inset: 0.09 }, // (the rim's centre, by a circle fit); the cluster in front of the binnacle hood's lip
     tail: { re: /^x1_tail/, idle: 0.25, brake: 6, keep: v => v.y < 1.25 }, // (the clusters, not the third brake light up by the spoiler)
     lamps: { head: /^x1_head/, tail: /^x1_tail/ },
     exhaustX: 0.45,
@@ -228,13 +231,12 @@ const CARS = {
     chassis: { m: 1850, front: 0.52, rear: 0.75 }, // M xDrive, rear-biased (all of it in 2WD)
     stiff: 2.4, // the GT-R's springs and bars (its page starts in M Chassis Sport, as the GT-R's in SUSP Normal)
     credit: ['2025 BMW M3 CS Touring', 'https://sketchfab.com/3d-models/2025-bmw-m3-cs-touring-ebda8c29a8ef4ec789391e918d52ef55'],
-    glass: /\|glass\|/, 
+    glass: /Window_Material1\|/,
     glassPlain: true,
-    cabin: /Interior_Geo|SeatBelt_Geo/,
     wheels: /Wheel1A_3D/, tyre: /Wheel1A_3D/,
     // inside the one-piece interior, which comes twice: a see-through layer over a solid glow layer. Turned, the two
     // speckle through each other, so the see-through layer's wheel is left out
-    steering: { re: /InteriorA_Material1\||^red_Int\|/, near: [-0.375, 0.885, 0.35], drop: /^m3cs\w*InteriorA_Material1\|/ },
+    steering: { re: /InteriorA_Material1\||^red_Int\|/, near: [0.375, 0.885, 0.35], drop: /^m3cs\w*InteriorA_Material1\|/ },
     // its lights are layered so that no layer's glow shows through: a soft red glow is laid over each tail light instead
     tail: { keep: v => v.y > 0.75 && v.y < 1 && Math.abs(v.x) > 0.45 }, // the clusters at the rear corners
     lamps: { head: /LightEmissiveA_Material1\|/, tail: /LightEmissiveA_Material1\|/ },
@@ -245,10 +247,10 @@ const CARS = {
     grip: 2.4, stiff: 2.4, // as agile as the GT-R: its grip, springs and bars (M Chassis Sport by default, as the GT-R's SUSP Normal)
     chassis: { m: 1825, front: 0.53, rear: 0.75 },
     credit: ['2021 BMW M5 Competition', 'https://sketchfab.com/3d-models/2021-bmw-m5-competition-29a4c13761cb40e6a050871bd40a0963'],
-    glass: /^bMAT_Glass1\|(?!bSM_FrontKit)/, glassPlain: true, cabin: /\|(bD_Body|bSM_Interior)_/, // (not the headlight lenses)
+    glass: /^bMAT_Glass1\|(?!bSM_FrontKit)/, glassPlain: true, // (not the headlight lenses)
     wheels: /Wheel1A_3D|\|bSM_(Hub|Disk)_/, tyre: /Wheel1A_3D/, // the calipers (bSM_Brake_) stay put
-    // in the interior's merged meshes: found by its rim, which sits here once the cabin is mirrored
-    steering: { re: /^bMAT_Details_(MAT1|INT1)\|bD_Body_/, near: [-0.4, 0.96, 0.405] },
+    // in the interior's merged meshes: found by its rim, which sits here
+    steering: { re: /^bMAT_Details_(MAT1|INT1)\|bD_Body_/, near: [0.4, 0.96, 0.405] },
     // one light material for every lamp: its rear half (tail lights, third brake light) glows
     tail: { re: /^bMAT_Lights1\|/, fromMap: true, idle: 0.25, brake: 6, keep: v => v.y > 0.8 }, // (signals: up in the clusters, not on the bumper)
     lamps: { head: /^bMAT_Lights1\|bSM_FrontKit/, tail: /^bMAT_Lights1\|bSM_RearKit/, mirror: /^bMAT_Lights1\|bANC_Door_[LR]_0[456]_/ },
@@ -259,9 +261,9 @@ const CARS = {
     grip: 2.2, stiff: 1.45,
     chassis: { m: 1600, front: 0.54, rear: 0.6 },
     credit: ['2018 BMW M140i', 'https://sketchfab.com/3d-models/2018-bmw-m140i-24f09cc46773424fb2a3922427f1c37d', 'by'],
-    paint: /^iBody1\|/, glass: /^iGlass_Clear_Windshield1\|/, glassPlain: true, cabin: /^iInterior1\||\|cabin_steering$/,
+    paint: /^iBody1\|/, glass: /^iGlass_Clear_Windshield1\|/, glassPlain: true,
     wheels: /^(iRim1|iTyres1|iBreak1)\|/, tyre: /^iTyres1\|/, // the (blue) calipers stay put
-    steering: { re: /\|cabin_steering$/, near: [-0.37, 0.86, 0.2], from: 'f30' }, // its cabin had none: the 320d's (the same M Sport wheel), fitted
+    steering: { re: /\|cabin_steering$/, near: [0.37, 0.86, 0.2], from: 'f30' }, // its cabin had none: the 320d's (the same M Sport wheel), fitted
     tail: {}, // its lights are already full red, so they can't glow brighter: only the red glow over them shows braking
     lamps: { head: /^iWhite_Glow1\|/, tail: /^iRed_Glow1\|/, mirror: /^iMirror1\|/ },
     exhaustX: 0.5, exhaustBoth: true, // tips both sides
@@ -287,23 +289,22 @@ const CARS = {
     credit: ['BMW 5-Series Sedan (G30) LCI', 'https://sketchfab.com/3d-models/bmw-5-series-sedan-g30-lci-c2910a4e0d154f2ebdc41e6265eaaac3', 'by', 'Mona x Supercars', 'https://sketchfab.com/Car2022'],
     grip: 2.2, stiff: 1.75,
     chassis: { m: 1950, front: 0.53, rear: 0.6 },
-    paint: /\|paint_(body|parts)\|/, paintColor: 0x403c38, glass: /\|glass\|/, glassPlain: true, cabin: /\|cabin_/, // dark graphite, like the garage photo
+    paint: /\|paint_(body|parts)\|/, paintColor: 0x403c38, glass: /\|glass\|/, glassPlain: true, // dark graphite, like the garage photo
     wheels: /\|wheel_/, tyre: /\|wheel_tyre_\d\|/,
-    steering: { re: /\|cabin_wheel\|/, near: [-0.395, 0.92, 0.385] }, // (it shares its mesh with the centre console)
+    steering: { re: /\|cabin_wheel\|/, near: [0.395, 0.92, 0.385] }, // (it shares its mesh with the centre console)
     tail: { re: /\|tail_lights\|/, fromMap: true, idle: 0.25, brake: 6 },
     lamps: { head: /\|head_accents\|/, tail: /\|tail_lights\|/ },
     exhaustX: 0.5, exhaustBoth: true, // tips both sides
   },
-  // merged by material under shuffled names: turned nose-first, its parts named by role (the rest cabin_ - its outside
-  // trims in those meshes are symmetric, so mirroring them is harmless) and its rims blacked
+  // merged by material under shuffled names: turned nose-first, its parts named by role (the rest cabin_) and its rims blacked
   e60: {
-    name: 'BMW M5 E60', page: 'bmw-m5-e60', model: '/models/bmw-m5-e60.glb', length: 4.855, wheelbase: 2.889, redline: 8250,
+    name: 'BMW M5 E60', page: 'bmw-m5-e60', model: '/models/bmw-m5-e60.glb?v=2', length: 4.855, wheelbase: 2.889, redline: 8250,
     credit: ['BMW M5 (E60)', 'https://sketchfab.com/3d-models/bmw-m5-e60-02b103c91e0947cb940a769851e69dd6', 'by', 'GT Cars: Hyperspeed', 'https://sketchfab.com/Car2022'],
     grip: 2.0, stiff: 1.7,
     chassis: { m: 1830, front: 0.52, rear: 1 },
-    paint: /\|paint_\d+\|/, paintColor: 0xf2f2ee, glass: /\|glass_1\|/, glassPlain: true, cabin: /\|cabin_/, // Alpine White
+    paint: /\|paint_\d+\|/, paintColor: 0xf2f2ee, glass: /\|glass_1\|/, glassPlain: true, // Alpine White
     wheels: /\|wheel_/, tyre: /\|wheel_tyre_1\|/,
-    steering: { re: /\|cabin_/, near: [-0.377, 0.903, 0.45], look: 0.13 }, // spread over several meshes: found by its rim
+    steering: { re: /\|cabin_/, near: [0.377, 0.903, 0.45], look: 0.13 }, // spread over several meshes: found by its rim
     tail: {},
     lamps: { head: /\|head_lights_1\|/, tail: /\|tail_lights_1\|/ },
     exhaustX: 0.5, exhaustBoth: true, // tips both sides
@@ -315,9 +316,9 @@ const CARS = {
     grip: 2.8, // Cup tyres and downforce: the garage's grippiest
     chassis: { m: 1420, front: 0.39, rear: 1, h: 0.45 }, // the engine behind the rear axle
     stiff: 3.6, // race-car springs and bars: it barely leans
-    paint: /^991_2phong2SG1\|/, paintColor: 0x8fd41e, glass: /^991_2phong18SG1\|/, glassPlain: true, cabin: /^991_2phong(9|11)SG1\|/, // lime
+    paint: /^991_2phong2SG1\|/, paintColor: 0x8fd41e, glass: /^991_2phong18SG1\|/, glassPlain: true, // lime
     wheels: /Wheel1A_3D|^991_2phong2[01]SG1\|/, tyre: /Wheel1A_3D/, // the calipers stay put
-    steering: { re: /^991_2phong9SG1\|/, near: [-0.338, 0.815, 0.245], look: 0.115, inset: 0.15 }, // over the rims of its five dial tubes
+    steering: { re: /^991_2phong9SG1\|/, near: [0.338, 0.815, 0.245], look: 0.115, inset: 0.15 }, // over the rims of its five dial tubes
     tail: { keep: v => v.y > 0.7 && v.y < 0.9 }, // the clusters (not the bumper reflectors or third brake light)
     lamps: { head: /^991_2phong8SG1\|/, tail: /^991_2phong12SG1\|/ },
     exhaustX: 0.06, exhaustBoth: true, // twin tips in the middle
@@ -330,23 +331,23 @@ const CARS = {
     credit: ['BMW 3 Series (E90) 2004-2012', 'https://sketchfab.com/3d-models/bmw-3-series-e90-2004-2012-1d3485a460a84fe6bde59bd8ee8f7334', 'by', 'DEMON_SCARY1235', 'https://sketchfab.com/szymonpasterczyk734'],
     grip: 1.9, stiff: 1.3,
     chassis: { m: 1600, front: 0.51, rear: 1 },
-    paint: /^e90_paint\|/, paintColor: 0xb4b8bc, glass: /^e90_glass\|/, glassPlain: true, cabin: /\|cabin_/, // Titanium Silver
+    paint: /^e90_paint\|/, paintColor: 0xb4b8bc, glass: /^e90_glass\|/, glassPlain: true, // Titanium Silver
     wheels: /\|wheel_/, tyre: /^e90_tyre\|/,
-    steering: { re: /\|cabin_steering/, near: [-0.369, 0.862, 0.404], look: 0.115, inset: 0.08, size: 0.295 }, // in front of its dial tubes' rims, whole in the wheel's upper opening
+    steering: { re: /\|cabin_steering/, near: [0.369, 0.862, 0.404], look: 0.115, inset: 0.08, size: 0.295 }, // in front of its dial tubes' rims, whole in the wheel's upper opening
     tail: { re: /^e90_tail\|/, idle: 0.25, brake: 6 },
     lamps: { head: /^e90_lens\|/, tail: /^e90_tail\|/ },
     exhaustX: 0.48, exhaustBoth: true, // a tip each side
     arrows: [37.6, 62.4, 15.42], // where the E9x's own turn arrows sit (BMW ST502)
   },
-  // the stock JDM car - already nose-first and right-hand drive (so its cabin isn't mirrored), the steering wheel a node of
+  // the stock JDM car - already nose-first and right-hand drive, as built, the steering wheel a node of
   // its own, the spare wheel under the front lid left out of the wheels; prep paints its own white wheels (not grey
   // metal), dims its lamps' baked glow and masks the cabin trim's alpha so the dash can't paint over the turned wheel
   nsx: {
     name: 'Honda NSX-R', page: 'honda-nsx-r', model: '/models/honda-nsx-r-1992.glb', length: 4.42, wheelbase: 2.53, redline: 8000,
     credit: ['1992 Honda NSX-R', 'https://sketchfab.com/3d-models/1992-honda-nsx-r-a21edb35a7714774a10b74642e815ca2'],
     grip: 2.2, stiff: 2.3, // the NSX-R's stiffer springs and bars
-    chassis: { m: 1230, front: 0.42, rear: 1, h: 0.42 }, // mid-engined
-    paint: /^\w*MI_1213_Body_Paint_006\|/, paintColor: 0xd81a24, glass: /^\w*MI_Glass1\|/, glassPlain: true, // Formula Red, metallic; the black roof stays
+    chassis: { m: 1230, front: 0.42, rear: 1, h: 0.42 }, engine: 'mid', // mid-engined
+    paint: /^\w*MI_1213_Body_Paint_006\|/, paintColor: 0xd81a24, glass: /^\w*MI_Glass1\||^glass_light\|\w*SM_Body_/, glassPlain: true, // Formula Red, metallic; the black roof stays (the screen behind the seats is on its lamps' glass)
     paintMat: { metalness: 0.55, roughness: 0.36, clearcoat: 1, clearcoatRoughness: 0.03 },
     wheels: /Ani_(Wheel_[FB][LR]\d|Disc_Scale_FR)/, tyre: /^\w*MI_Tyre1\|\w*Ani_/, // (not the calipers, or the spare under the front lid)
     steering: { re: /SK_Body_Bones/, near: [-0.329, 0.707, 0.399], look: 0.085, inset: 0.03, size: 0.5 }, // the whole wide binnacle, both dials clear of the rim
@@ -356,7 +357,7 @@ const CARS = {
     exhaustX: 0.55, exhaustBoth: true, // a tip each side
     arrows: [14.7, 85.3, 25.8], // in the empty windows either side of the dials
   },
-  // the N-Attack Package car, as it comes: nose-first, right-hand drive (its cabin isn't mirrored), Nismo white on black
+  // the N-Attack Package car, as it comes: nose-first, right-hand drive, Nismo white on black
   // wheels and gold calipers. Prep merges each wheel's ~150 pieces (and each caliper's 24) into one mesh, so it draws as
   // few meshes as the other cars, and cuts the steering wheel out of the one-piece interior (rim, spokes, pods, paddles)
   gtr: {
@@ -2228,7 +2229,10 @@ car.add(body);
 // lights wash it to silver
 const bodyMat = new THREE.MeshPhysicalMaterial({ color: CAR.paintColor ?? 0x070809, metalness: 0.3, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.1, envMap: env, envMapIntensity: 0.07, ...CAR.paintMat }); // paintMat: a metallic finish
 const envLit = [[bodyMat, 0.07]]; // materials with their own reflections, and how strong: the weather dims them at night
-const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x0c0f13, metalness: 0.1, roughness: 0.05 });
+// the windows: clear, with a faint sky reflection from outside so they still read as glass; from the seat none at all
+// (hidden, tintGlass), as if they were wound down
+const windowGlass = new THREE.MeshPhysicalMaterial({ color: 0x000000, metalness: 0, roughness: 0, ior: 2.33, specularColor: new THREE.Color().setScalar(2.5),
+  transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide });
 const blackMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
 const gloss = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 });   // high-gloss black trim
 const chromeMat = new THREE.MeshStandardMaterial({ color: 0xdfe3e8, metalness: 1, roughness: 0.12 });
@@ -2256,7 +2260,7 @@ const bodyMesh = profile(new THREE.Shape()
   .absarc(1.38, 0.33, 0.44, Math.PI + arch, -arch, true), 1.8, bodyMat, 0.04);
 
 // glasshouse with blacked-out pillars; sides lean in toward the roof (tumblehome)
-const glass = profile(new THREE.Shape([[0.80, 1.0], [0.0, 1.50], [-1.55, 1.48], [-1.85, 1.44], [-2.10, 1.05]].map(([z, y]) => new THREE.Vector2(z, y))), 1.62, glassMat);
+const glass = profile(new THREE.Shape([[0.80, 1.0], [0.0, 1.50], [-1.55, 1.48], [-1.85, 1.44], [-2.10, 1.05]].map(([z, y]) => new THREE.Vector2(z, y))), 1.62, windowGlass);
 const gp = glass.geometry.attributes.position;
 for (let i = 0; i < gp.count; i++) gp.setX(i, gp.getX(i) * (1 - 0.2 * Math.max(0, (gp.getY(i) - 1.03) / 0.47)));
 glass.geometry.computeVertexNormals();
@@ -2383,14 +2387,12 @@ for (const [x, z] of [[0.75, 1.38], [-0.75, 1.38], [0.75, -1.38], [-0.75, -1.38]
 scene.add(car);
 
 // The car's model, once it loads; until then (or if it can't) the car built above stands in. Every mesh is baked into
-// car space (metres, front +Z, left +X) so it can be sized, its left-hand-drive cabin mirrored to right-hand drive, its
+// car space (metres, front +Z, left +X) so it can be sized, its
 // wheels hung on pivots that spin and steer, and its steering wheel turned about its own rim. CAR's patterns say which
 // part is which
 let usingModel = false;
-// glassPlain glass: darker and mirror-like from outside, so it reads as glass; from the seat a light tint that's
-// easy to see through (its inside face would reflect the sky over the road)
-const plainGlass = [], tintGlass = () => { for (const m of plainGlass) Object.assign(m, inCar ? { opacity: 0.3, specularIntensity: 0 } : { opacity: 0.6, specularIntensity: 1 }); };
-const modelLamps = { 1: [], [-1]: [] }, modelTail = [], modelTailGlow = [], modelHeadGlow = [], modelHead = [];
+const tintGlass = () => { windowGlass.visible = !inCar; };
+const modelLamps = { 1: [], [-1]: [] }, modelTail = [], modelTailGlow = [], modelHeadGlow = [], modelHead = [], modelReverse = [];
 const popup = new THREE.Group(); let popK = 0; // pop-up headlamps (CAR.popups: the pods' parts, the ones that light, hinge [y, z], degrees up): their hinge, and how far up (0-1)
 new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
   gltf.updateMatrixWorld(true);
@@ -2403,25 +2405,19 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
   const is = (p, re) => !!re && re.test(p.id);
   for (const p of parts) {
     p.geo.applyMatrix4(norm);
-    if (is(p, CAR.cabin)) { // right-hand drive: mirror the cabin, re-winding its faces so they still face out
-      p.geo.applyMatrix4(new THREE.Matrix4().makeScale(-1, 1, 1));
-      const ix = p.geo.index.array;
-      for (let i = 0; i < ix.length; i += 3) [ix[i + 1], ix[i + 2]] = [ix[i + 2], ix[i + 1]];
-    }
     p.geo.computeBoundingBox();
     if (is(p, CAR.paint)) p.mat = bodyMat;            // Black Sapphire, or its paintColor
     if (p.mat.transmission) p.mat.transmission = 0;    // plain tinted glass: no second render pass every frame
     if (p.mat.clearcoat) Object.assign(p.mat, { envMap: env, envMapIntensity: 0.2 }), envLit.push([p.mat, 0.2]); // clear-coated paint/carbon: the studio lights would wash it white
-    if (is(p, CAR.glass)) { // tinted (its own copy: a lens may share the material)
+    if (is(p, CAR.glass)) { // its windows go clear (below); the lamp lenses and mirror glass in it stay tinted (its own copy: a lens may share the material)
       p.mat = p.mat.clone();
       p.mat.opacity = 0.45;
       // glassPlain: a texture that's only the black frit round the edges (clear elsewhere, made for the transmission
       // above) goes for an even tint, and black "metal" glass, which reflects nothing, becomes glass that reflects
-      // the sky through the transparency (tintGlass)
+      // the sky through the transparency
       if (CAR.glassPlain) {
-        Object.assign(p.mat, { map: null, metalness: 0, ior: 2.33 });
+        Object.assign(p.mat, { map: null, metalness: 0, ior: 2.33, opacity: 0.6 });
         p.mat.specularColor?.setScalar(2.5);
-        plainGlass.push(p.mat);
       }
     }
   }
@@ -2572,7 +2568,7 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
         const h = at.sub(pivot).dot(axis); // along the column, + into the dash
         return h > -0.15 && h < (CAR.steering.depth ?? 0.05) && Math.sqrt(at.lengthSq() - h * h) < 0.22; // depth: a wheel cut out on its own may reach further back
       });
-      root.add(subMesh(p, fixed));
+      root.add(subMesh(p, fixed, is(p, CAR.glass) ? windowGlass : p.mat)); // (a model all in one: its windows clear too)
       if (is(p, CAR.steering.drop)) continue;
       const m = subMesh(p, turning);
       m.quaternion.copy(inv);
