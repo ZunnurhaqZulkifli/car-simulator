@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car Model Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Electrolize&display=swap" rel="stylesheet">
+<style>
+  :root { --base: #07080a; --panel: #0e1013; --key: #16191d; --key-hi: #1e2227; --line: #262a31; --line-hi: #363b44;
+    --text: #f2f4f7; --dim: #8a929c; --faint: #5a626c; --accent: #2f80ff; --green: #35d07f; --amber: #ffad1f; --red: #e1262d;
+    --num: 'Electrolize', system-ui, sans-serif; --ui: 'Barlow', system-ui, sans-serif; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--base); color: var(--text); font: 500 14px/1.35 var(--ui); }
+  body { display: grid; grid-template-columns: minmax(320px, 400px) 1fr; height: 100dvh; }
+  aside { display: flex; flex-direction: column; gap: 22px; overflow-y: auto; padding: 18px 16px 28px; background: var(--panel); border-right: 1px solid var(--line); }
+  main { position: relative; min-width: 0; }
+  #view { position: absolute; inset: 0; }
+  h1 { margin: 0; font-size: 19px; font-weight: 700; }
+  h2 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+  h2 span { color: var(--faint); letter-spacing: .04em; }
+  p { margin: 6px 0 0; color: var(--dim); }
+  .hint { color: var(--faint); }
+  button, select, input { font: inherit; color: inherit; }
+  button { padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(var(--key-hi), var(--key)); cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--line-hi); }
+  button:disabled { opacity: .4; cursor: default; }
+  button[aria-pressed=true] { border-color: var(--accent); background: rgba(47, 128, 255, .16); }
+  button.go { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 700; }
+  select, input[type=number] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--key); }
+  select { flex: 1; min-width: 0; }
+  input[type=number] { width: 84px; font-family: var(--num); }
+  input[type=checkbox] { accent-color: var(--accent); }
+  label { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .row + .row, .row + p, p + .row { margin-top: 8px; }
+  #verdict { margin: 0 0 8px; color: var(--text); font-weight: 600; }
+  #checks { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+  #checks li { display: grid; grid-template-columns: 16px 1fr; gap: 6px; color: var(--dim); }
+  #checks i { font-style: normal; font-weight: 700; text-align: center; }
+  #checks b { color: var(--text); font-weight: 600; }
+  .ok i { color: var(--green); } .warn i { color: var(--amber); } .bad i { color: var(--red); } .info i { color: var(--faint); }
+  #picked { margin: 0 0 8px; }
+  #roles { display: flex; flex-wrap: wrap; gap: 4px; }
+  #roles button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 13px; }
+  .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  #parts { margin: 10px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+  #parts li { display: grid; grid-template-columns: 26px 10px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  #parts li.sel { background: rgba(47, 128, 255, .14); }
+  #parts li.off { opacity: .45; }
+  #parts input { width: 100%; padding: 2px 4px; border: 1px solid transparent; border-radius: 5px; background: none; font-weight: 600; }
+  #parts input:hover, #parts input:focus { border-color: var(--line-hi); background: var(--key); }
+  #parts small { display: block; padding: 0 5px; overflow: hidden; color: var(--faint); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+  .eye { width: 26px; padding: 2px 0; font-size: 12px; }
+  .chips { color: var(--dim); font-size: 12px; text-align: right; }
+  #empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--faint); pointer-events: none; }
+  .legend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: calc(100% - 24px); padding: 6px 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: rgba(14, 16, 19, .85); color: var(--dim); font-size: 12px; pointer-events: none; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  kbd, code { padding: 0 5px; border: 1px solid var(--line-hi); border-radius: 4px; background: var(--key); color: var(--text); font: 12px var(--num); white-space: nowrap; }
+  dialog { width: min(700px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; overflow: auto; border: 1px solid var(--line-hi); border-radius: 12px; background: var(--panel); color: var(--text); }
+  dialog::backdrop { background: rgba(0, 0, 0, .6); }
+  dialog header { position: sticky; top: 0; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  dialog article { padding: 2px 18px 22px; }
+  dialog h3 { margin: 20px 0 4px; font-size: 15px; }
+  dialog p, dialog li, dialog td { color: var(--dim); }
+  dialog b { color: var(--text); font-weight: 600; }
+  dialog ol, dialog ul { display: grid; gap: 5px; margin: 6px 0 0; padding-left: 20px; }
+  dialog table { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 13px; }
+  dialog th, dialog td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  dialog th { color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  dialog td:first-child { white-space: nowrap; color: var(--text); }
+  dialog .sw { display: inline-block; }
+  @media (max-width: 820px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 55dvh auto; height: auto; }
+    main { grid-row: 1; position: sticky; top: 0; z-index: 1; height: 55dvh; }
+    aside { grid-row: 2; overflow: visible; border-right: 0; }
+  }
+</style>
+<script type="importmap">{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
+} }</script>
+</head>
+<body>
+<aside>
+  <header>
+    <div class="head"><h1>Car Model Editor</h1><button id="guide-btn" aria-haspopup="dialog">User guide</button></div>
+    <p>Tag a car model's parts with the upload template's names, see it the way drive.html will read it, and export the .glb.</p>
+  </header>
+  <section>
+    <h2>Model</h2>
+    <div class="row">
+      <select id="builtin" aria-label="Open a built-in car"><option value="">Built-in car…</option></select>
+      <button id="open">Open .glb…</button>
+      <input id="file" type="file" accept=".glb" hidden>
+    </div>
+    <div class="row">
+      <label>Real length <input id="length" type="number" min="2" max="8" step="0.001" value="4.5"> m</label> <span class="hint">drive.html scales to it</span>
+    </div>
+    <div class="row" role="group" aria-label="Match parts by">
+      <button data-mode="template" aria-pressed="true">Upload template</button>
+      <button data-mode="car" id="mode-car" disabled>Its drive.html patterns</button>
+    </div>
+    <p id="status" role="status">Pick a built-in car, or open or drop a .glb anywhere.</p>
+  </section>
+  <section>
+    <h2>Model tools</h2>
+    <div class="row">
+      <button id="undo" disabled>Undo</button><button id="redo" disabled>Redo</button> <span class="hint"><kbd>⌘Z</kbd> · <kbd>⇧⌘Z</kbd></span>
+    </div>
+    <div class="row">
+      <button data-turn="1">Turn +90°</button><button data-turn="2">180°</button><button data-turn="-1">−90°</button>
+      <label><input id="roleview" type="checkbox" checked> Colour by role</label>
+    </div>
+    <div class="row">
+      <button id="convert" hidden>Rename all to template</button>
+      <button id="export" class="go" disabled>Export .glb</button>
+    </div>
+  </section>
+  <section>
+    <h2>Template check</h2>
+    <p id="verdict">Open a model to check it.</p>
+    <ul id="checks"></ul>
+  </section>
+  <section>
+    <h2>Parts <span id="count"></span></h2>
+    <p id="picked"></p>
+    <div id="roles" role="group" aria-label="Tag the picked parts as"></div>
+    <p id="carhint" hidden>Tagging works on template names: Rename all to template first.</p>
+    <div class="row">
+      <button id="hide" class="need-pick">Hide / show</button>
+      <button id="split" class="need-pick" title="Make each loose piece of the picked parts a part of its own, e.g. a steering wheel modelled into the dash">Split loose pieces</button>
+      <button id="delete" class="need-pick">Delete</button>
+      <button id="showall">Show all</button>
+    </div>
+    <ul id="parts"></ul>
+  </section>
+</aside>
+<main>
+  <div id="view"></div>
+  <div id="empty">Pick a built-in car, or drop a .glb here</div>
+  <div id="legend" class="legend" hidden>
+    <span><i style="background:#2f80ff"></i>front (+Z)</span><span><i style="background:#35d07f"></i>wheel hubs</span>
+    <span><i style="background:#ffad1f"></i>steering rim</span><span><i style="background:#81c4ff"></i>driver's eye</span>
+    <span><i style="background:#ffd166"></i>lamp spots</span>
+  </div>
+</main>
+<dialog id="guide" aria-labelledby="guide-title">
+  <header class="head">
+    <h1 id="guide-title">User guide</h1>
+    <form method="dialog"><button>Close</button></form>
+  </header>
+  <article>
+    <h3>What it does</h3>
+    <p>drive.html can only drive a model once it knows which part is which: what to paint, which wheels spin, where the
+      steering wheel and the lamps are. The upload template says it in each part's own name (<code>paint_1</code>,
+      <code>wheel_tyre_3</code>), so any model named that way can drive without patterns written for it. This editor
+      gives the parts those names, checks the model the way drive.html's loader will read it, and exports the renamed .glb.</p>
+    <p><b>Nothing is saved or uploaded.</b> Your work only lives in this tab: export before you close or reload it.</p>
+
+    <h3>Step by step</h3>
+    <ol>
+      <li><b>Open a model.</b> Pick a built-in car, press <b>Open .glb…</b>, or drop a .glb anywhere on the page.</li>
+      <li><b>Set its real length</b>, bumper to bumper in metres. drive.html scales every model to its length, so the checks
+        measure it at that size. Each grid square is 50 cm.</li>
+      <li><b>Point the nose along the blue arrow.</b> If it faces another way, press <b>Turn +90°</b>, <b>180°</b> or <b>−90°</b> until it doesn't.</li>
+      <li><b>Pick parts.</b> Click one on the car or in the Parts list. Shift-click (or ⌘/Ctrl-click) adds another, or takes a
+        picked one back out. <kbd>Esc</kbd> lets go of them all. Picked parts show blue, through everything in front of them.</li>
+      <li><b>Tag them.</b> Press a role button under Parts: each picked part is renamed to that role's next free name
+        (Paint gives <code>paint_1</code>, then <code>paint_2</code>…) and coloured as it.</li>
+      <li><b>Work down the Template check</b> until nothing is ✕ and it says <b>Fits the template</b>.</li>
+      <li><b>Press Export .glb.</b> It downloads <code>&lt;name&gt;-template.glb</code>: every part with your names, hidden
+        ones too, in the model's own materials.</li>
+    </ol>
+    <p>A built-in car opens checked by <b>Its drive.html patterns</b>, which is how drive.html reads it today, and tagging is
+      off there. Press <b>Rename all to template</b> to name every part from those patterns, then tag as above.</p>
+
+    <h3>The roles</h3>
+    <table>
+      <thead><tr><th>Button</th><th>Names</th><th>What to tag</th></tr></thead>
+      <tbody id="guide-roles"></tbody>
+    </table>
+    <p>A part whose name starts with none of these counts as Other and is drawn as modelled.</p>
+
+    <h3>Reading the Template check</h3>
+    <p><b>✓</b> fine · <b>!</b> it drives, but goes without something (indicators, tinted glass) · <b>✕</b> drive.html gets
+      it wrong, or can't load the model · <b>i</b> for your information.</p>
+    <ul>
+      <li><b>Size</b>: at its real length the model should be 1.4–2.3 m wide and 0.9–2.2 m tall. Bigger means something outside
+        the car (a floor, a stand, a stray part) stretches it, or the nose isn't along the arrow.</li>
+      <li><b>Facing</b>: the steering wheel (or else the headlights) must be in the front half.</li>
+      <li><b>Drive side</b>: whichever side the steering wheel is on. drive.html keeps the cabin as modelled, so a
+        left-hand-drive car is driven from the left.</li>
+      <li><b>Tyres</b>: one in each corner. Each corner's tyres say where its hub is (the green boxes).</li>
+      <li><b>Wheels</b>: everything tagged Wheel spins, so it must stay inside the wheels. A part reaching outside them would
+        spin too: split it and tag only the wheel piece.</li>
+      <li><b>Steering wheel</b>: tag only the wheel (about 0.30–0.40 m across). The orange ring is the rim drive.html found and
+        turns the wheel about; the blue dot is where the driver's eye goes.</li>
+      <li><b>Headlights / Tail lights</b>: lamp parts on both sides in the front (or rear) 60 cm get the indicators, beam and
+        brake glows (the yellow boxes).</li>
+      <li><b>Paint / Glass</b>: without them the body keeps the model's own colour and the windows aren't tinted.</li>
+    </ul>
+
+    <h3>Tools</h3>
+    <ul>
+      <li><b>Hide / show</b> (<kbd>H</kbd>) hides the picked parts so you can see past them; the ◉ in the list hides one. Hidden
+        parts still export. <b>Show all</b> brings them all back.</li>
+      <li><b>Split loose pieces</b> makes each separate piece of the picked parts a part of its own, named after it with
+        <code>_1</code>, <code>_2</code>… (biggest first), e.g. to get a steering wheel out of the dashboard it was modelled
+        into. A part in one piece, or in more than 400, stays whole: cut it apart in Blender.</li>
+      <li><b>Delete</b> takes the picked parts out of the model and the export.</li>
+      <li><b>Rename</b>: type in a part's name in the list and press Enter. A name starting with a role's prefix gives it that role.</li>
+      <li><b>Colour by role</b> paints each part in its role's colour; off shows the model's own materials. It only changes
+        the view: the export always has the model's own materials.</li>
+      <li>An opened .glb's groups named like a role (<code>paint_…</code>) are renamed <code>group_1</code>, <code>group_2</code>…,
+        so only part names carry roles.</li>
+    </ul>
+
+    <h3>Undo and redo</h3>
+    <table>
+      <tbody>
+        <tr><td>Undo</td><td><kbd>⌘Z</kbd> (<kbd>Ctrl+Z</kbd> on Windows), or the Undo button</td></tr>
+        <tr><td>Redo</td><td><kbd>⇧⌘Z</kbd> (<kbd>Ctrl+Shift+Z</kbd> or <kbd>Ctrl+Y</kbd>), or the Redo button</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>Each change to the model is one step: tagging, renaming, Rename all to template, hiding and showing parts, Delete,
+        Split loose pieces, a turn, and the real length.</li>
+      <li>Undo puts the model back exactly as it was before the step: names, hidden, deleted and split parts, which way it
+        faces, its length and the patterns it's checked by. The parts picked then are picked again, the checks run again,
+        and the status line says what was undone. Hover the buttons to see what they'll undo or redo.</li>
+      <li>Redo does an undone step again. Changing anything after an undo drops the steps you undid: they can't be redone.</li>
+      <li>The last 100 steps are kept. Opening another model starts afresh.</li>
+      <li>Not steps: picking, Colour by role, switching patterns by hand, moving the view and exporting.</li>
+      <li>While you're typing in a box (a part's name, the real length), ⌘Z undoes your typing there, as anywhere. Click off
+        the box to undo a step.</li>
+    </ul>
+
+    <h3>Moving around</h3>
+    <p>Drag to turn the view, Shift-drag or right-drag to move it, scroll or pinch to zoom. A click that doesn't drag picks
+      the part under it, skipping hidden ones.</p>
+
+    <h3>After exporting</h3>
+    <p>drive.html doesn't read template names by itself yet: to drive the model, put the .glb in <code>public/models/</code>
+      and give it a <code>CARS</code> entry in drive.html that uses the template's patterns.</p>
+  </article>
+</dialog>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
+const setStatus = t => $('status').textContent = t;
+const few = list => list.length > 4 ? `${list.slice(0, 4).join(', ')} and ${list.length - 4} more` : list.join(', ');
+const plural = (n, what) => `${n} ${what}${n > 1 ? 's' : ''}`;
+
+// The upload template: what a part is lives in its own name, so drive.html can tell any model's parts apart without
+// patterns written for it. The same shape as a CARS entry in drive.html, and matched the way drive.html matches -
+// against "material|mesh|parent" - so one CARS entry with these patterns fits every template model
+const TEMPLATE = {
+  paint: /\|paint_/, glass: /\|glass_/, cabin: /\|cabin_/, wheels: /\|wheel_/, tyre: /\|wheel_tyre_/,
+  steering: { re: /\|cabin_steering/ }, lamps: { head: /\|(head|lamps)_/, tail: /\|(tail|lamps)_/ },
+};
+// each role's template name (tagging a part renames it to the next free one: paint_1, paint_2...) and role-view colour
+const ROLES = [
+  { key: 'paint', name: 'paint_', label: 'Paint', color: '#e1262d', tip: 'Body panels: the paint colour goes on these' },
+  { key: 'glass', name: 'glass_', label: 'Glass', color: '#4fd8ff', tip: 'Windows: tinted' },
+  { key: 'cabin', name: 'cabin_', label: 'Cabin', color: '#a77bff', tip: 'The interior, drawn as modelled' },
+  { key: 'steering', name: 'cabin_steering_', label: 'Steering wheel', color: '#ffad1f', tip: 'Only the wheel itself (rim, spokes, hub): it turns' },
+  { key: 'wheels', name: 'wheel_rim_', label: 'Wheel', color: '#35d07f', tip: 'What spins: rims, discs, caps - not the calipers' },
+  { key: 'tyre', name: 'wheel_tyre_', label: 'Tyre', color: '#1c8f53', tip: 'The tyres: they say where each hub is' },
+  { key: 'head', name: 'head_lights_', label: 'Headlights', color: '#fff1b8', tip: 'Headlamps: their front 60 cm lights up' },
+  { key: 'tail', name: 'tail_lights_', label: 'Tail lights', color: '#ff7a3d', tip: 'Tail lamps: their rear half glows when braking' },
+  { key: 'lamps', name: 'lamps_', label: 'Head + tail', color: '#ffd166', tip: 'One part holding both: drive.html takes its front and rear' },
+  { key: 'body', name: 'body_', label: 'Other', color: '#5a626c', tip: 'Everything else, drawn as it is' },
+];
+const ROLE = Object.fromEntries(ROLES.map(r => [r.key, r]));
+// a part's roles under a CARS-shaped set of patterns, its colour from the first
+const PATTERN = { steering: P => P.steering?.re, tyre: P => P.tyre, wheels: P => P.wheels, head: P => P.lamps?.head,
+  tail: P => P.lamps?.tail ?? P.tail?.re, glass: P => P.glass, paint: P => P.paint, cabin: P => P.cabin };
+const roleKey = roles => roles.includes('head') && roles.includes('tail') ? 'lamps' : roles[0] ?? 'body';
+const ROLE_NAME = /^(paint|glass|cabin|wheel|head|tail|lamps)_/;
+
+// shortcut: the built-in cars, and the patterns drive.html finds their parts by, are read out of its CARS source -
+// switch to a JSON endpoint once CARS lives in the database
+let CARS = {};
+try {
+  const src = await (await fetch('drive.html')).text(), at = src.indexOf('const CARS = {');
+  CARS = new Function(`return ${src.slice(at + 13, src.indexOf('\n};', at) + 2)}`)();
+  $('builtin').insertAdjacentHTML('beforeend', Object.entries(CARS).map(([k, c]) => `<option value="${k}">${esc(c.name)}</option>`).join(''));
+} catch (e) { setStatus(`Couldn't read the built-in cars out of drive.html (${e.message}): open a .glb instead.`); }
+
+const view = $('view'), renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.NeutralToneMapping;
+view.append(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0d10);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 500), controls = new OrbitControls(camera, renderer.domElement);
+camera.position.set(4.6, 2.4, 5.6);
+controls.target.set(0, 0.6, 0);
+controls.enableDamping = true;
+// the model sits in wrap, which puts it in drive.html's car space: metres, front +Z, left +X, its lowest point on the
+// ground. overlay: what the checks found; picked: the picked parts, drawn through everything
+const wrap = new THREE.Group(), overlay = new THREE.Group(), picked = new THREE.Group();
+scene.add(new THREE.GridHelper(12, 24, 0x363b44, 0x1a1d22), new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0.01, 0), 3.4, 0x2f80ff, 0.4, 0.22), wrap, overlay, picked);
+new ResizeObserver(() => {
+  renderer.setSize(view.clientWidth, view.clientHeight);
+  camera.aspect = view.clientWidth / view.clientHeight;
+  camera.updateProjectionMatrix();
+}).observe(view);
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
+  .setDRACOLoader(new DRACOLoader().setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/libs/draco/gltf/'));
+const roleMat = Object.fromEntries(ROLES.map(r => [r.key, new THREE.MeshStandardMaterial({ color: r.color, roughness: 0.55, side: THREE.DoubleSide,
+  ...r.key === 'glass' && { transparent: true, opacity: 0.3, depthWrite: false } })]));
+const pickMat = new THREE.MeshBasicMaterial({ color: 0x2f80ff, transparent: true, opacity: 0.55, depthTest: false });
+
+let model = null, carKey = null, fileName = '', mode = 'template', parts = [], len = 0; // (len: the length it's scaled to)
+const dims = new THREE.Vector3(), selected = new Set(), ownMat = new WeakMap(); // (a part's own material, while the role view paints over it)
+const pattern = () => mode === 'car' ? CARS[carKey] : TEMPLATE;
+
+async function open(load, name, key) {
+  setStatus(`Opening ${name}…`);
+  let gltf;
+  try { gltf = await load(); } catch (e) { return setStatus(`Couldn't open ${name}: ${e.message || e}`); }
+  wrap.clear();
+  selected.clear();
+  model = new THREE.Group(); // what's exported: the turns go on it
+  model.add(gltf.scene);
+  wrap.add(model);
+  undos.length = redos.length = 0;
+  carKey = key;
+  fileName = name.replace(/\.glb$/i, '');
+  model.traverse(o => {
+    if (!o.isMesh) return;
+    ownMat.set(o, o.material);
+    const g = o.geometry; // drive.html splits parts by their triangles, so every part needs an index
+    if (!g.index) g.setIndex([...Array(g.attributes.position.count).keys()]);
+  });
+  const renamed = key ? 0 : clearGroupRoles();
+  if (key) $('length').value = CARS[key].length;
+  setMode(key ? 'car' : 'template', true);
+  const L = +$('length').value;
+  camera.position.set(L * 0.95, L * 0.5, L * 1.2);
+  controls.target.set(0, dims.y * 0.45, 0);
+  $('export').disabled = false;
+  $('empty').hidden = true;
+  $('legend').hidden = false;
+  showHistory();
+  setStatus(`${name}: ${parts.length} parts${renamed ? `, and ${renamed} group${renamed > 1 ? 's' : ''} named like a role renamed group_N, so only part names carry roles` : ''}.`);
+}
+
+// in the template only a part's own name says what it is: a group named like a role would hand it to every part in it
+function clearGroupRoles() {
+  let n = 0;
+  model.traverse(o => { if (!o.isMesh && ROLE_NAME.test(o.name)) o.name = `group_${++n}`; });
+  return n;
+}
+
+function setMode(m, moved) {
+  mode = m;
+  for (const b of document.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', b.dataset.mode === m);
+  $('mode-car').disabled = !carKey;
+  $('convert').hidden = $('carhint').hidden = m !== 'car';
+  refresh(moved);
+}
+
+// drive.html's car space: the whole model (every part, hidden or not) scaled to the car's real length, its lowest point
+// on the ground and centred, so the grid is in metres and the checks measure what drive.html will
+function normalise() {
+  wrap.scale.setScalar(1);
+  wrap.position.set(0, 0, 0);
+  wrap.updateMatrixWorld(true);
+  len = +$('length').value;
+  const b = new THREE.Box3().setFromObject(model, true), k = len / (b.max.z - b.min.z);
+  wrap.scale.setScalar(k);
+  wrap.position.set(-(b.min.x + b.max.x) / 2 * k, -b.min.y * k, -(b.min.z + b.max.z) / 2 * k);
+  wrap.updateMatrixWorld(true);
+  b.getSize(dims).multiplyScalar(k);
+}
+
+function refresh(moved) {
+  if (!model) return;
+  if (moved) normalise();
+  parts = [];
+  model.traverse(o => o.isMesh && parts.push({ o, id: `${ownMat.get(o).name}|${o.name}|${o.parent.name}` }));
+  const P = pattern();
+  for (const p of parts) p.roles = Object.keys(PATTERN).filter(k => PATTERN[k](P)?.test(p.id));
+  check();
+  paintRoles();
+  listParts();
+  showPicked();
+}
+
+// the template check: what drive.html's model loader will make of these parts, done the way it does it
+function check() {
+  const P = pattern(), L = +$('length').value, v = new THREE.Vector3(), c = new THREE.Vector3(), out = [];
+  const of = key => parts.filter(p => p.roles.includes(key));
+  const world = p => p.w ??= (() => { // every vertex of a part in car space
+    const pos = p.o.geometry.attributes.position, a = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) v.fromBufferAttribute(pos, i).applyMatrix4(p.o.matrixWorld).toArray(a, i * 3);
+    return a;
+  })();
+  const each = (p, fn) => { const a = world(p), ix = p.o.geometry.index.array; for (let t = 0; t < ix.length; t += 3) fn(a, ix[t] * 3, ix[t + 1] * 3, ix[t + 2] * 3); };
+  const mid = (a, i, j, k) => c.set(a[i] + a[j] + a[k], a[i + 1] + a[j + 1] + a[k + 1], a[i + 2] + a[j + 2] + a[k + 2]).divideScalar(3);
+
+  const fits = dims.x > 1.4 && dims.x < 2.3 && dims.y > 0.9 && dims.y < 2.2;
+  out.push([fits ? 'ok' : 'bad', 'Size', `${L} × ${dims.x.toFixed(2)} × ${dims.y.toFixed(2)} m (long × wide × tall) at its real length${fits ? '.' : ': something outside the car stretches its box (a floor, a stand, a stray part), or the nose isn’t along the arrow.'}`]);
+
+  // drive side: wherever the steering wheel is (left is +X) - drive.html keeps every cabin as modelled
+  const steer = of('steering');
+  let x = 0, n = 0;
+  for (const p of steer) for (let a = world(p), i = 0; i < a.length; i += 3) x += a[i], n++;
+  out.push(['info', 'Drive side', !n ? 'No steering wheel yet.' : `${x > 0 ? 'Left' : 'Right'}-hand drive: drive.html keeps the cabin as modelled, so it's driven from the ${x > 0 ? 'left' : 'right'}.`]);
+
+  // wheels: drive.html splits every wheel part by which corner its triangles are in, and hangs each corner on the hub of its tyre
+  const CORNER = ['right rear', 'left rear', 'right front', 'left front'], cornerOf = at => (at.x > 0) + 2 * (at.z > 0);
+  const hubs = CORNER.map(() => new THREE.Box3());
+  for (const p of of('tyre')) each(p, (a, i, j, k) => { const h = hubs[cornerOf(mid(a, i, j, k))]; for (const q of [i, j, k]) h.expandByPoint(v.fromArray(a, q)); });
+  const bare = CORNER.filter((_, n) => hubs[n].isEmpty());
+  if (!of('tyre').length) out.push(['bad', 'Tyres', 'Nothing tagged tyre: drive.html hangs each wheel on its tyre’s hub, and can’t load the model without them.']);
+  else if (bare.length) out.push(['bad', 'Tyres', `No tyre in the ${bare.join(', ')} corner${bare.length > 1 ? 's' : ''}: every corner needs one to hang its wheel on.`]);
+  else {
+    const r = hubs.map(h => (h.max.y - h.min.y) / 2), odd = r.some(x => x < 0.25 || x > 0.45);
+    out.push([odd ? 'warn' : 'ok', 'Tyres', `One in each corner, ${Math.min(...r).toFixed(2)}–${Math.max(...r).toFixed(2)} m in radius${odd ? ': real ones are about 0.28–0.40 m, so something else may be tagged tyre' : ''}.`]);
+  }
+  const spin = of('wheels').filter(p => !p.roles.includes('steering')), stuck = of('tyre').filter(p => !p.roles.includes('wheels')), loose = [];
+  if (!bare.length) {
+    const near = hubs.map(h => h.clone().expandByScalar(0.05));
+    for (const p of spin) {
+      let off = 0, n = 0;
+      each(p, (a, i, j, k) => { n++; const at = mid(a, i, j, k); if (!near[cornerOf(at)].containsPoint(at)) off++; });
+      if (off > n / 100) loose.push(`${p.o.name || '(unnamed)'} (${Math.round(100 * off / n)}%)`);
+    }
+  }
+  if (!spin.length) out.push(['bad', 'Wheels', 'Nothing tagged wheel: nothing will spin.']);
+  else if (loose.length) out.push(['bad', 'Wheels', `${few(loose)} reach${loose.length > 1 ? '' : 'es'} outside the wheels, and would spin with them: split the wheel out (Split loose pieces) and tag only that.`]);
+  else if (stuck.length) out.push(['bad', 'Wheels', `${few(stuck.map(p => p.o.name))}: tagged tyre but not wheel, so ${stuck.length > 1 ? 'they' : 'it'} won’t spin.`]);
+  else if (!bare.length) out.push(['ok', 'Wheels', `${spin.length} part${spin.length > 1 ? 's' : ''} spin, all inside the wheels.`]);
+
+  // the steering wheel: drive.html's rim search - the centre and tilt that put the most points on a 0.15-0.2 m ring,
+  // started from the car's near point, or the first steering part's 3 and 9 o'clock
+  let rim = null;
+  if (steer.length) {
+    let pts = [];
+    for (const p of steer) for (let a = world(p), i = 0; i < a.length; i += 9) pts.push(new THREE.Vector3(a[i], a[i + 1], a[i + 2])); // every third vertex, as drive.html
+    const width = new THREE.Box3().setFromPoints(pts).getSize(v).x;
+    let seed;
+    if (P.steering?.near) {
+      seed = new THREE.Vector3(...P.steering.near);
+      pts = pts.filter(q => q.distanceTo(seed) < 0.3);
+    } else {
+      const b = new THREE.Box3().setFromArray(world(steer[0])), cx = (b.min.x + b.max.x) / 2, wide = pts.filter(q => Math.abs(q.x - cx) > 0.9 * (b.max.x - cx));
+      seed = new THREE.Vector3(cx, wide.reduce((s, q) => s + q.y, 0) / wide.length, wide.reduce((s, q) => s + q.z, 0) / wide.length);
+    }
+    // shortcut: past 12k points (a whole dash tagged steering) only an even spread of them is searched, to stay quick
+    // while tagging; drive.html searches them all
+    if (pts.length > 12000) pts = pts.filter((_, i) => i % Math.ceil(pts.length / 12000) === 0);
+    rim = { n: -1, of: pts.length, width };
+    const tryRim = (cy, cz, a) => {
+      const ny = Math.sin(a), nz = Math.cos(a);
+      let n = 0;
+      for (const q of pts) {
+        const y = q.y - cy, z = q.z - cz;
+        if (Math.abs(y * ny + z * nz) > 0.02) continue; // off the plane
+        const r = Math.hypot(q.x - seed.x, y * nz - z * ny);
+        if (r > 0.15 && r < 0.2) n++;
+      }
+      if (n > rim.n) Object.assign(rim, { n, cy, cz, a });
+    };
+    for (let a = 0; a < Math.PI; a += Math.PI / 90) tryRim(seed.y, seed.z, a);
+    const a0 = rim.a;
+    for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) for (let d = -4; d <= 4; d++) tryRim(seed.y + i * 0.005, seed.z + j * 0.005, a0 + d * Math.PI / 360);
+    rim.at = new THREE.Vector3(seed.x, rim.cy, rim.cz);
+    rim.axis = new THREE.Vector3(0, Math.sin(rim.a), Math.cos(rim.a));
+    if (rim.axis.z < 0) rim.axis.negate();
+    rim.found = rim.n >= 30;
+  }
+  if (!steer.length) out.push(P.steering?.near ? ['warn', 'Steering wheel', 'No steering part: drive.html puts a plain wheel of its own at this car’s near point.']
+    : ['bad', 'Steering wheel', 'Nothing tagged steering wheel: drive.html has nowhere to seat the driver or put the live cluster, and can’t load the model.']);
+  else if (!P.steering?.near && (rim.width > 0.45 || rim.width < 0.28)) out.push(['bad', 'Steering wheel', `Tagged steering wheel: ${rim.width.toFixed(2)} m across. ${rim.width > 0.45
+    ? 'That’s more than the wheel (rims are 0.30–0.40 m): cut the wheel out of the dash (Split loose pieces) and tag only it.' : 'That’s smaller than a steering wheel (rims are 0.30–0.40 m).'}`]);
+  else if (!rim.found) out.push(['bad', 'Steering wheel', `No rim found (${rim.n} of ${rim.of} points on a 0.15–0.2 m ring): drive.html turns the wheel about its rim, and seats the driver behind it.`]);
+  else out.push(['ok', 'Steering wheel', `Rim found, ${rim.n} of ${rim.of} points on its ring: the orange ring should sit on it, and the blue dot is where the driver’s eye goes.`]);
+
+  // lamps, as drive.html's sideBox: each side's lamp vertices in the front (head) or rear (tail) 60 cm - the indicators
+  // go on their faces, the beam and brake glows over them
+  const sideBox = (key, s, end, keep = () => true) => {
+    const b = new THREE.Box3();
+    for (const p of of(key)) for (let a = world(p), i = 0; i < a.length; i += 3) {
+      v.fromArray(a, i);
+      if (Math.sign(v.x) === s && v.z * end > L / 2 - 0.6 && keep(v)) b.expandByPoint(v);
+    }
+    return b;
+  };
+  const lamps = [];
+  for (const [key, end, title, where, what] of [['head', 1, 'Headlights', 'front', 'indicators and headlight glow'], ['tail', -1, 'Tail lights', 'rear', 'indicators and brake glow']]) {
+    const boxes = [1, -1].map(s => sideBox(key, s, end, key === 'tail' && P.tail?.keep || undefined)), none = ['left', 'right'].filter((_, n) => boxes[n].isEmpty());
+    lamps.push(...boxes.filter(b => !b.isEmpty()));
+    out.push(!of(key).length ? ['warn', title, `Nothing tagged: the model gets no ${what}.`]
+      : none.length ? ['warn', title, `Nothing tagged in the ${where} 60 cm on the ${none.join(' or ')}: the ${what} have nowhere to go there.`]
+      : ['ok', title, `Both sides, in the ${where} 60 cm.`]);
+  }
+
+  // which way it faces: every built-in car's steering wheel sits ahead of its middle; else the headlights ahead of the tail lights
+  const meanZ = key => { let z = 0, n = 0; for (const p of of(key)) for (let a = world(p), i = 2; i < a.length; i += 3) z += a[i], n++; return n ? z / n : null; };
+  const hz = meanZ('head'), tz = meanZ('tail'), facing = rim?.found ? rim.at.z : hz !== null && tz !== null && hz !== tz ? hz - tz : null;
+  out.push(facing === null ? ['warn', 'Facing', 'Can’t tell which way it faces yet (no steering rim or lamps): check the blue arrow comes out of the nose.']
+    : facing > 0 ? ['ok', 'Facing', 'The nose points along the blue arrow (+Z).']
+    : ['bad', 'Facing', `${rim?.found ? 'The steering wheel sits in the back half' : 'The headlights are behind the tail lights'}, so the nose points the wrong way: Turn 180°.`]);
+
+  for (const [key, title, without] of [['paint', 'Paint', 'the body keeps the model’s own colour'], ['glass', 'Glass', 'the windows keep the model’s own look, untinted']]) {
+    const n = of(key).length;
+    out.push(n ? ['ok', title, `${n} part${n > 1 ? 's' : ''}.`] : ['warn', title, `Nothing tagged: ${without}.`]);
+  }
+  out.push(['info', 'Parts', `${parts.length} parts, ${Math.round(parts.reduce((s, p) => s + p.o.geometry.index.count / 3, 0)).toLocaleString()} triangles.`]);
+
+  const ORDER = ['Size', 'Facing', 'Drive side', 'Tyres', 'Wheels', 'Steering wheel', 'Headlights', 'Tail lights', 'Paint', 'Glass', 'Parts'];
+  out.sort((a, b) => ORDER.indexOf(a[1]) - ORDER.indexOf(b[1]));
+  const bad = out.filter(x => x[0] === 'bad').length;
+  $('verdict').textContent = mode === 'car' ? 'How drive.html reads this car today, by its own patterns:' : bad ? `${bad} thing${bad > 1 ? 's' : ''} to fix before it fits the template:` : 'Fits the template.';
+  $('checks').innerHTML = out.map(([s, t, d]) => `<li class="${s}"><i title="${s}">${{ ok: '✓', warn: '!', bad: '✕', info: 'i' }[s]}</i><span><b>${t}</b> ${esc(d)}</span></li>`).join('');
+
+  overlay.traverse(o => { o.geometry?.dispose(); o.material?.dispose(); });
+  overlay.clear();
+  for (const h of hubs) if (!h.isEmpty()) overlay.add(new THREE.Box3Helper(h, 0x35d07f));
+  for (const b of lamps) overlay.add(new THREE.Box3Helper(b, 0xffd166));
+  if (rim?.found) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.175, 0.006, 8, 72), new THREE.MeshBasicMaterial({ color: 0xffad1f, depthTest: false }));
+    ring.position.copy(rim.at);
+    ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), rim.axis);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.03), new THREE.MeshBasicMaterial({ color: 0x81c4ff, depthTest: false }));
+    eye.position.copy(rim.at).add(new THREE.Vector3(0, 0.3, -0.55)); // drive.html's EYE
+    ring.renderOrder = eye.renderOrder = 10;
+    overlay.add(ring, eye);
+  }
+}
+
+function paintRoles() {
+  const on = $('roleview').checked;
+  for (const p of parts) p.o.material = on ? roleMat[roleKey(p.roles)] : ownMat.get(p.o);
+}
+
+function listParts() {
+  $('count').textContent = parts.length ? `· ${parts.length}` : '';
+  $('parts').innerHTML = parts.map((p, i) => `<li data-i="${i}"${p.o.visible ? '' : ' class="off"'}>
+    <button class="eye" title="${p.o.visible ? 'Hide' : 'Show'}" aria-label="${p.o.visible ? 'Hide' : 'Show'}">${p.o.visible ? '◉' : '○'}</button>
+    <span class="sw" style="background:${ROLE[roleKey(p.roles)].color}"></span>
+    <span><input value="${esc(p.o.name)}" aria-label="Part name" spellcheck="false"><small>${esc(ownMat.get(p.o).name || 'unnamed material')} · in ${esc(p.o.parent.name || 'an unnamed group')} · ${(p.o.geometry.index.count / 3).toLocaleString()} ▲</small></span>
+    <span class="chips">${p.roles.map(r => ROLE[r].label).join(' · ') || '–'}</span></li>`).join('');
+}
+
+function showPicked() {
+  picked.clear(); // (its meshes share the parts' geometry: nothing to dispose)
+  for (const o of selected) {
+    const m = new THREE.Mesh(o.geometry, pickMat);
+    m.matrixAutoUpdate = false;
+    m.matrix.copy(o.matrixWorld);
+    m.renderOrder = 9;
+    picked.add(m);
+  }
+  for (const li of $('parts').children) li.classList.toggle('sel', selected.has(parts[li.dataset.i].o));
+  const n = selected.size;
+  $('picked').textContent = n ? `${n} part${n > 1 ? 's' : ''} picked: tag ${n > 1 ? 'them' : 'it'} as` : model ? 'Click a part, here or on the car (shift adds more). Esc lets go, H hides.' : '';
+  for (const b of document.querySelectorAll('#roles button, .need-pick')) b.disabled = !n || (mode === 'car' && !!b.dataset.role);
+  $('showall').disabled = !model;
+}
+
+function pick(o, add) {
+  if (!add) selected.clear();
+  if (o) add && selected.has(o) ? selected.delete(o) : selected.add(o);
+  showPicked();
+  if (o) $('parts').children[parts.findIndex(p => p.o === o)]?.scrollIntoView({ block: 'nearest' });
+}
+
+// the next free name for a role: paint_1, paint_2...
+const nextName = prefix => prefix + (1 + Math.max(0, ...parts.map(p => p.o.name.startsWith(prefix) && +p.o.name.slice(prefix.length) || 0)));
+
+// a part's loose pieces (shells that share no corner, once coincident vertices are welded) as parts of their own, each
+// keeping only its own vertices: drive.html measures a part by every vertex it has (the lamp spots, the rim search)
+function splitLoose(o) {
+  const g = o.geometry, pos = g.attributes.position, ix = g.index.array, up = new Int32Array(pos.count), weld = new Map();
+  g.computeBoundingBox();
+  const eps = g.boundingBox.getSize(new THREE.Vector3()).length() * 1e-6 || 1e-9;
+  for (let i = 0; i < pos.count; i++) {
+    const k = `${Math.round(pos.getX(i) / eps)},${Math.round(pos.getY(i) / eps)},${Math.round(pos.getZ(i) / eps)}`;
+    up[i] = weld.get(k) ?? (weld.set(k, i), i);
+  }
+  const find = i => { while (up[i] !== i) i = up[i] = up[up[i]]; return i; };
+  for (let t = 0; t < ix.length; t += 3) { const a = find(ix[t]); up[find(ix[t + 1])] = a; up[find(ix[t + 2])] = a; }
+  const pieces = new Map();
+  for (let t = 0; t < ix.length; t += 3) {
+    const r = find(ix[t]);
+    if (!pieces.has(r)) pieces.set(r, []);
+    pieces.get(r).push(ix[t], ix[t + 1], ix[t + 2]);
+  }
+  if (pieces.size < 2 || pieces.size > 400) return pieces.size; // (more than the list can sensibly show)
+  const parent = o.parent, made = [];
+  for (const c of [...o.children]) parent.attach(c);
+  for (const tris of [...pieces.values()].sort((a, b) => b.length - a.length)) { // biggest first
+    const m = new THREE.Mesh(compact(g, tris), ownMat.get(o));
+    m.name = `${o.name}_${made.length + 1}`;
+    m.position.copy(o.position);
+    m.quaternion.copy(o.quaternion);
+    m.scale.copy(o.scale);
+    ownMat.set(m, m.material);
+    parent.add(m);
+    made.push(m);
+  }
+  o.removeFromParent();
+  return made;
+}
+
+// these triangles of a geometry as a geometry of their own, with only the vertices they use
+function compact(g, tris) {
+  const remap = new Map(), index = tris.map(i => remap.get(i) ?? (remap.set(i, remap.size), remap.size - 1)), out = new THREE.BufferGeometry();
+  for (const [name, a] of Object.entries(g.attributes)) {
+    const b = new THREE.BufferAttribute(new (a.isInterleavedBufferAttribute ? a.data.array : a.array).constructor(remap.size * a.itemSize), a.itemSize, a.normalized);
+    for (const [from, to] of remap) for (let k = 0; k < a.itemSize; k++) b.setComponent(to, k, a.getComponent(from, k));
+    out.setAttribute(name, b);
+  }
+  out.setIndex(index);
+  return out;
+}
+
+// undo and redo: before each edit, a snapshot of the model's tree - every node's name, visibility, transform and
+// children. Split and delete only re-hang nodes and never change a geometry, so hanging the old ones back undoes them
+const undos = [], redos = [];
+function snapshot(label) {
+  const nodes = [];
+  model.traverse(o => nodes.push([o, o.name, o.visible, o.position.clone(), o.quaternion.clone(), o.scale.clone(), [...o.children]]));
+  return { label, nodes, len, mode, picked: [...selected] };
+}
+function remember(s) {
+  undos.push(s);
+  if (undos.length > 100) undos.shift();
+  redos.length = 0;
+  showHistory();
+}
+const edit = label => model && remember(snapshot(label));
+function step(from, to, done) {
+  const s = from.pop();
+  if (!s) return;
+  to.push(snapshot(s.label));
+  for (const [o, name, visible, p, q, k, kids] of s.nodes) {
+    Object.assign(o, { name, visible, children: [...kids] });
+    o.position.copy(p);
+    o.quaternion.copy(q);
+    o.scale.copy(k);
+    for (const c of kids) c.parent = o;
+  }
+  $('length').value = s.len;
+  selected.clear();
+  for (const o of s.picked) selected.add(o);
+  setMode(s.mode, true);
+  setStatus(`${done}: ${s.label}.`);
+  showHistory();
+}
+const undo = () => step(undos, redos, 'Undone'), redo = () => step(redos, undos, 'Redone');
+function showHistory() {
+  for (const [b, list, verb, keys] of [[$('undo'), undos, 'Undo', '⌘Z'], [$('redo'), redos, 'Redo', '⇧⌘Z']]) {
+    b.disabled = !list.length;
+    b.title = list.length ? `${verb} ${list.at(-1).label} (${keys})` : `Nothing to ${verb.toLowerCase()}`;
+  }
+}
+
+$('roles').innerHTML = ROLES.map(r => `<button data-role="${r.key}" title="${r.tip} (named ${r.name}1, ${r.name}2…)" disabled><span class="sw" style="background:${r.color}"></span>${r.label}</button>`).join('');
+$('roles').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  edit(`tag ${plural(selected.size, 'part')} as ${ROLE[b.dataset.role].label}`);
+  for (const o of selected) o.name = nextName(ROLE[b.dataset.role].name);
+  refresh();
+});
+$('parts').addEventListener('click', e => {
+  const li = e.target.closest('li');
+  if (!li) return;
+  const o = parts[li.dataset.i].o;
+  if (!e.target.closest('.eye')) return pick(o, e.shiftKey || e.metaKey || e.ctrlKey);
+  edit(`${o.visible ? 'hide' : 'show'} ${o.name || '(unnamed)'}`);
+  o.visible = !o.visible;
+  listParts();
+  showPicked();
+});
+$('parts').addEventListener('change', e => {
+  const o = parts[e.target.closest('li').dataset.i].o, name = e.target.value.trim();
+  if (name !== o.name) {
+    edit(`rename ${o.name || '(unnamed)'} to ${name || '(unnamed)'}`);
+    o.name = name;
+  }
+  refresh();
+});
+$('hide').onclick = () => {
+  const show = [...selected].every(o => !o.visible);
+  edit(`${show ? 'show' : 'hide'} ${plural(selected.size, 'part')}`);
+  for (const o of selected) o.visible = show;
+  listParts();
+  showPicked();
+};
+$('showall').onclick = () => {
+  if (parts.every(p => p.o.visible)) return;
+  edit('show all');
+  for (const p of parts) p.o.visible = true;
+  listParts();
+  showPicked();
+};
+$('delete').onclick = () => { edit(`delete ${plural(selected.size, 'part')}`); for (const o of selected) o.removeFromParent(); selected.clear(); refresh(true); };
+$('split').onclick = () => {
+  const before = snapshot(`split ${plural(selected.size, 'part')}`), made = [], whole = [];
+  for (const o of [...selected]) {
+    const r = splitLoose(o);
+    if (Array.isArray(r)) made.push(...r);
+    else whole.push(`${o.name || '(unnamed)'} (${r === 1 ? 'one piece' : `${r.toLocaleString()} pieces: cut it apart in Blender`})`);
+  }
+  if (made.length) remember(before); // (nothing split: nothing to undo)
+  selected.clear();
+  for (const m of made) selected.add(m);
+  refresh(true);
+  setStatus(`${made.length ? `Split into ${made.length} pieces, biggest first.` : ''}${whole.length ? ` Left whole: ${few(whole)}.` : ''}`.trim());
+};
+
+// a built-in car renamed to the template from its own drive.html patterns: each part by its first role (both lamps:
+// lamps_), the rest body_. A steering pattern wider than 0.6 m in all (the whole dash, searched near a point) isn't
+// the wheel: its parts go by their other roles, and the check then asks for the wheel cut out
+$('convert').onclick = () => {
+  edit('rename all to template');
+  const box = new THREE.Box3();
+  for (const p of parts) if (p.roles.includes('steering')) box.expandByObject(p.o);
+  const wheel = box.getSize(new THREE.Vector3()).x < 0.6;
+  const to = parts.map(p => [p.o, ROLE[roleKey(p.roles.filter(r => r !== 'steering' || wheel))].name]);
+  for (const [o] of to) o.name = '';
+  for (const [o, prefix] of to) o.name = nextName(prefix);
+  clearGroupRoles();
+  setMode('template');
+  setStatus(`Renamed ${to.length} parts to the template: the checks now read them the way they'd read an uploaded model.`);
+};
+
+$('export').onclick = async () => {
+  const roleView = $('roleview').checked;
+  $('roleview').checked = false;
+  paintRoles();
+  setStatus('Exporting…');
+  try { // hidden parts too: hiding is only for seeing past them
+    const glb = await new GLTFExporter().parseAsync(model, { binary: true, onlyVisible: false }), a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([glb], { type: 'model/gltf-binary' }));
+    a.download = `${fileName}-template.glb`;
+    a.click();
+    setStatus(`Exported ${a.download}, ${(glb.byteLength / 1048576).toFixed(1)} MB.`);
+  } catch (e) { setStatus(`Couldn't export: ${e.message || e}`); }
+  $('roleview').checked = roleView;
+  paintRoles();
+};
+
+const openFile = f => { $('builtin').value = ''; open(async () => loader.parseAsync(await f.arrayBuffer(), ''), f.name, null); };
+$('builtin').onchange = () => { const k = $('builtin').value; if (k) open(() => loader.loadAsync(CARS[k].model), CARS[k].model.split('/').pop().split('?')[0], k); };
+$('open').onclick = () => $('file').click();
+$('file').onchange = () => { const f = $('file').files[0]; $('file').value = ''; if (f) openFile(f); };
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) openFile(f); });
+for (const b of document.querySelectorAll('[data-mode]')) b.onclick = () => model && setMode(b.dataset.mode);
+for (const b of document.querySelectorAll('[data-turn]')) b.onclick = () => { if (!model) return; edit(`turn ${b.dataset.turn * 90}°`); model.rotation.y += b.dataset.turn * Math.PI / 2; refresh(true); };
+$('roleview').onchange = paintRoles;
+$('length').onchange = () => { edit(`real length ${len} → ${$('length').value} m`); refresh(true); };
+$('undo').onclick = undo;
+$('redo').onclick = redo;
+$('guide-roles').innerHTML = ROLES.map(r => `<tr><td><span class="sw" style="background:${r.color}"></span> ${r.label}</td><td><code>${r.name}1</code></td><td>${r.tip}</td></tr>`).join('');
+$('guide-btn').onclick = () => $('guide').showModal();
+addEventListener('keydown', e => {
+  if (!model || $('guide').open) return;
+  // ⌘Z / Ctrl+Z undoes, with Shift (or Ctrl+Y) redoes - except in a text box, which keeps them for its own typing
+  const key = e.key.toLowerCase();
+  if ((e.metaKey || e.ctrlKey) && (key === 'z' || key === 'y' && e.ctrlKey)) {
+    if (e.target.closest?.('input:not([type=checkbox])')) return;
+    e.preventDefault();
+    return key === 'y' || e.shiftKey ? redo() : undo();
+  }
+  if (e.target.closest?.('input, select')) return;
+  if (e.key === 'Escape') pick(null);
+  else if (e.key === 'h' && selected.size) $('hide').click();
+});
+
+// a click (not an orbit drag) on the car picks the part under it
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), shown = o => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e => down = [e.clientX, e.clientY]);
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!model || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(ndc.set((e.clientX - r.left) / r.width * 2 - 1, (r.top - e.clientY) / r.height * 2 + 1), camera);
+  pick(ray.intersectObject(model, true).find(h => shown(h.object))?.object, e.shiftKey || e.metaKey || e.ctrlKey);
+});
+showPicked();
+showHistory();
+</script>
+</body>
+</html>
