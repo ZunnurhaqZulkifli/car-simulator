@@ -369,7 +369,8 @@ const CARS = {
     wheels: /Wheel1A_3D/, tyre: /Wheel1A_3D/, // the calipers stay put
     // the wheel on its own (its spokes reach 9 cm behind the rim); the cluster in front of the binnacle's side walls,
     // which would clip the speedo and the small gauges, and over the model's own dials
-    steering: { re: /\|cabin_steering\|/, near: [-0.37, 0.889, 0.278], depth: 0.1, look: 0.12, inset: 0.15, size: 0.42 },
+    // + the hub's red R: a decal of the badge mesh (its other badges lie outside the wheel's disc, so stay put)
+    steering: { re: /\|cabin_steering\||^\w*_2017BadgeA_Material1\|/, near: [-0.37, 0.889, 0.278], depth: 0.1, look: 0.12, inset: 0.15, size: 0.42 },
     tail: { re: /LightA_Material1\|/, fromMap: true, idle: 0.25, brake: 6, keep: v => v.y > 0.7 && Math.abs(v.x) > 0.4 }, // the four round lamps
     lamps: { head: /LightA_Material1\|/, tail: /LightA_Material1\|/ },
     exhaustX: 0.61, exhaustBoth: true, // a pair of tips at each corner
