@@ -174,17 +174,27 @@
   .mute-fab:hover{ color:#fff; border-color:var(--red); }
   .mute-fab.muted{ color:var(--red); border-color:var(--red); }
   .mute-fab svg{ width:20px; height:20px; }
-  .warning-lights{
-    display:flex; justify-content:center; gap:22px;
-    margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid #151618;
-  }
-  .wl{ width:22px; height:22px; color:#2a1210; transition: color .2s, filter .2s; }
-  .wl svg{ width:100%; height:100%; display:block; }
-  .wl.on-red{ color:var(--red); filter:drop-shadow(0 0 6px rgba(232,64,42,.85)); }
-  .wl.on-amber{ color:var(--amber); filter:drop-shadow(0 0 6px rgba(255,157,46,.75)); }
-  .wl.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 6px rgba(79,168,255,.85)); }
+  /* tell-tales: the 6WA cluster's LEDs behind the dead-front (BMW ST1113 "F30 Displays, Indicators and Controls" p.8,
+     the F2x 6WA shares the layout), placed round the dials by their centres (tools/lamps/maps.mjs) in cqw of .dials.
+     The top row between the dials is .warning-lights (drive.html adds the arrows at its ends); unlit, all are invisible */
+  .wl-band{ height:37px; margin-bottom:18px; border-bottom:1px solid #151618; box-sizing:border-box; } /* the old lamp row's room: the cluster keeps its height */
+  .wl-face{ grid-column:1 / 4; grid-row:1; align-self:stretch; position:relative; z-index:3; pointer-events:none; }
+  .wl-face > .wl{ position:absolute; transform:translate(-50%,-50%); }
+  .warning-lights{ position:absolute; left:50.2cqw; top:1.46cqw; transform:translateX(-50%); display:flex; }
+  .warning-lights > .wl{ width:4.76cqw; height:4.76cqw; display:flex; align-items:center; justify-content:center; } /* one slot per lamp, as spaced on the cluster */
+  .wl{ opacity:0; color:#000; transition:opacity .12s, color 0s linear .12s, filter 0s linear .12s; } /* (its colour holds while it fades) */
+  .wl svg{ width:100%; height:100%; display:block; overflow:visible; }
+  .wl[class*="on-"]{ transition:opacity .12s; }
+  .wl.on-red{ opacity:1; color:#ff3b1f; filter:drop-shadow(0 0 2px rgba(255,60,30,.95)) drop-shadow(0 0 7px rgba(255,40,20,.55)); }
+  .wl.on-amber{ opacity:1; color:#ffb21e; filter:drop-shadow(0 0 2px rgba(255,170,30,.95)) drop-shadow(0 0 7px rgba(255,140,20,.5)); }
+  .wl.on-green{ opacity:1; color:#38f04a; filter:drop-shadow(0 0 2px rgba(60,240,80,.9)) drop-shadow(0 0 6px rgba(60,230,80,.45)); }
+  .wl.on-blue{ opacity:1; color:#3e8bff; filter:drop-shadow(0 0 2px rgba(70,140,255,.95)) drop-shadow(0 0 7px rgba(60,130,255,.5)); }
+  .wl.on-white{ opacity:1; color:#f2f4f6; filter:drop-shadow(0 0 2px rgba(240,245,255,.8)); }
+  .wl[data-cc][class*="on-"]{ filter:none; } /* check-control symbols are TFT pixels, no LED glow */
+  .wl[data-cc].on-red{ color:#ff2a1a; } .wl[data-cc].on-amber{ color:#ffb000; }
   .wl.blink{ animation: wlBlink 0.5s steps(1) infinite; }
-  @keyframes wlBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.15; } }
+  @keyframes wlBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.06; } }
+  .wl text{ font-family:Arial,sans-serif; font-weight:700; fill:currentColor; }
   .dyno-panel{
     margin-top:16px; padding:18px 20px 20px;
     background:#0a0a0a; border:1px solid #1c1c1c; border-radius:14px;
@@ -270,7 +280,6 @@
   .launch-indicator{ font-size:.6rem; letter-spacing:.14em; color:#ff9d2e; font-weight:800; font-family:"Courier New", monospace; text-shadow:0 0 6px rgba(255,157,46,.6); }
   .launch-blink{ animation: tcBlink .5s steps(1) infinite; }
   @keyframes tcBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.15; } }
-  .wl.on-green{ color:#3ddc6a; filter:drop-shadow(0 0 6px rgba(61,220,106,.8)); }
   button.lights-btn.active{ color:#04140a; background:#3ddc6a; border-color:#3ddc6a; }
   button.highbeam-btn.active{ color:#00101f; background:#4fa8ff; border-color:#4fa8ff; }
   /* headlights on: F20 night illumination - every printed dial marking lights up bright white with a soft
@@ -300,35 +309,7 @@
 <div class="page-layout">
 <div class="rig">
   <div class="cluster tft-off">
-    <div class="warning-lights">
-      <div class="wl" id="wl-engine" title="Check Engine">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v2.5M10 3v2.5M6 8h11l2 2v3l-2 1v3l-3 2H8l-3-2v-4H4V9h1z"/><circle cx="10" cy="14" r="1.4" fill="currentColor" stroke="none"/></svg>
-      </div>
-      <div class="wl" id="wl-battery" title="Battery">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="10" rx="1.5"/><path d="M8 8V6h2v2M14 8V6h2v2M7 13h3M13 13h4"/></svg>
-      </div>
-      <div class="wl" id="wl-oil" title="Oil Pressure">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"/></svg>
-      </div>
-      <div class="wl" id="wl-temp" title="Coolant Temperature">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v11.5"/><circle cx="12" cy="17.5" r="3"/><path d="M12 3a2 2 0 0 1 2 2v9.5h-4V5a2 2 0 0 1 2-2z"/></svg>
-      </div>
-      <div class="wl" id="wl-abs" title="ABS">
-        <svg viewBox="0 0 24 24" fill="none"><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="800" fill="currentColor" font-family="Arial">ABS</text><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-      </div>
-      <div class="wl" id="wl-tc" title="Traction Control">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13.5l1.5-4a2 2 0 0 1 1.9-1.3h7.2a2 2 0 0 1 1.9 1.3l1.5 4V16H5z"/><path d="M7.5 16v1.5M16.5 16v1.5"/><path d="M8.5 23c-1.2-1.2 1.2-2.3 0-3.5M15.5 23c-1.2-1.2 1.2-2.3 0-3.5"/></svg>
-      </div>
-      <div class="wl" id="wl-lowbeam" title="Headlights">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5L3 9.5M10 11L3 13M10 14.5L3 16.5"/></svg>
-      </div>
-      <div class="wl" id="wl-highbeam" title="High Beam">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5H3M10 10.5H3M10 13.5H3M10 16.5H3"/></svg>
-      </div>
-      <div class="wl" id="wl-belt" title="Seatbelt">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3"/><path d="M6 21c0-5 3-8 6-8s6 3 6 8"/><path d="M9 13l6 8M15 13l-6 8"/></svg>
-      </div>
-    </div>
+    <div class="wl-band"></div>
     <div class="dials">
 
       <!-- SPEEDOMETER (single km/h scale, BMW F20 style) -->
@@ -423,6 +404,7 @@
       </div>
 
       <!-- TACHOMETER with temp sub-gauge -->
+      <div class="wl-face"><div class="warning-lights"></div></div>
       <div class="dial-wrap">
         <svg viewBox="0 0 320 320" id="tach-svg">
           <circle cx="160" cy="160" r="157" fill="#020202"/>
@@ -1376,13 +1358,14 @@
     const gain = actx.createGain(); gain.gain.value = 0.0001;
     src.connect(shaper).connect(filter).connect(gain).connect(masterGain);
     gain.gain.setValueAtTime(0.0001, pt);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(0.6, peak)), pt + 0.003);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(2, peak)), pt + 0.003);
     gain.gain.exponentialRampToValueAtTime(0.0001, pt + dur);
     src.start(pt); src.stop(pt + dur + 0.02);
   }
   // how much the exhaust pops and bangs per drive mode - ECO PRO stays civil, Sport is the loudest (M5: Efficient /
   // Sport / Sport Plus)
   const POP_MODE = { eco:0, comfort:0.7, sport:1 };
+  const POP_GAIN = 4.5; // every pop and bang: at 1 they sat 2-7 dB over the coasting six and got lost (tools/pops)
   // rev cut: a short, deep cut bang the moment it's first hit, a couple of crackles behind it in Comfort / Sport
   function playLimiterHit(){
     if(!actx || !soundOn || layerVol.limiter <= 0.01) return;
@@ -1400,8 +1383,8 @@
             * (transmissionMode === 'S' || transmissionMode === 'M' ? 1 : 0.6) * POP_MODE[currentMode];
     if(k < 0.15) return;
     const t = actx.currentTime;
-    burst(t, 0.09, 520, 120, 1.2, 10, 0.42*k*layerVol.shiftPop);
-    burst(t + 0.03, 0.05, 1300, 300, 1.6, 7, 0.2*k*layerVol.shiftPop);
+    burst(t, 0.09, 520, 120, 1.2, 10, 0.42*k*layerVol.shiftPop*POP_GAIN);
+    burst(t + 0.03, 0.05, 1300, 300, 1.6, 7, 0.2*k*layerVol.shiftPop*POP_GAIN);
     CarDyno.pop(0, 0.5 + 0.5*k);
   }
   // downshift: the rev-match blip is the engine sound following rpm; it's chased by a scatter of pops as the throttle
@@ -1412,7 +1395,7 @@
     if(k < 0.1) return;
     const t = actx.currentTime, n = 2 + Math.floor(Math.random()*4);
     for(let i=0;i<n;i++){ const pt = t + 0.08 + Math.random()*0.25, bang = Math.random() < 0.3;
-      burst(pt, bang ? 0.11 : 0.05, bang ? 200 + Math.random()*150 : 700 + Math.random()*1000, bang ? 90 : 250, bang ? 1.1 : 1.6, bang ? 10 : 7, (bang ? 0.3 : 0.17)*k*layerVol.shiftPop*(0.5+Math.random()*0.5)); CarDyno.pop(pt - t, bang ? 1 : 0.5); }
+      burst(pt, bang ? 0.11 : 0.05, bang ? 200 + Math.random()*150 : 700 + Math.random()*1000, bang ? 90 : 250, bang ? 1.1 : 1.6, bang ? 10 : 7, (bang ? 0.3 : 0.17)*k*layerVol.shiftPop*POP_GAIN*(0.5+Math.random()*0.5)); CarDyno.pop(pt - t, bang ? 1 : 0.5); }
   }
 
   /* ================= STATE + PHYSICS (335 hp / 500 Nm turbo petrol I6) ================= */
@@ -1471,14 +1454,48 @@
   dynoCloseBtn.addEventListener('click', ()=> setDynoOpen(false));
   window.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !dynoPanel.classList.contains('dyno-collapsed')) setDynoOpen(false); });
 
-  const wlEngine = document.getElementById('wl-engine');
-  const wlBattery = document.getElementById('wl-battery');
-  const wlOil = document.getElementById('wl-oil');
-  const wlTemp = document.getElementById('wl-temp');
-  const wlAbs = document.getElementById('wl-abs');
-  const wlBelt = document.getElementById('wl-belt');
-  const wlTc = document.getElementById('wl-tc');
-  let bulbCheckUntil = 0; // engineOnTime value until which the startup bulb-check stays lit
+  /* ---- tell-tales: [id, title, centre x, y (cqw of .dials), symbol w x h (its own box; x .0995 = cqw), symbol, where].
+     Places from BMW's 6WA diagram (ST1113 p.8) through tools/lamps/maps.mjs, symbols the F80 page's (same KOMBI);
+     row = the top row between drive.html's arrows, cc = a check-control symbol the TFT draws (guessed slots) ---- */
+  const LAMPS = [
+    ['cruise', 'Cruise control', 0, 0, 30, 33, '<g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6.5 27.5a12 12 0 1 1 17 0"/><path d="M15 19.5l6.5-7"/><path d="M3.5 8.5l3 2.5M15 4.5v3.5M26.5 8.5l-3 2.5"/></g><circle cx="15" cy="19.5" r="2.4" fill="currentColor"/>', 'row'],
+    ['collision', 'Collision warning', 0, 0, 42, 33, '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M5 29V18l4-10.5h24L37 18v11"/><path d="M3 18h36v7H3z"/><path d="M5 29h5M32 29h5M10 7.5l-2 9h26l-2-9"/></g><circle cx="9" cy="21.5" r="1.8" fill="currentColor"/><circle cx="33" cy="21.5" r="1.8" fill="currentColor"/>', 'row'],
+    ['lim', 'Speed limiter', 0, 0, 31, 20, '<text x="15.5" y="17" text-anchor="middle" font-size="17.5" letter-spacing="-.5">LIM</text>', 'row'],
+    ['highbeam', 'High beam', 47.62, 15.14, 35, 26, '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 3c8 0 12 4.5 12 10s-4 10-12 10z" fill="currentColor"/><path d="M2 5h15M2 10.5h15M2 16h15M2 21.5h15"/></g>'],
+    ['dsc', 'DSC', 47.33, 27.98, 29, 32, '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l2.5-8h12l2.5 8M4 15h21v6H4zM7 21v2.5M22 21v2.5"/><path d="M5 31c2.5-2.2 0-3.6 2.5-6M19.5 31c2.5-2.2 0-3.6 2.5-6"/></g>'],
+    ['dscoff', 'DSC OFF', 52.49, 27.64, 26, 39, '<g fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l2.3-7h11.4l2.3 7M3.5 12h19v5.5h-19zM6.5 17.5v2M19.5 17.5v2"/><path d="M5 27c2.2-2 0-3.2 2.2-5.4M17.5 27c2.2-2 0-3.2 2.2-5.4"/></g><text x="13" y="38" text-anchor="middle" font-size="10">OFF</text>'],
+    ['brake', 'Parking brake / brake', 47.39, 32, 36, 26, '<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="18" cy="13" r="8.8"/><path d="M5.5 4a13 13 0 0 0 0 18M30.5 4a13 13 0 0 1 0 18M18 7.8v6.4"/></g><circle cx="18" cy="18" r="1.5" fill="currentColor"/>'],
+    ['tpms', 'Tyre pressure', 52.61, 32.23, 29, 30, '<g fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3C3.5 9 3.5 18 6 24.5h17C25.5 18 25.5 9 21.5 3"/><path d="M5 28h19M8 24.5l-1 3.5M12.5 24.5l-.6 3.5M16.5 24.5l.6 3.5M21 24.5l1 3.5M14.5 9v8"/></g><circle cx="14.5" cy="20.5" r="1.5" fill="currentColor"/>'],
+    ['side', 'Side lights', 4.1, 40.48, 34, 18, '<g fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M13 3.5a5.5 5.5 0 0 0 0 11M21 3.5a5.5 5.5 0 0 1 0 11"/><path d="M8.5 4.5L4 2M8.5 9H2.5M8.5 13.5L4 16M25.5 4.5L30 2M25.5 9h6M25.5 13.5L30 16"/></g>'],
+    ['fogf', 'Front fog lights', 4.45, 44.38, 35, 25, '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 3c7.5 0 11 4.5 11 9.5s-3.5 9.5-11 9.5z"/><path d="M3 6l13 3M3 12.5h13M3 19l13-3"/><path d="M9.5 1.5c-1.6 3.5 1.6 7 0 10.5s1.6 7 0 10.5"/></g>'],
+    ['fogr', 'Rear fog light', 8.98, 44.38, 34, 25, '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 3C5.5 3 2 7.5 2 12.5S5.5 22 13 22z"/><path d="M18 6.5h13M18 12.5h13M18 18.5h13"/><path d="M24.5 1.5c-1.6 3.5 1.6 7 0 10.5s1.6 7 0 10.5"/></g>'],
+    ['eps', 'Steering', 8.46, 48.8, 30, 29, '<g fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><circle cx="12" cy="15" r="10"/><circle cx="12" cy="15" r="3"/><path d="M2.5 13h6.5M15 13h6.5M12 18v6.5M26.5 5v12"/></g><circle cx="26.5" cy="22.5" r="1.6" fill="currentColor"/>'],
+    ['engine', 'Engine malfunction', 13.91, 48.51, 36, 22, '<path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" d="M8 5h7V2.5h-5M15 2.5h6M18 2.5V5h5l2.5 2.5h3V4.5h3v14h-3v-3H26l-3 3.5H11L8 15.5H5v3H2.5V8H5v3h3z"/>'],
+    ['belt', 'Seat belt', 19.01, 48.57, 19, 33, '<g fill="currentColor"><circle cx="9.5" cy="3.5" r="3"/><path d="M5.5 8.5h8l2.3 10H13l-.6 13H6.6L6 18.5H3.2z"/></g><path d="M14 8L4.6 19.5" stroke="#000" stroke-width="2.2" fill="none"/>'],
+    ['airbag', 'Airbag', 23.02, 48.51, 28, 29, '<g fill="currentColor"><circle cx="7" cy="5" r="3"/><path d="M3.5 10h6l3 6.5h6.5v3H11L8.5 14.5v12h-5z"/><circle cx="20.5" cy="9" r="6.2" opacity=".95"/></g>'],
+    ['abs', 'ABS', 28.13, 48.57, 32, 22, '<g fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="16" cy="11" r="8.6"/><path d="M4.2 3a12 12 0 0 0 0 16M27.8 3a12 12 0 0 1 0 16"/></g><text x="16" y="14.4" text-anchor="middle" font-size="8.4" letter-spacing="-.3">ABS</text>'],
+    // the TFT's check-control symbols, left of the temperature / clock (BMW's own: battery, oil can, thermometer in waves)
+    ['battery', 'Charging', 42.6, 35.6, 30, 21, '<g fill="none" stroke="currentColor" stroke-width="2.4"><rect x="2" y="5.5" width="26" height="14"/><path d="M6 12.5h6M18 12.5h6M21 9.5v6"/></g><path fill="currentColor" d="M5 1.5h5v4H5zM20 1.5h5v4h-5z"/>', 'cc'],
+    ['oil', 'Engine oil pressure', 45.9, 35.6, 36, 18, '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M2 7.5h5l2.5-2h8l12-3.5-9.5 11.5H8L2 10.5z"/><path d="M12.5 5.5V2.5M10 2.5h5"/></g><path fill="currentColor" d="M33.5 12.5c0 1.7-1 2.7-2 2.7s-2-1-2-2.7c0-1.4 2-4 2-4s2 2.6 2 4z"/>', 'cc'],
+    ['temp', 'Coolant temperature', 42.6, 38.8, 26, 24, '<g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M13 2v11M13 4.5h4.5M13 8h4.5M13 11.5h4.5"/><path d="M1.5 21.5c2.6-2 5 2 7.6 0s5-2 7.6 0 5 2 7.6 0"/></g><circle cx="13" cy="15.5" r="3" fill="currentColor"/>', 'cc'],
+  ];
+  const wl = {}, wlRow = document.querySelector('.warning-lights'), wlFace = document.querySelector('.wl-face');
+  LAMPS.forEach(([id, title, x, y, w, h, svg, where]) => {
+    const d = document.createElement('div'), size = `width:${(w*.0995).toFixed(2)}cqw;height:${(h*.0995).toFixed(2)}cqw`;
+    d.className = 'wl'; d.id = 'wl-' + id; d.title = title;
+    if(where === 'cc') d.dataset.cc = '';
+    if(where === 'row') d.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="${size}">${svg}</svg>`;
+    else { d.style.cssText = `left:${x}cqw;top:${y}cqw;${size}`; d.innerHTML = `<svg viewBox="0 0 ${w} ${h}">${svg}</svg>`; }
+    (where === 'row' ? wlRow : wlFace).appendChild(d); wl[id] = d;
+  });
+  const lamp = (n, cls) => { const c = cls ? 'wl ' + cls : 'wl'; if(n.className !== c) n.className = c; };
+  const lampsOff = () => Object.values(wl).forEach(w => lamp(w, ''));
+  // ?bulbs (or window.__bulbs = true): every lamp held on - for checking their places
+  const bulbsForced = () => window.__bulbs || /[?&]bulbs\b/.test(location.search);
+  const engineDead = () => CarTune.blown() || !!CarTune.ch.blown; // blown up: the ignition can stay on with it dead
+  const pFault = () => { for(const c of CarService.codes.values()) if(c.status === 'active' && c.code[0] === 'P') return true; return false; }; // an active powertrain code lights the MIL
+  const tyreLow = () => (CarService.parts.find(p => p.key === 'pressure')?.value || 0) > 60;
+  let svcLamp = null; // car-service.js's service light, moved onto the TFT once it exists
   const brakeBtn = document.getElementById('brake-btn');
   // sound toggle: a floating button in the sound-mixer corner (bottom-right)
   const muteBtn = document.createElement('button');
@@ -1552,7 +1569,6 @@
   // dial markings glow bright white), H / High toggles high beam (brings the lights on with it; lights off kills it).
   // Indicators and illumination only show with the ignition on, like the real cluster. ----
   const clusterEl = document.querySelector('.cluster');
-  const wlLowBeam = document.getElementById('wl-lowbeam'), wlHighBeam = document.getElementById('wl-highbeam');
   const lightsBtn = document.getElementById('lights-btn'), highBeamBtn = document.getElementById('highbeam-btn');
   let lightsOn = false, highBeamOn = false;
   function setLights(on, high){
@@ -1629,7 +1645,7 @@
     }
   }
   // one exhaust pop: a bang is longer, deeper and harder driven
-  const liftPop = (pt, bang, freq, peak) => { burst(pt, bang ? 0.13 : 0.05, freq, bang ? 90 : 200, bang ? 1.1 : 1.6, bang ? 10 : 7, peak); CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5); };
+  const liftPop = (pt, bang, freq, peak) => { burst(pt, bang ? 0.13 : 0.05, freq, bang ? 90 : 200, bang ? 1.1 : 1.6, bang ? 10 : 7, peak*POP_GAIN); CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5); };
   // a = forward drive accel (m/s^2) before drag
   function applyTraction(a, thr){
     if(launchState === 'engage') return 0; // drive still engaging - revs held, no pull yet
@@ -1717,8 +1733,7 @@
   CarService.startButton({ button: powerBtn, brake: () => sDown || spaceDown || mouseBrakeDown,
     state: () => ignition ? 'running' : keyOn ? 'on' : 'off',
     on(){
-      keyOn = true; keyT = 0;
-      bulbCheckUntil = 1.6; // all warning lights flash briefly, classic startup bulb-check
+      keyOn = true; keyT = 0; // keyT drives the bulb check
       initAudio();
       if(actx.state==='suspended') actx.resume();
       CarService.holdMessages(12); clearTimeout(chimeTimer); chimeTimer = setTimeout(() => { if(keyOn || ignition) playStartChime(); }, 1800); // chime a beat after the ignition comes on, like the real car
@@ -1733,7 +1748,7 @@
       powerBtn.classList.remove('active');
       throttleSlider.value=0; throttleVal.textContent='0%';
       setTransmission('D'); manualGearIdx=0;
-      [wlEngine,wlBattery,wlOil,wlTemp,wlAbs,wlBelt,wlTc].forEach(w=>w.className='wl');
+      lampsOff();
       setCruise(false);
     } });
   muteBtn.addEventListener('click', ()=>{
@@ -2227,7 +2242,7 @@
       powerBtn.classList.remove('active');
       throttleSlider.value = 0; throttleVal.textContent = '0%';
       setTransmission('D'); manualGearIdx = 0;
-      [wlEngine,wlBattery,wlOil,wlTemp,wlAbs,wlBelt,wlTc].forEach(w=>w.className='wl');
+      lampsOff();
       setCruise(false);
     }
 
@@ -2343,26 +2358,31 @@
     CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
       gearLabel: transmissionMode==='R' || transmissionMode==='N' ? transmissionMode : `${transmissionMode==='M' ? 'M' : (transmissionMode==='S' ? 'S' : 'D')}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
 
-    // ---- warning lights: startup bulb-check, then live conditions ----
-    if(!ignition && !keyOn){
-      // all off (handled on ignition-off click, nothing to do per-frame)
-    } else if(keyT < bulbCheckUntil){
-      [wlEngine,wlBattery,wlOil,wlTemp,wlAbs,wlBelt,wlTc].forEach(w=>w.className='wl on-red');
-    } else if(!ignition){
-      [wlEngine,wlBattery,wlOil,wlTemp,wlAbs,wlBelt,wlTc].forEach(w=>w.className='wl');
-      wlBattery.className = wlOil.className = 'wl on-red'; // engine off: no charge, no oil pressure
-    } else {
-      wlBattery.className = 'wl';
-      wlBelt.className = 'wl';
-      const overheating = coolantC > 112;
-      wlEngine.className = (overheating || wearPct > 50 || CarTune.warnLight()) ? 'wl on-red' : 'wl';
-      wlTemp.className = overheating ? 'wl on-red blink' : (coolantC < CarTune.tstat() - 5 ? 'wl on-blue' : 'wl'); // blue until the engine reaches operating temp
-      wlOil.className = (engineOnTime > 2 && oilPressureBar < 0.5) ? 'wl on-red blink' : 'wl';
-      wlAbs.className = (braking && speed > 5) ? 'wl on-amber blink' : 'wl';
-      wlTc.className = tcIntervening ? 'wl on-amber blink' : (dsc !== 'on' ? 'wl on-amber' : 'wl'); // flicker = DSC/DTC cutting power, solid = DTC or DSC off
-    }
-    wlLowBeam.className = ((ignition || keyOn) && lightsOn) ? 'wl on-green' : 'wl';
-    wlHighBeam.className = ((ignition || keyOn) && highBeamOn) ? 'wl on-blue' : 'wl';
+    // ---- tell-tales: the bulb check at key-on (~3 s; belt and air bag 6 s), then live. The MIL, charge and oil pressure
+    // stay lit until the engine runs (a blown one too), ABS + DSC until their self-check just after it starts. No coolant
+    // lamp on the F20: a hot engine is a TFT check-control symbol ----
+    if(!svcLamp && (svcLamp = wlRow.querySelector('[title="Service required"]'))){ svcLamp.dataset.cc = ''; svcLamp.style.cssText = 'left:45.9cqw;top:38.8cqw;width:2.2cqw;height:2.2cqw'; wlFace.appendChild(svcLamp); }
+    const kl15 = ignition || keyOn, bulbs = bulbsForced();
+    if(kl15 || bulbs){
+      const all = bulbs || keyT < 3, run = ignition && !engineDead(), self = !run || engineOnTime < 1.5;
+      lamp(wl.cruise, bulbs || cruiseActive ? 'on-green' : '');
+      lamp(wl.collision, bulbs ? 'on-red' : ''); lamp(wl.lim, bulbs ? 'on-white' : ''); // Driving Assistant / limiter cars only
+      lamp(wl.highbeam, bulbs || highBeamOn ? 'on-blue' : '');
+      lamp(wl.dsc, all || self ? 'on-amber' : tcIntervening ? 'on-amber blink' : ''); // flashes while DSC / DTC cut in
+      lamp(wl.dscoff, all || dsc !== 'on' ? 'on-amber' : ''); // DTC or DSC off
+      lamp(wl.brake, all || parked ? 'on-red' : '');
+      lamp(wl.tpms, all || tyreLow() ? 'on-amber' : '');
+      lamp(wl.side, bulbs || lightsOn ? 'on-green' : '');
+      lamp(wl.fogf, bulbs ? 'on-green' : ''); lamp(wl.fogr, bulbs ? 'on-amber' : '');
+      lamp(wl.eps, all ? 'on-amber' : '');
+      lamp(wl.engine, all || !run || wearPct > 50 || CarTune.warnLight() || pFault() ? 'on-amber' : ''); // incl. limp mode
+      lamp(wl.belt, bulbs || keyT < 6 ? 'on-red' : '');
+      lamp(wl.airbag, bulbs || keyT < 6 ? 'on-red' : '');
+      lamp(wl.abs, all || self ? 'on-amber' : '');
+      lamp(wl.battery, bulbs || !run ? 'on-red' : '');
+      lamp(wl.oil, bulbs || !run || (engineOnTime > 2 && oilPressureBar < 0.5) ? 'on-red' : '');
+      lamp(wl.temp, bulbs || coolantC > 112 ? 'on-red' : '');
+    } else lampsOff();
     clusterEl.classList.toggle('lit', (ignition || keyOn) && lightsOn);
 
     // ---- telemetry mini-graphs: sample at a throttled rate, always running regardless of dyno state ----

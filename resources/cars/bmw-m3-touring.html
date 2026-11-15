@@ -89,12 +89,6 @@
   body[data-mmode="track"] .road-only{ opacity:0; }
   .road-only{ transition: opacity .5s; }
   .cluster:not(.on) .road-only{ opacity:0; }
-  /* tell-tales drawn inside the TFT */
-  .tt{ color:#141716; transition: color .2s, filter .2s; }
-  .tt.on-red{ color:var(--red); filter:drop-shadow(0 0 5px rgba(232,64,42,.85)); }
-  .tt.on-amber{ color:#ffc21a; filter:drop-shadow(0 0 5px rgba(255,194,26,.7)); }
-  .tt.on-green{ color:#a6e22e; filter:drop-shadow(0 0 5px rgba(140,220,40,.7)); }
-  .tt.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 5px rgba(79,168,255,.85)); }
   /* M setup strip (engine / chassis / steering) + the selection list that pops up on a change */
   .su-val{ font:400 14px var(--ui); fill:#dfe4ea; }
   .su-ico{ fill:none; stroke:#cfd6dc; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
@@ -124,17 +118,24 @@
   .acc-on .acc-bar{ opacity:1; filter:drop-shadow(0 0 4px rgba(42,165,230,.8)); }
   .refused{ animation: wlBlink .18s steps(1) 4; }
 
-  /* ---------- warning lights strip (top of the TFT) ---------- */
+  /* ---------- the strip over the cluster: keeps its row for car-service's service light and drive.html's arrows (both
+     unlit = invisible); the real tell-tales are #os-lamps in the SVG ---------- */
   .warning-lights{ display:flex; justify-content:center; gap:18px; padding:2px 0 2px; position:relative; z-index:1; }
-  .wl{ width:19px; height:19px; color:#0e0f11; transition: color .2s, filter .2s; }
+  .wl{ width:19px; height:19px; color:transparent; transition: color .2s, filter .2s; }
   .wl svg{ width:100%; height:100%; display:block; }
   .wl.on-red{ color:var(--red); filter:drop-shadow(0 0 6px rgba(232,64,42,.85)); }
   .wl.on-amber{ color:var(--amber); filter:drop-shadow(0 0 6px rgba(255,157,46,.75)); }
   .wl.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 6px rgba(79,168,255,.85)); }
   .wl.on-green{ color:var(--green); filter:drop-shadow(0 0 6px rgba(61,220,106,.8)); }
-  .wl.blink, .tt.blink{ animation: wlBlink 0.5s steps(1) infinite; }
+  .wl.blink{ animation: wlBlink 0.5s steps(1) infinite; }
   @keyframes wlBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.15; } }
   .launch-blink{ animation: wlBlink .5s steps(1) infinite; }
+  /* OS7 tell-tales are TFT pixels: flat colour (the .tt hues, sampled off the reference photo), no glow, nothing when off */
+  .lp{ opacity:0; }
+  .lp.on{ opacity:1; }
+  .lp.blink{ animation: lpFlash .5s steps(1) infinite; }
+  @keyframes lpFlash{ 0%,49%{ opacity:1; } 50%,100%{ opacity:0; } }
+  .lp-red{ color:var(--red); } .lp-yellow{ color:#ffc21a; } .lp-green{ color:#a6e22e; } .lp-blue{ color:#4fa8ff; }
 
   /* ---------- drive deck ---------- */
   .deck{
@@ -301,31 +302,10 @@
 <div class="page-layout">
 <div class="rig">
   <div class="cluster" id="cluster">
+    <!-- the driving page flashes the first [data-turn] pair it finds: these, mirrored onto the TFT's own arrows -->
+    <i data-turn="1" hidden></i><i data-turn="-1" hidden></i>
     <div class="warning-lights">
-      <div class="wl" id="wl-engine" title="Check Engine">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v2.5M10 3v2.5M6 8h11l2 2v3l-2 1v3l-3 2H8l-3-2v-4H4V9h1z"/><circle cx="10" cy="14" r="1.4" fill="currentColor" stroke="none"/></svg>
-      </div>
-      <div class="wl" id="wl-battery" title="12V Battery">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="10" rx="1.5"/><path d="M8 8V6h2v2M14 8V6h2v2M7 13h3M13 13h4"/></svg>
-      </div>
-      <div class="wl" id="wl-oil" title="Oil Pressure">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"/></svg>
-      </div>
-      <div class="wl" id="wl-temp" title="Coolant Temperature">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v11.5"/><circle cx="12" cy="17.5" r="3"/><path d="M12 3a2 2 0 0 1 2 2v9.5h-4V5a2 2 0 0 1 2-2z"/></svg>
-      </div>
-      <div class="wl" id="wl-abs" title="ABS">
-        <svg viewBox="0 0 24 24" fill="none"><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="800" fill="currentColor" font-family="Arial">ABS</text><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-      </div>
-      <div class="wl" id="wl-tc" title="DSC">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13.5l1.5-4a2 2 0 0 1 1.9-1.3h7.2a2 2 0 0 1 1.9 1.3l1.5 4V16H5z"/><path d="M7.5 16v1.5M16.5 16v1.5"/><path d="M8.5 23c-1.2-1.2 1.2-2.3 0-3.5M15.5 23c-1.2-1.2 1.2-2.3 0-3.5"/></svg>
-      </div>
-      <div class="wl" id="wl-belt" title="Seatbelt">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3"/><path d="M6 21c0-5 3-8 6-8s6 3 6 8"/><path d="M9 13l6 8M15 13l-6 8"/></svg>
-      </div>
-      <div class="wl" id="wl-fuel" title="Low Fuel">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12"/><rect x="6.5" y="6" width="5" height="4" fill="currentColor" stroke="none"/><path d="M14 8h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V9l-2-2"/></svg>
-      </div>
+      <div class="wl" aria-hidden="true"></div>
     </div>
 
     <!-- G81 Live Cockpit Professional, OS7 Sport layout, laid out from the reference photo (photo px - (20,600) =
@@ -436,11 +416,6 @@
       </g>
       <g id="cruise-marker"></g>
 
-      <!-- ===== tell-tales inside the TFT, left edge ===== -->
-      <g class="tt" id="wl-highbeam" transform="translate(18,238)"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4c5.5 0 9 4 9 8s-3.5 8-9 8z"/><path d="M12 6.5H3M12 10.5H3M12 14.5H3M12 18.5H3"/></g></g>
-      <g class="tt" id="wl-lowbeam" transform="translate(18,276)"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4c5.5 0 9 4 9 8s-3.5 8-9 8z"/><path d="M12 6.5L3 9M12 11L3 13.5M12 15.5L3 18"/></g></g>
-      <g class="tt" id="tt-park" transform="translate(23,384)"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="13" cy="12" r="9"/><path d="M5 4.5a12 12 0 0 0 0 15M21 4.5a12 12 0 0 1 0 15"/></g><text x="13" y="16.5" text-anchor="middle" style="font:700 12px Arial;fill:currentColor;">P</text></g>
-      <text class="tt" id="tt-autoh" x="40" y="434" text-anchor="middle" style="font:700 15px var(--cond);fill:currentColor;letter-spacing:-.02em;">AUTO H</text>
       <!-- ///M -->
       <g transform="translate(96,398)">
         <g transform="skewX(-24)">
@@ -616,8 +591,8 @@
         <path class="acc-bar" d="M714 432 H772 L758 470 H696Z"/><path class="acc-bar" d="M782 432 H840 L826 470 H764Z"/>
       </g>
       <text id="cruise-set" x="700" y="458" text-anchor="middle" class="os-txt live" style="font-size:18px;font-weight:700;"></text>
-      <!-- seat-belt status: red belt figure + the car from above -->
-      <g class="live road-only">
+      <!-- seat-belt status: red belt figure + the car from above (the belt warning: shown with the bulb check) -->
+      <g class="live road-only" id="belt-g">
         <g transform="translate(846,436)" fill="#e0242c"><circle cx="9" cy="3.5" r="3.4"/><path d="M3 22c0-8 2.5-13 6-13s6 5 6 13z"/><path d="M4 9l10 9" stroke="#000" stroke-width="1.6"/></g>
         <g transform="translate(878,433)">
           <path d="M6 15 Q6 3 24 2 L80 2 Q102 3 104 15 Q102 27 80 28 L24 28 Q6 27 6 15Z" fill="#c9ced4"/>
@@ -634,6 +609,8 @@
         <text id="mode-sm" x="18" y="5" style="font:700 12px var(--cond);fill:#ff9d2e;letter-spacing:.06em;"></text>
       </g>
       <g id="temp-g" class="live"></g>
+      <!-- ===== tell-tales: drawn on the TFT down its left and right edges (#os-lamps, built in the script) ===== -->
+      <g id="os-lamps"></g>
     </svg>
   </div>
 
@@ -843,8 +820,6 @@
     const t = el('text', { x:cx, y:cy + h/2, 'text-anchor':'middle', class:'os-num' + (cls ? ' ' + cls : ''), style:`font-size:${(h/CAP).toFixed(2)}px;stroke-width:${round}px;--sx:${sx};${style}` });
     t.textContent = text; g.appendChild(t); return t;
   }
-  // SVG elements can't take .className - tell-tales inside the TFT go through this
-  const setTT = (e, on) => e.setAttribute('class', 'tt' + (on ? ' ' + on : ''));
 
   /* ---------------- SPEEDOMETER: blue chevron, 0-150 in 30s then 210/270/330 (uneven, as on the car) ----------------
      The outer line runs top (213,47) -> apex (133,190) -> bottom (256,410); the band is the 54 px strip inside it.
@@ -1163,7 +1138,9 @@
     if(actx) return;
     actx = new (window.AudioContext||window.webkitAudioContext)();
     masterGain = actx.createGain(); masterGain.gain.value = soundOn ? MASTER_BASE*layerVol.master : 0;
-    masterGain.connect(actx.destination);
+    const clip = actx.createWaveShaper(); // safety soft clip for the loudest bangs: untouched below -6 dBFS (a compressor's makeup gain would lift it all)
+    clip.curve = Float32Array.from({ length: 1025 }, (_, i) => { const x = i/512 - 1, a = Math.abs(x); return a < 0.5 ? x : Math.sign(x)*(0.5 + 0.5*Math.tanh(2*a - 1)); });
+    masterGain.connect(clip).connect(actx.destination);
     fetch('/audio/bmw-chime.mp3').then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b))
       .then(b => { chimeBuf = b; if(chimeWanted && ignition) playStartChime(); }).catch(() => {}); // chime is optional - no file, no chime
     const noise = noiseBuffer(2);
@@ -1403,7 +1380,7 @@
     const gain = actx.createGain(); gain.gain.value = 0.0001;
     src.connect(shaper).connect(filter).connect(gain).connect(dest || popBus);
     gain.gain.setValueAtTime(0.0001, pt);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(0.6, peak)), pt + 0.003);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(8, peak)), pt + 0.003);
     gain.gain.exponentialRampToValueAtTime(0.0001, pt + dur);
     src.start(pt); src.stop(pt + dur + 0.02);
   }
@@ -1454,6 +1431,7 @@
     const ms = Math.max(0, (pt - actx.currentTime)*1000);
     setTimeout(() => { carRear.classList.add('pop'); clearTimeout(popFlashT); popFlashT = setTimeout(() => carRear.classList.remove('pop'), 70); }, ms);
   }
+  const POP_GAIN = 18; // every pop and bang: at 1 they sat under the six's own level (the M5 CS's levels; tools/pops)
   // rev limiter: the first slam into the cut is a sharp bang; flaps open it adds a couple of crackles behind it
   function playLimiterHit(){
     if(!actx || !soundOn || layerVol.limiter <= 0.01) return;
@@ -1468,8 +1446,8 @@
     const k = clamp01((rpmAtShift - 3.5)/(REDLINE - 3.5)) * clamp01(load*1.4) * (drivelogic === 3 ? 1 : 0.6) * (setup.engine === 'sportplus' ? 1 : 0.7);
     if(k < 0.15) return;
     const t = actx.currentTime;
-    burst(t, 0.08, 600, 140, 1.2, 10, 0.4*k*layerVol.shiftPop);
-    burst(t + 0.025, 0.045, 1500, 350, 1.6, 7, 0.2*k*layerVol.shiftPop);
+    burst(t, 0.08, 600, 140, 1.2, 10, 0.4*k*layerVol.shiftPop*POP_GAIN);
+    burst(t + 0.025, 0.045, 1500, 350, 1.6, 7, 0.2*k*layerVol.shiftPop*POP_GAIN);
     flashTips(t);
     CarDyno.pop(0, 0.5 + 0.5*k);
   }
@@ -1481,7 +1459,7 @@
     if(k < 0.1) return;
     const t = actx.currentTime, n = 2 + Math.floor(Math.random()*4);
     for(let i=0;i<n;i++){ const pt = t + 0.08 + Math.random()*0.25, bang = Math.random() < 0.3;
-      burst(pt, bang ? 0.1 : 0.045, bang ? 240 + Math.random()*160 : 900 + Math.random()*1200, bang ? 100 : 300, bang ? 1.1 : 1.6, bang ? 10 : 7, (bang ? 0.28 : 0.16)*k*layerVol.shiftPop*(0.5+Math.random()*0.5));
+      burst(pt, bang ? 0.1 : 0.045, bang ? 240 + Math.random()*160 : 900 + Math.random()*1200, bang ? 100 : 300, bang ? 1.1 : 1.6, bang ? 10 : 7, (bang ? 0.28 : 0.16)*k*layerVol.shiftPop*POP_GAIN*(0.5+Math.random()*0.5));
       if(bang) flashTips(pt); CarDyno.pop(pt - t, bang ? 1 : 0.5); }
   }
 
@@ -1576,10 +1554,56 @@
   window.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !dynoPanel.classList.contains('dyno-collapsed')) setDynoOpen(false); });
 
 
-  const wlEngine = $('wl-engine'), wlBattery = $('wl-battery'), wlOil = $('wl-oil'), wlTemp = $('wl-temp');
-  const wlAbs = $('wl-abs'), wlBelt = $('wl-belt'), wlTc = $('wl-tc'), wlFuel = $('wl-fuel');
-  const wlLowBeam = $('wl-lowbeam'), wlHighBeam = $('wl-highbeam'), ttPark = $('tt-park'), ttAutoH = $('tt-autoh');
-  const mainLights = [wlEngine,wlBattery,wlOil,wlTemp,wlAbs,wlBelt,wlTc];
+  /* ---- tell-tales: OS7 (G81 pre-OS8) - the lamp set, symbols and colours of BMW ST1855 "Displays and Controls 2018" p.25
+     fig. TE18-0859, all drawn on the TFT. The M layout moves them to the display's outer edges: low beam, (P) and AUTO H are
+     where the reference photo shows them lit (size too: ~40 px); the rest follow ST1855's column order, ~38 px apart, the
+     right edge mirroring the left (guess). Charge, oil pressure, coolant and low fuel are check-control messages (the info
+     field's head line), not lamps. ---- */
+  const LAMP_ICON = {
+    turnL: '<path d="M2 12l9-8v5h11v6H11v5z" fill="currentColor" stroke="none"/>',
+    turnR: '<path d="M22 12l-9-8v5H2v6h11v5z" fill="currentColor" stroke="none"/>',
+    high: '<path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5H3M10 10.5H3M10 13.5H3M10 16.5H3"/>',
+    low: '<path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5L3 9.5M10 11L3 13M10 14.5L3 16.5"/>',
+    hba: '<path d="M11 6.5c3.4 0 6 2.4 6 5.5s-2.6 5.5-6 5.5z"/><path d="M8.5 8.5H3M8.5 11.5H3M8.5 14.5H3"/><path d="M17.5 11l2.2-6 2.2 6M18.3 9h2.8" stroke-width="1.4"/>',
+    side: '<path d="M8 7.5a4.5 4.5 0 0 0 0 9M16 7.5a4.5 4.5 0 0 1 0 9"/><path d="M5 9L2 8M5 12H1.5M5 15l-3 1M19 9l3-1M19 12h3.5M19 15l3 1"/>',
+    lane: '<path d="M4 3v3M4 9v3M4 15v3M4 21v1M20 3v3M20 9v3M20 15v3M20 21v1"/><path d="M8.5 19V9.5l1.5-3h4l1.5 3V19zM8.5 15h7"/>',
+    brake: '<circle cx="12" cy="12" r="6.5"/><path d="M5 5.5a9 9 0 0 0 0 13M19 5.5a9 9 0 0 1 0 13M12 8.5v4.5"/><circle cx="12" cy="15.6" r=".6" fill="currentColor"/>',
+    tpms: '<path d="M5 6.5c-2 3.5-2 7.5 0 11h14c2-3.5 2-7.5 0-11M5 20h14M12 9v4.5"/><circle cx="12" cy="16" r=".6" fill="currentColor"/>',
+    abs: '<circle cx="12" cy="12" r="7"/><path d="M4 5.5a9 9 0 0 0 0 13M20 5.5a9 9 0 0 1 0 13"/><text x="12" y="14.6" text-anchor="middle" font-size="6.6" font-weight="800" font-family="Arial" fill="currentColor" stroke="none">ABS</text>',
+    dsc: '<path d="M5 12.5l1.5-4a2 2 0 0 1 1.9-1.3h7.2a2 2 0 0 1 1.9 1.3l1.5 4V15H5z"/><path d="M7.5 15v1.5M16.5 15v1.5"/><path d="M8.5 22c-1.2-1.2 1.2-2.3 0-3.5M15.5 22c-1.2-1.2 1.2-2.3 0-3.5"/>',
+    dscoff: '<path d="M5 10.5l1.5-4a2 2 0 0 1 1.9-1.3h7.2a2 2 0 0 1 1.9 1.3l1.5 4V13H5z"/><path d="M8.5 17c-1 -1 1-2 0-3M15.5 17c-1-1 1-2 0-3"/><text x="12" y="23" text-anchor="middle" font-size="6.4" font-weight="800" font-family="Arial" fill="currentColor" stroke="none">OFF</text>',
+    autoh: '<text x="12" y="15" text-anchor="middle" font-size="8" font-weight="700" font-family="Arial" fill="currentColor" stroke="none">AUTO H</text>',
+    park: '<circle cx="12" cy="12" r="7"/><path d="M4 5.5a9 9 0 0 0 0 13M20 5.5a9 9 0 0 1 0 13"/><text x="12" y="15.3" text-anchor="middle" font-size="9" font-weight="800" font-family="Arial" fill="currentColor" stroke="none">P</text>',
+    eps: '<circle cx="11" cy="12" r="7"/><circle cx="11" cy="12" r="2"/><path d="M4.5 10.5h4.5M13 10.5h4.5M11 14v5"/><path d="M21 7v6"/><circle cx="21" cy="16" r=".6" fill="currentColor"/>',
+    ffog: '<path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 8L3 9.5M10 12L3 13.5M10 16L3 17.5"/><path d="M7 5.5c-1 2 1 3.5 0 6.5s1 4.5 0 7"/>',
+    rfog: '<path d="M11 5.5c-4.2 0-7.5 2.9-7.5 6.5s3.3 6.5 7.5 6.5z"/><path d="M14 9h7M14 12h7M14 15h7"/><path d="M17 5.5c-1 2 1 3.5 0 6.5s1 4.5 0 7"/>',
+    mil: '<path d="M14 3v2.5M10 3v2.5M6 8h11l2 2v3l-2 1v3l-3 2H8l-3-2v-4H4V9h1z"/><circle cx="10" cy="14" r="1.4" fill="currentColor" stroke="none"/>',
+    airbag: '<circle cx="8" cy="5" r="2.3"/><path d="M4 21v-6a4.5 4.5 0 0 1 8 -2.5l2 3h4"/><circle cx="18.5" cy="9" r="4.2"/>'
+  };
+  // [key, x, y, colour, icon, size]
+  const LAMPS = [
+    ['eps', 32, 135, 'yellow', 'eps', 42], ['turnL', 32, 173, 'green', 'turnL', 40], ['high', 32, 211, 'blue', 'high', 48], ['hba', 32, 249, 'green', 'hba', 48],
+    ['low', 30, 287, 'green', 'low', 54], ['side', 32, 323, 'green', 'side', 42], ['brake', 36, 359, 'red', 'brake', 42],
+    ['park', 38, 397, 'red', 'park', 52], ['autoh', 42, 426, 'green', 'autoh', 38],
+    ['lane', 1368, 118, 'green', 'lane', 38], ['turnR', 1368, 156, 'green', 'turnR', 40], ['ffog', 1368, 194, 'green', 'ffog', 46], ['rfog', 1368, 232, 'yellow', 'rfog', 46],
+    ['mil', 1368, 270, 'yellow', 'mil', 44], ['dscoff', 1368, 309, 'yellow', 'dscoff', 40], ['dsc', 1368, 349, 'yellow', 'dsc', 40],
+    ['abs', 1368, 389, 'yellow', 'abs', 42], ['tpms', 1368, 428, 'yellow', 'tpms', 40],
+    ['airbag', 998, 447, 'red', 'airbag', 32]]; // the bottom row: right of the belt + seats graphic
+  const lamp = {};
+  LAMPS.forEach(([k, x, y, col, icon, size]) => {
+    const lg = el('g', { class:`lp lp-${col}`, transform:`translate(${x - size/2} ${y - size/2}) scale(${size/24})` });
+    lg.innerHTML = `<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${LAMP_ICON[icon]}</g>`;
+    $('os-lamps').appendChild(lg); lamp[k] = lg;
+  });
+  // ?bulbs (or window.__bulbs = true) holds every lamp on, as the bulb check shows them - for checking their places
+  if(/[?&]bulbs\b/.test(location.search)) window.__bulbs = true;
+  const lampState = {};
+  const lampSet = (k, on, blink) => { const v = on ? (blink ? 2 : 1) : 0; if(lampState[k] === v) return; lampState[k] = v;
+    lamp[k].classList.toggle('on', v > 0); lamp[k].classList.toggle('blink', v === 2); };
+  const lampsOff = () => Object.keys(lamp).forEach(k => lampSet(k, false));
+  const turnOn = {}; // what the driving page has lit on the [data-turn] pair
+  document.querySelectorAll('.cluster > i[data-turn]').forEach(p => new MutationObserver(() => { turnOn[p.dataset.turn] = p.classList.contains('on-green'); }).observe(p, { attributes:true, attributeFilter:['class'] }));
+  const beltG = $('belt-g');
   let bulbCheckUntil = 0;
   const brakeBtn = $('brake-btn'), muteBtn = $('mute-btn'), refuelBtn = $('refuel-btn');
   const transDBtn = $('trans-d-btn'), transNBtn = $('trans-n-btn'), transRBtn = $('trans-r-btn');
@@ -1853,7 +1877,7 @@
     }
   }
   // one exhaust pop: distorted noise burst through a falling bandpass (a bang is longer, deeper, harder driven)
-  const liftPop = (pt, bang, freq, peak) => { burst(pt, bang ? 0.11 : 0.045, freq, bang ? 100 : 230, bang ? 1.1 : 1.6, bang ? 10 : 7, peak); if(bang) flashTips(pt); CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5); };
+  const liftPop = (pt, bang, freq, peak) => { burst(pt, bang ? 0.11 : 0.045, freq, bang ? 100 : 230, bang ? 1.1 : 1.6, bang ? 10 : 7, peak*POP_GAIN); if(bang) flashTips(pt); CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5); };
 
   // ---- fuel: 59 L tank, 8 L reserve ----
   const TANK_SIZE_L = 59, RESERVE_L = 8, REFUEL_RATE = 0.12, PETROL_KG_PER_L = 0.745;
@@ -1895,7 +1919,7 @@
     clusterEl.classList.remove('on');
     throttleSlider.value = 0; throttleVal.textContent = '0%';
     setTransmission('D'); shift = null;
-    mainLights.forEach(w=>w.className='wl');
+    lampsOff();
     setCruise(false);
   }
   const SND_ON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M19.5 5.5a9 9 0 0 1 0 13"/></svg>';
@@ -2295,26 +2319,31 @@
       chassis: ['comfort','sport','sportplus'].indexOf(setup.chassis) }); // the dampers, soft (0) to firm (2): the driving page's body roll and pitch
 
     // ---- warning lights ----
-    if(ignition && engineOnTime < bulbCheckUntil) mainLights.forEach(w=>w.className='wl on-red');
-    else if(ignition){
-      wlBattery.className = !running ? 'wl on-red' : 'wl';
-      wlBelt.className = 'wl';
-      const overheating = coolantC > 112;
-      wlEngine.className = (overheating || wearPct > 50 || CarTune.warnLight()) ? 'wl on-red' : 'wl';
-      wlTemp.className = overheating ? 'wl on-red blink' : (coolantC < CarTune.tstat() - 5 ? 'wl on-blue' : 'wl');
-      wlOil.className = !running ? 'wl on-red' : (crankT > 2 && oilPressureBar < 0.5) ? 'wl on-red blink' : 'wl';
-      wlAbs.className = (braking > 60 && speed > 5) ? 'wl on-amber blink' : 'wl';
-      wlTc.className = tcIntervening ? 'wl on-amber blink' : (dsc !== 'on' ? 'wl on-amber' : 'wl'); // solid = MDM / off, flicker = cutting in
-    }
-    wlFuel.className = (ignition && rangeKm <= 0) ? 'wl on-amber' : 'wl';
-    setTT(wlLowBeam, ignition && lightsOn ? 'on-green' : '');
-    setTT(wlHighBeam, ignition && highBeamOn ? 'on-blue' : '');
-    setTT(ttPark, ignition && gearStr === 'P' ? 'on-red' : '');
-    setTT(ttAutoH, ignition && speed < 0.5 && (gearIdx >= 0 || braking > 0) ? 'on-green' : (ignition ? 'on-amber' : ''));
+    // the bulb check at key-on (~3 s; belt and airbag 6 s), then live
+    const allOn = !!window.__bulbs || (ignition && engineOnTime < 3), seatsOn = allOn || (ignition && engineOnTime < 6);
+    const alive = running && !CarTune.blown(), selfCheck = ignition && (!alive || crankT < 2.5); // the DME / DSC lamps hold until it runs
+    const partAt = k => CarService.parts.find(p => p.key === k)?.value || 0;
+    lampSet('mil', allOn || selfCheck || (ignition && (coolantC > 112 || wearPct > 50 || CarTune.warnLight())));
+    lampSet('abs', allOn || selfCheck);
+    lampSet('dsc', allOn || selfCheck || (ignition && tcIntervening), !allOn && !selfCheck && tcIntervening); // flashes while it cuts in
+    lampSet('dscoff', allOn || (ignition && dsc !== 'on')); // DSC off / MDM
+    lampSet('brake', allOn || (ignition && (partAt('brake') >= 100 || partAt('fluid') >= 100)));
+    lampSet('park', allOn || (ignition && gearStr === 'P')); // guess: P stands in for the electric parking brake (the photo: P + AUTO H)
+    lampSet('autoh', allOn || (ignition && speed < 0.5)); // holding at a standstill
+    lampSet('tpms', allOn || (ignition && partAt('pressure') > 60));
+    lampSet('airbag', seatsOn);
+    if(beltG.style.display !== (seatsOn ? '' : 'none')) beltG.style.display = seatsOn ? '' : 'none'; // the belt reminder + seats
+    lampSet('low', allOn || (ignition && lightsOn));
+    lampSet('high', allOn || (ignition && highBeamOn));
+    ['eps', 'side', 'lane', 'hba', 'ffog', 'rfog'].forEach(k => lampSet(k, allOn)); // not modelled: the bulb check only
+    lampSet('turnL', allOn || !!turnOn[1]); lampSet('turnR', allOn || !!turnOn[-1]);
 
     // ---- info field head line: status messages take it over, else the trip computer title ----
     let status = '', statusCol = '#eef1f4';
-    if(launchState !== 'idle'){ status = 'Launch Control'; statusCol = '#ff4a3a'; }
+    if(running && !alive){ status = 'Engine oil pressure! Stop'; statusCol = '#ff3322'; } // dead with the ignition held on: no oil pressure, no charging
+    else if(alive && crankT > 2 && oilPressureBar < 0.5){ status = 'Engine oil pressure'; statusCol = '#ff3322'; }
+    else if(ignition && coolantC > 112){ status = 'Engine temperature'; statusCol = '#ff3322'; }
+    else if(launchState !== 'idle'){ status = 'Launch Control'; statusCol = '#ff4a3a'; }
     else if(launchHint){ status = 'Launch: M gate + DSC MDM / off'; statusCol = '#ffc21a'; }
     else if(ignition && rangeKm <= 5){ status = 'Low fuel'; statusCol = '#ff3322'; }
     else if(running && REDLINE < NORMAL_REDLINE){ status = `Engine warming up · ${REDLINE.toFixed(1)}k`; statusCol = '#ff9d2e'; }

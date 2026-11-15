@@ -77,12 +77,12 @@ php artisan storage:link   # public/storage -> storage/app/public, so the car fi
 php artisan db:seed        # BMW 550D, Proton Iriz, BMW 320D, M140i xDrive, 530e xDrive
 ```
 
-Then register the other nine, all of them drivable in 3D. This copies each page into storage only if it isn't
+Then register the other twelve, all of them drivable in 3D. This copies each page into storage only if it isn't
 there yet, and adds the car only if it's missing, so it's safe to run again:
 
 ```sh
 php artisan tinker --execute '
-$cars = ["bmw-x1-xdrive20d" => "BMW X1 xDrive20d", "bmw-m3-touring" => "BMW M3 Touring", "bmw-m5-cs" => "BMW M5 CS", "bmw-550d-mk2" => "BMW M550d xDrive", "bmw-m5-e60" => "BMW M5 E60", "porsche-911-gt3-rs" => "Porsche 911 GT3 RS", "bmw-335i-e90" => "BMW 335i", "honda-nsx-r" => "Honda NSX-R", "nissan-gt-r-nismo" => "Nissan GT-R NISMO"];
+$cars = ["bmw-x1-xdrive20d" => "BMW X1 xDrive20d", "bmw-m3-touring" => "BMW M3 Touring", "bmw-m5-cs" => "BMW M5 CS", "bmw-550d-mk2" => "BMW M550d xDrive", "bmw-m5-e60" => "BMW M5 E60", "porsche-911-gt3-rs" => "Porsche 911 GT3 RS", "bmw-335i-e90" => "BMW 335i", "honda-nsx-r" => "Honda NSX-R", "nissan-gt-r-nismo" => "Nissan GT-R NISMO", "audi-rs6-avant" => "Audi RS 6 Avant performance", "bmw-m3-f80" => "BMW M3 F80", "bmw-x3-m40i" => "BMW X3 M40i"];
 foreach ($cars as $slug => $name) {
     $path = "cars/$slug.html";
     Storage::disk("public")->exists($path) || Storage::disk("public")->put($path, file_get_contents(resource_path($path)));
@@ -141,6 +141,7 @@ While you work on the garage's styles, `composer dev` runs Vite and the other de
 | `/` | Nordschleife lap timer and leaderboard |
 | `\` | time & weather (or click the clock in the HUD) |
 | `;` | drift mode |
+| `]` | settings: graphics (FPS cap, resolution, textures, view distance), camera (FOV, chase distance / height, head position), audio (wind, crash and indicator tick volume, 0-200 %), the phone pad's connection log |
 
 Each car's own keys (xDrive, DSC, M modes, maps, Drivelogic…) are listed on its page and in the car menu.
 
@@ -175,7 +176,7 @@ Each car's own keys (xDrive, DSC, M modes, maps, Drivelogic…) are listed on it
 
 URL options for `public/drive.html`:
 - `?car={slug}`
-- `&at=pits`, `&at=ring`, `&at=bay<n>` or `&at=home2` to start in a pit garage, at the Nordschleife, in a car park bay or at the Westhaven home
+- `&at=pits`, `&at=ring`, `&at=bay<n>`, `&at=home2`, `&at=home3` or `&at=home4` to start in a pit garage, at the Nordschleife, in a car park bay, at the Westhaven home, the Kuantan home or the Genting safe house
 - `&hour=0-3&season=…&sky=…` to set the time and weather
 - `&test_drive=1` to drive without saving
 
@@ -207,7 +208,9 @@ https.
 4. **On the phone,** paste the link into Safari, hold the phone sideways like a wheel, tap **Start driving**, and allow
    **Motion & Orientation** access. Add it to the Home Screen to get rid of Safari's bars.
 
-The relay log is `storage/logs/pad-relay.log`. Useful commands:
+The relay log is `storage/logs/pad-relay.log` (timestamped: connects, drops with close code and idle time, heartbeat
+timeouts, and the phone's own events). The drive page's **Settings › Pad** (`]`) shows the same story merged from the
+phone, the relay and the drive page. Useful commands:
 - Restart the login agent: `launchctl kickstart -k gui/$(id -u)/test.sim-app.pad`
 - Remove it: `launchctl bootout gui/$(id -u)/test.sim-app.pad`
 
@@ -227,9 +230,10 @@ The relay log is `storage/logs/pad-relay.log`. Useful commands:
 - **Setup tab** (**M Setup** on M cars): the car's other keys. Hidden on a car that has none.
 - **Lights tab:** lights, high beam, headlight brightness.
 - **View tab:** drag to look around, chase / in-car, Reset view.
+- **Settings** (the gear in the header): opens the drive page's `]` Settings; lit while it's open.
 - **Extras:**
   - Tab and Esc.
-  - **Map:** the whole world, your car, a legend, and tap-to-teleport.
+  - **Map:** the whole world, your car, a legend, and tap-to-teleport. Drag to move it, pinch to zoom, twist with two fingers to turn it; double-tap for the whole of it, north up.
   - **Weather:** the time & weather menu.
   - **Sound:** Mute and every sound layer's slider. They appear once the engine has been started.
   - **Mouse** (step 8).
@@ -285,9 +289,11 @@ changed those in System Settings › Keyboard › Keyboard Shortcuts › Mission
 | Progress "doesn't save" | Only the latest-opened page of a car may save, so an old tab can't overwrite newer progress. Close the others and reload |
 | Pad: *Can't reach the Mac* | The relay isn't running (`npm run pad:install`), or Tailscale is off on one side |
 | Pad: *Open the drive page on the Mac* | The relay is up, but no drive page is open at `http://sim-app.test` |
+| Pad drops mid-drive | `]` › **Pad** on the drive page: the log shows whether the phone went to the background (`hidden`), lost the network (`offline`, `ws-close` 1006), went silent (`stale`, `client-timeout`) or the drive page did. The ms readout beside the pad's status dot shows the link's lag live |
 | Pad: *Tilt steering is off* | Open the https link (not http), and allow Motion & Orientation for Safari in Settings |
 | Mouse: *Needs Accessibility* or nothing moves | Step 8.2 for the right process, then Turn on again; the relay's log shows each step (`pad mouse: …`) |
 | *Couldn't save this car* after updating | Run `php artisan migrate` (new columns, such as `handling`) and reload the car |
 | Self-check failures | The drive page and the shared scripts check themselves on load; failures show in the browser's console |
+| The Genting / Kuantan run is bare (no hills or roads past Gombak) | Its land and roads come from `public/js/karak.js` and `karak-terrain.bin`: hard-reload. Rebuilding them from OpenStreetMap is optional (`tools/karak/README.md`: Node, curl and ImageMagick) |
 
 Run the test suite with `composer test`.

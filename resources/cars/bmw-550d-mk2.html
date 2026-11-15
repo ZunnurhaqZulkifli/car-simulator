@@ -97,16 +97,18 @@
   body[data-mode="sport"] #scale-groove-s, body[data-mode="sport"] #scale-groove-t{ stroke:#5a1410; }
 
   /* ---------- warning lights strip (top of the TFT) ---------- */
-  /* LED tell-tales behind a smoked strip in the bezel (the X1's): faintly printed while dark, glowing once lit */
-  .warning-lights{ display:flex; justify-content:center; gap:16px; width:fit-content; margin:0 auto 6px; padding:6px 18px; position:relative; z-index:1;
-    border-radius:10px; border:1px solid #1d1f23; background:linear-gradient(180deg,#131417 0%,#0b0c0e 100%); box-shadow:inset 0 1px 0 rgba(255,255,255,.04); }
-  .wl{ width:19px; height:19px; color:#2a2b2f; transition: color .2s, filter .2s; }
+  /* ---------- telltales (6WB, BMW fig. TE15-0720): unlit they don't show - TFT pixels, or LEDs behind the black glass.
+     .warning-lights is the TFT's top row (in the SVG, user units): fogs + high beam, drive.html's turn arrows at its ends ---------- */
+  .warning-lights{ display:flex; justify-content:space-between; align-items:center; width:100%; height:100%; }
+  .wl{ width:30px; height:30px; opacity:0; color:#888; }
   .wl svg{ width:100%; height:100%; display:block; }
-  .wl.on-red{ color:#ff3b26; filter:drop-shadow(0 0 5px rgba(255,59,38,.85)); }
-  .wl.on-amber{ color:var(--amber); filter:drop-shadow(0 0 5px rgba(255,157,46,.75)); }
-  .wl.on-blue{ color:#4fa8ff; filter:drop-shadow(0 0 5px rgba(79,168,255,.85)); }
-  .wl.on-green{ color:#3ddc6a; filter:drop-shadow(0 0 5px rgba(61,220,106,.8)); }
-  .wl.blink{ animation: wlBlink 0.5s steps(1) infinite; }
+  .wl.on-red, .wl.on-amber, .wl.on-blue, .wl.on-green, .lp.on{ opacity:1; }
+  .wl.on-red, .lp-red{ color:#ff2b1c; } .wl.on-amber, .lp-yellow{ color:#ffb200; } .wl.on-blue, .lp-blue{ color:#2c6cff; } .wl.on-green, .lp-green{ color:#35d24f; }
+  .wl-slot{ width:30px; } /* the real row's free slot right of the rear fog; CarService's service wrench takes it */
+  .wl-slot:has(~ [title="Service required"]){ display:none; }
+  .lp{ opacity:0; }
+  .lp.blink{ animation: ttBlink .5s steps(1) infinite; }
+  @keyframes ttBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:0; } }
   @keyframes wlBlink{ 0%,49%{ opacity:1; } 50%,100%{ opacity:.15; } }
   .launch-blink{ animation: wlBlink .5s steps(1) infinite; }
 
@@ -237,8 +239,6 @@
   }
   @media (max-width:640px){
     .cluster{ padding:10px 8px 6px; border-radius:60px 60px 24px 24px / 40px 40px 24px 24px; }
-    .warning-lights{ gap:9px; }
-    .wl{ width:15px; height:15px; }
     .subgauge-grid{ grid-template-columns:1fr 1fr; }
     .dyno-content-row{ flex-direction:column; }
     .telemetry-grid{ width:100%; flex:none; }
@@ -262,45 +262,6 @@
 <div class="page-layout">
 <div class="rig">
   <div class="cluster" id="cluster">
-    <div class="warning-lights">
-      <div class="wl" id="wl-lowbeam" title="Headlights">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5L3 9.5M10 11L3 13M10 14.5L3 16.5"/></svg>
-      </div>
-      <div class="wl" id="wl-highbeam" title="High Beam">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5H3M10 10.5H3M10 13.5H3M10 16.5H3"/></svg>
-      </div>
-      <div class="wl" id="wl-glow" title="Pre-glow">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 9c0-2 2-3 3-1.5S8.5 9 9.5 7.5 12 6 12 9M12 9c0-2 2-3 3-1.5s2.5 1.5 3.5 0S21 6 21 9"/><path d="M4 13h16M6 13v4M18 13v4M12 13v6"/></svg>
-      </div>
-      <div class="wl" id="wl-fuel" title="Low Fuel">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M4 21h12"/><rect x="7" y="6" width="6" height="4.5"/><path d="M15 8h2a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V9l-2.5-2.5"/></svg>
-      </div>
-      <div class="wl" id="wl-engine" title="Check Engine">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3v2.5M10 3v2.5M6 8h11l2 2v3l-2 1v3l-3 2H8l-3-2v-4H4V9h1z"/><circle cx="10" cy="14" r="1.4" fill="currentColor" stroke="none"/></svg>
-      </div>
-      <div class="wl" id="wl-battery" title="12V Battery">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="18" height="10" rx="1.5"/><path d="M8 8V6h2v2M14 8V6h2v2M7 13h3M13 13h4"/></svg>
-      </div>
-      <div class="wl" id="wl-oil" title="Oil Pressure">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h4l2-2h5l7-2-6 9H6l-3-3z"/><path d="M14 9V7M11 7h6"/><path d="M21 15.5c0 1-.7 1.6-1.4 1.6s-1.4-.6-1.4-1.6c0-.8 1.4-2.6 1.4-2.6s1.4 1.8 1.4 2.6z"/></svg>
-      </div>
-      <div class="wl" id="wl-temp" title="Coolant Temperature">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v11.5"/><circle cx="12" cy="17.5" r="3"/><path d="M12 3a2 2 0 0 1 2 2v9.5h-4V5a2 2 0 0 1 2-2z"/><path d="M15 7h3M15 10h3M4 20c1.5 1 3 1 4.5 0M15.5 20c1.5 1 3 1 4.5 0"/></svg>
-      </div>
-      <div class="wl" id="wl-belt" title="Seatbelt">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="5" r="2.4"/><path d="M8 21v-6.5C8 11 9.8 9 12 9s4 2 4 5.5V21"/><path d="M9 9.8l6 7.2"/></svg>
-      </div>
-      <div class="wl" id="wl-abs" title="ABS">
-        <svg viewBox="0 0 24 24" fill="none"><text x="12" y="15.5" text-anchor="middle" font-size="8.5" font-weight="800" fill="currentColor" font-family="Arial">ABS</text><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6.5a10 10 0 0 0 0 11M20.5 6.5a10 10 0 0 1 0 11" stroke="currentColor" stroke-width="1.5"/></svg>
-      </div>
-      <div class="wl" id="wl-tc" title="DSC">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13.5l1.5-4a2 2 0 0 1 1.9-1.3h7.2a2 2 0 0 1 1.9 1.3l1.5 4V16H5z"/><path d="M7.5 16v1.5M16.5 16v1.5"/><path d="M8.5 23c-1.2-1.2 1.2-2.3 0-3.5M15.5 23c-1.2-1.2 1.2-2.3 0-3.5"/></svg>
-      </div>
-      <div class="wl" id="wl-dscoff" title="DSC OFF">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10.5l1.3-3.3a1.8 1.8 0 0 1 1.7-1.2h8a1.8 1.8 0 0 1 1.7 1.2l1.3 3.3V13H5z"/><path d="M8 15.5c-1 -1 1 -2 0 -3"/><text x="12" y="22.5" text-anchor="middle" font-size="6.6" font-weight="800" fill="currentColor" stroke="none" font-family="Arial">OFF</text></svg>
-      </div>
-    </div>
-
     <!-- G30 "Live Cockpit" TFT: one canvas, like the real 12.3" screen. Speedo left, rev counter /
          rev counter right, fuel + fuel-consumption arcs tucked outside them, clock top-centre,
          the perspective "road" info field + odometer bottom-centre. -->
@@ -501,6 +462,18 @@
       <g id="cons-bar" class="live"></g>
       <!-- range under the fuel arc -->
       <text x="214" y="496" text-anchor="middle" class="live"><tspan id="fuel-range" class="disp-txt" style="font-size:24px;font-weight:700;">640</tspan><tspan class="disp-dim" style="font-size:12px;"> km</tspan></text>
+      <!-- telltales (BMW fig. TE15-0720): the TFT's top row - turn arrows (drive.html) at its ends - then the rest from JS -->
+      <defs><filter id="tt-halo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.4"/></filter></defs>
+      <foreignObject x="452" y="11" width="296" height="30" style="overflow:visible">
+        <div class="warning-lights" xmlns="http://www.w3.org/1999/xhtml">
+          <div class="wl lp lp-green" id="wl-ffog" title="Front fog lights"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 8L3 9.5M10 12L3 13.5M10 16L3 17.5"/><path d="M7 5.5c-1 2 1 3.5 0 6.5s1 4.5 0 7"/></svg></div>
+          <div class="wl lp lp-green" id="wl-hba" title="High-beam assistant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 6.5c3.4 0 6 2.4 6 5.5s-2.6 5.5-6 5.5z"/><path d="M8.5 8.5H3M8.5 11.5H3M8.5 14.5H3"/><path d="M17.5 11l2.2-6 2.2 6M18.3 9h2.8" stroke-width="1.4"/></svg></div>
+          <div class="wl lp lp-blue" id="wl-high" title="High beam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5c4.2 0 7.5 2.9 7.5 6.5s-3.3 6.5-7.5 6.5z"/><path d="M10 7.5H3M10 10.5H3M10 13.5H3M10 16.5H3"/></svg></div>
+          <div class="wl lp lp-yellow" id="wl-rfog" title="Rear fog light"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5.5c-4.2 0-7.5 2.9-7.5 6.5s3.3 6.5 7.5 6.5z"/><path d="M14 9h7M14 12h7M14 15h7"/><path d="M17 5.5c-1 2 1 3.5 0 6.5s1 4.5 0 7"/></svg></div>
+          <i class="wl-slot"></i>
+        </div>
+      </foreignObject>
+      <g id="tt-lamps"></g>
     </svg>
     <div class="gearrow" style="display:none;"><span id="gear-letter">P</span><span id="gear-num" style="display:none;">1</span></div>
   </div>
@@ -1206,7 +1179,7 @@
     src.onended = () => CarService.holdMessages(0); // dashboard messages wait for the chime to finish
     src.connect(g).connect(masterGain); src.start();
   }
-  const layerVol = { chime:0.8, fan:0.7, master:1, rasp:1, body:1, turbo:1, turbo2:1, turbo3:1, turboJet:0.75, zf:1, intake:1, bov:1, exhaust:1, limiter:0.75, shiftPop:0.7, liftCrackle:0.8 };
+  const layerVol = { chime:0.8, fan:0.7, master:1, rasp:1, body:1, turbo:1, turbo2:1, turbo3:1, turboJet:0.75, zf:1, intake:1, bov:1, exhaust:1, limiter:0.75 };
 
   function makeDistortionCurve(amount){
     const n = 2048;
@@ -1430,8 +1403,6 @@
         { id:'intake', label:'Intake',            value:layerVol.intake, set:setTrim('intake') },
         { id:'exhaust',label:'Exhaust',           value:layerVol.exhaust,set:setTrim('exhaust') },
         { id:'limiter',label:'Rev Limiter',       value:layerVol.limiter,set:(f)=>{ layerVol.limiter=f; } },
-        { id:'liftCrackle',label:'Lift-off Crackle',value:layerVol.liftCrackle,set:(f)=>{ layerVol.liftCrackle=f; } },
-        { id:'shiftPop',label:'Upshift Pop',      value:layerVol.shiftPop,set:(f)=>{ layerVol.shiftPop=f; } },
         { id:'chime',  label:'Startup Chime',     value:layerVol.chime,  set:(f)=>{ layerVol.chime=f; } },
         { id:'fan',    label:'Radiator Fan',      value:layerVol.fan,    set:(f)=>{ layerVol.fan=f; fanTrim.gain.setTargetAtTime(f, actx.currentTime, 0.03); } },
       ],
@@ -1593,46 +1564,6 @@
   }
 
 
-  // upshift pop: a quick burst of exhaust crackle right on gear-up, like a DSG "fart" - only really
-  // audible on a genuinely hard shift. Gated on the rpm the engine was actually AT when it shifted
-  // (not instantaneous throttle position, which a manual paddle-click may or may not coincide with,
-  // and which a light-throttle auto upshift can still cross even at low rpm) - a low-rev shift (D
-  // comfort/eco light-throttle) stays quiet, a shift held up near redline (D sport WOT, or holding a
-  // gear in M) cracks off properly, in both D and M alike. A few short, sharp distorted noise pops in
-  // rapid succession, each a bit quieter than the last, rather than one smooth swell. Adjustable via
-  // the 'shiftPop' sound-mixer layer.
-  function playUpshiftPop(rpmAtShift, boost){
-    if(!actx || !soundOn) return;
-    const amt = layerVol.shiftPop;
-    if(amt <= 0.01) return;
-    const rpmFactor = Math.max(0, Math.min(1, (rpmAtShift - 3.0) / (REV_LIMIT_K - 3.0)));
-    const loadFactor = Math.min(1, rpmFactor*0.85 + Math.max(0,boost)/STOCK_BOOST_MAX*0.25);
-    if(loadFactor < 0.15) return; // no crackle on a low-rev, gentle upshift
-    const t = actx.currentTime;
-    const popCount = 2 + Math.round(loadFactor*2); // 2-4 pops, more under harder load
-    for(let i=0;i<popCount;i++){
-      const pt = t + i*(0.022 + Math.random()*0.01); // tight, rapid-fire spacing - much snappier than a lazy drawn-out brap
-      CarDyno.pop(pt - t, 0.5 + 0.5*loadFactor);
-      const bufSize = Math.floor(actx.sampleRate * 0.12);
-      const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
-      const data = buf.getChannelData(0);
-      for(let j=0;j<bufSize;j++) data[j] = Math.random()*2-1;
-      const src = actx.createBufferSource(); src.buffer = buf;
-      const shaper = actx.createWaveShaper(); shaper.curve = makeDistortionCurve(7); shaper.oversample='2x';
-      const filter = actx.createBiquadFilter(); filter.type='bandpass'; filter.Q.value=1.3;
-      filter.frequency.setValueAtTime(500 - i*40, pt);
-      filter.frequency.exponentialRampToValueAtTime(140, pt+0.05);
-      const gain = actx.createGain(); gain.gain.value = 0.0001;
-      src.connect(shaper).connect(filter).connect(gain).connect(masterGain);
-      const peak = Math.max(0.001, Math.min(0.5, (0.16 + loadFactor*0.28) * amt) * (1 - i*0.18));
-      gain.gain.setValueAtTime(0.0001, pt);
-      gain.gain.exponentialRampToValueAtTime(peak, pt+0.003);
-      gain.gain.exponentialRampToValueAtTime(0.0001, pt+0.06);
-      src.start(pt);
-      src.stop(pt+0.08);
-    }
-  }
-
   /* ================= STATE + PHYSICS (300 hp / 500 Nm diesel) ================= */
   const throttleSlider = document.getElementById('throttle');
   const throttleVal = document.getElementById('throttle-val');
@@ -1691,13 +1622,60 @@
   dynoCloseBtn.addEventListener('click', ()=> setDynoOpen(false));
   window.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !dynoPanel.classList.contains('dyno-collapsed')) setDynoOpen(false); });
 
-  const wlEngine = document.getElementById('wl-engine');
-  const wlBattery = document.getElementById('wl-battery');
-  const wlOil = document.getElementById('wl-oil');
-  const wlTemp = document.getElementById('wl-temp');
-  const wlAbs = document.getElementById('wl-abs');
-  const wlBelt = document.getElementById('wl-belt');
-  const wlTc = document.getElementById('wl-tc'), wlDscOff = document.getElementById('wl-dscoff'), wlGlow = document.getElementById('wl-glow');
+  // ---- telltales: BMW ST1501 "G12 Displays and Controls" p.13 fig. TE15-0720, the 6WB KOMBI the pre-LCI G30 shares, mapped onto
+  // this TFT by an affine on the dials, clock and side gauges (tools/lamps/g2/fit-g30.mjs; top and bottom rows pulled in to fit).
+  // The top row (HTML, above), belts, airbag, lane, steering, AUTO H and the fuel pump are TFT pixels; the side and bottom lamps
+  // are LED chambers in the black glass round the TFT (soft halo). No fixed oil / charge / coolant / glow lamps on the 6WB:
+  // check-control symbols in the info field (the glow one is a guess - the G30 delays the start while it pre-heats).
+  const LAMP_ICON = {
+    turnL: '<path d="M2 12l9-8v5h11v6H11v5z" fill="currentColor" stroke="none"/>',
+    turnR: '<path d="M22 12l-9-8v5H2v6h11v5z" fill="currentColor" stroke="none"/>',
+    side: '<path d="M8 7.5a4.5 4.5 0 0 0 0 9M16 7.5a4.5 4.5 0 0 1 0 9"/><path d="M5 9L2 8M5 12H1.5M5 15l-3 1M19 9l3-1M19 12h3.5M19 15l3 1"/>',
+    lane: '<path d="M4 3v3M4 9v3M4 15v3M4 21v1M20 3v3M20 9v3M20 15v3M20 21v1"/><path d="M8.5 19V9.5l1.5-3h4l1.5 3V19zM8.5 15h7"/>',
+    brake: '<circle cx="12" cy="12" r="6.5"/><path d="M5 5.5a9 9 0 0 0 0 13M19 5.5a9 9 0 0 1 0 13M12 8.5v4.5"/><circle cx="12" cy="15.6" r=".6" fill="currentColor"/>',
+    tpms: '<path d="M5 6.5c-2 3.5-2 7.5 0 11h14c2-3.5 2-7.5 0-11M5 20h14M12 9v4.5"/><circle cx="12" cy="16" r=".6" fill="currentColor"/>',
+    abs: '<circle cx="12" cy="12" r="7"/><path d="M4 5.5a9 9 0 0 0 0 13M20 5.5a9 9 0 0 1 0 13"/><text x="12" y="14.6" text-anchor="middle" font-size="6.6" font-weight="800" font-family="Arial" fill="currentColor" stroke="none">ABS</text>',
+    dsc: '<path d="M5 12.5l1.5-4a2 2 0 0 1 1.9-1.3h7.2a2 2 0 0 1 1.9 1.3l1.5 4V15H5z"/><path d="M7.5 15v1.5M16.5 15v1.5"/><path d="M8.5 22c-1.2-1.2 1.2-2.3 0-3.5M15.5 22c-1.2-1.2 1.2-2.3 0-3.5"/>',
+    dscoff: '<path d="M5 10.5l1.5-4a2 2 0 0 1 1.9-1.3h7.2a2 2 0 0 1 1.9 1.3l1.5 4V13H5z"/><path d="M8.5 17c-1 -1 1-2 0-3M15.5 17c-1-1 1-2 0-3"/><text x="12" y="23" text-anchor="middle" font-size="6.4" font-weight="800" font-family="Arial" fill="currentColor" stroke="none">OFF</text>',
+    autoh: '<text x="12" y="15" text-anchor="middle" font-size="8" font-weight="700" font-family="Arial" fill="currentColor" stroke="none">AUTO H</text>',
+    park: '<circle cx="12" cy="12" r="7"/><path d="M4 5.5a9 9 0 0 0 0 13M20 5.5a9 9 0 0 1 0 13"/><text x="12" y="15.3" text-anchor="middle" font-size="9" font-weight="800" font-family="Arial" fill="currentColor" stroke="none">P</text>',
+    eps: '<circle cx="11" cy="12" r="7"/><circle cx="11" cy="12" r="2"/><path d="M4.5 10.5h4.5M13 10.5h4.5M11 14v5"/><path d="M21 7v6"/><circle cx="21" cy="16" r=".6" fill="currentColor"/>',
+    mil: '<path d="M14 3v2.5M10 3v2.5M6 8h11l2 2v3l-2 1v3l-3 2H8l-3-2v-4H4V9h1z"/><circle cx="10" cy="14" r="1.4" fill="currentColor" stroke="none"/>',
+    belt: '<circle cx="12" cy="5" r="2.5"/><path d="M7 21v-6.5a5 5 0 0 1 10 0V21"/><path d="M9 9.5l6.5 8"/>',
+    rbelt: '<g transform="translate(-6.5 3) scale(.55)"><circle cx="12" cy="5" r="2.5"/><path d="M7 21v-6.5a5 5 0 0 1 10 0V21"/></g><g transform="translate(5.5 3) scale(.55)"><circle cx="12" cy="5" r="2.5"/><path d="M7 21v-6.5a5 5 0 0 1 10 0V21"/></g><g transform="translate(17.5 3) scale(.55)"><circle cx="12" cy="5" r="2.5"/><path d="M7 21v-6.5a5 5 0 0 1 10 0V21"/></g>',
+    airbag: '<circle cx="8" cy="5" r="2.3"/><path d="M4 21v-6a4.5 4.5 0 0 1 8 -2.5l2 3h4"/><circle cx="18.5" cy="9" r="4.2"/>',
+    fuel: '<g transform="translate(12 12)"><path d="M-8 9V-7a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2V9M-10 9h15" stroke-width="1.6"/><rect x="-5.5" y="-6" width="6" height="4" fill="currentColor" stroke="none"/><path d="M3 -4h2.5a1.5 1.5 0 0 1 1.5 1.5V4a1.5 1.5 0 0 0 3 0V-3l-2-2" stroke-width="1.6"/></g>',
+    oil: '<path d="M2.5 9.5l3.5 1.5V16h10.5l5-6.5-5.5 1.5-1.5-2H8.5L6.5 10.5"/><path d="M11 9V7M8.5 7h5"/><path d="M21.3 12.5c0 1-.7 1.7-.7 2.3a.7.7 0 0 0 1.4 0c0-.6-.7-1.3-.7-2.3z" fill="currentColor"/>',
+    batt: '<rect x="3" y="7.5" width="18" height="11" rx="1"/><path d="M6.5 7.5V5.5h3v2M14.5 7.5V5.5h3v2"/><path d="M6 13h4M8 11v4M14 13h4"/>',
+    coolant: '<path d="M12 3v10.5"/><path d="M12 4.5h3.5M12 7.5h2.5M12 10.5h3.5"/><circle cx="12" cy="15.5" r="2.2" fill="currentColor"/><path d="M2.5 20.5c1.6-1.2 3.2-1.2 4.8 0s3.2 1.2 4.8 0 3.2-1.2 4.8 0 3.2 1.2 4.8 0"/>',
+    glow: '<path d="M2.5 8v5M2.5 10.5H6M21.5 8v5M21.5 10.5H18"/><path d="M6 10.5c0-3 1.5-3.5 2-1.5s0 5 1.3 5 1.4-6 2.7-6 1.4 6 2.7 6 .8-3 1.3-5 2-1.5 2 1.5"/>'
+  };
+  // [key, x, y, colour, icon, size, led]: LED chambers L/R of the side gauges and under them, the rest TFT
+  const LAMPS = [
+    ['hazL', 29, 181, 'green', 'turnL', 30, 1], ['abs', 29, 234, 'yellow', 'abs', 30, 1], ['side', 29, 338, 'green', 'side', 30, 1],
+    ['hazR', 1171, 181, 'green', 'turnR', 30, 1], ['park', 1171, 234, 'red', 'park', 30, 1], ['dscoff', 1171, 338, 'yellow', 'dscoff', 30, 1],
+    ['mil', 110, 486, 'yellow', 'mil', 30, 1], ['tpms', 145, 486, 'yellow', 'tpms', 30, 1], ['dsc', 1055, 486, 'yellow', 'dsc', 30, 1], ['brake', 1090, 486, 'yellow', 'brake', 30, 1],
+    ['lane', 147, 129, 'green', 'lane', 22], ['belt', 116, 178, 'red', 'belt', 20], ['airbag', 147, 178, 'red', 'airbag', 22], ['rbelt', 121, 229, 'red', 'rbelt', 24],
+    ['eps', 1090, 183, 'yellow', 'eps', 26], ['autoh', 1104, 234, 'green', 'autoh', 36], ['fuel', 92, 262, 'yellow', 'fuel', 24],
+    ['oil', 555, 232, 'red', 'oil', 26], ['batt', 585, 232, 'red', 'batt', 26], ['coolant', 615, 232, 'red', 'coolant', 26], ['glow', 645, 232, 'yellow', 'glow', 26]];
+  const lamp = {};
+  { const g = document.getElementById('tt-lamps');
+    LAMPS.forEach(([k, x, y, col, icon, size, led]) => {
+      const lg = el('g', { class:`lp lp-${col}`, transform:`translate(${x - size/2} ${y - size/2}) scale(${size/24})` });
+      const glyph = `<g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${LAMP_ICON[icon]}</g>`;
+      lg.innerHTML = (led ? `<g filter="url(#tt-halo)" opacity=".8">${glyph}</g>` : '') + glyph; // an LED's glow through the lens: drawn once, no per-frame filter
+      g.appendChild(lg); lamp[k] = lg; });
+    ['ffog', 'hba', 'high', 'rfog'].forEach(k => lamp[k] = document.getElementById('wl-' + k));
+  }
+  // bulb check at key-on (~3 s; belts and airbag 6 s); ?bulbs or window.__bulbs = true holds every lamp on
+  if(/[?&]bulbs\b/.test(location.search)) window.__bulbs = true;
+  const lampState = {};
+  const lampSet = (k, on, blink) => { const v = on ? (blink ? 2 : 1) : 0; if(lampState[k] === v) return; lampState[k] = v;
+    lamp[k].classList.toggle('on', !!on); lamp[k].classList.toggle('blink', !!(on && blink)); };
+  const lampsOff = () => Object.keys(lamp).forEach(k => lampSet(k, false));
+  // the engine's own state: car-tune keeps the ignition on after a blow-up, with the engine dead
+  const engineDead = () => !!(window.CarTune && ((CarTune.ch && CarTune.ch.blown) || (CarTune.blown && CarTune.blown())));
+  const pCodeActive = () => { for(const c of CarService.codes.values()) if(c.status === 'active' && c.code[0] === 'P') return true; return false; }; // powertrain codes light the EML
   let bulbCheckUntil = 0; // engineOnTime value until which the startup bulb-check stays lit
   const brakeBtn = document.getElementById('brake-btn');
   const muteBtn = document.getElementById('mute-btn');
@@ -1747,8 +1725,6 @@
   // dial markings glow red), H / High toggles high beam (brings the lights on with it; lights off kills it).
   // Indicators and illumination only show with the ignition on, like the real cluster. ----
   const clusterEl = document.getElementById('cluster');
-  const wlFuel = document.getElementById('wl-fuel');
-  const wlLowBeam = document.getElementById('wl-lowbeam'), wlHighBeam = document.getElementById('wl-highbeam');
   const lightsBtn = document.getElementById('lights-btn'), highBeamBtn = document.getElementById('highbeam-btn');
   let lightsOn = false, highBeamOn = false;
   function setLights(on, high){
@@ -1768,83 +1744,6 @@
     else if(launchState === 'armed' && !brakeHeld){ launchState = 'engage'; launchTimer = LAUNCH_ENGAGE_S; braking = 0; } // brake released - drops instantly, then the engagement delay
     else if(launchState === 'engage'){ if(brakeHeld) launchState = 'idle'; else if((launchTimer -= dt) <= 0) launchState = 'go'; }
     else if(launchState === 'go' && (brakeHeld || speed > 100)) launchState = 'idle';
-  }
-  // ---- lift-off misfire / crackle + overrun burble: snapping off the throttle from very high load
-  // (deep throttle, high rpm) sometimes lights unburnt fuel in the hot exhaust - an irregular burst of
-  // crackles with the odd full misfire bang. And on most lifts (not all) the engine then burbles on the
-  // overrun as the revs fall: random scattered pops, softer and duller the lower the rpm, dying out
-  // near idle or after a few seconds. Both share the 'liftCrackle' mixer layer. ----
-  const LIFT_CRACKLE_CHANCE = 0.45, LIFT_LOAD_MIN = 0.75;
-  const BURBLE_CHANCE = 0.6, OVERRUN_MIN_K = 2.0, OVERRUN_END_K = 1.4, OVERRUN_MAX_S = 5;
-  const [CRK_LO, CRK_SPAN, BANG_LO, BANG_SPAN] = [500, 800, 210, 190];
-  let liftLoad = 0, liftPrevThrottle = 0, liftCooldown = 0, overrunT = -1; // overrunT < 0: no burble session
-  function updateLiftCrackle(thr, dt){
-    // recent engine load, held briefly so a fast lift still counts the load it came from
-    liftLoad = Math.max(thr * Math.min(1, rpmK / AUTO_SHIFT_RPM_MAX), liftLoad - dt*1.5);
-    liftCooldown = Math.max(0, liftCooldown - dt);
-    if(ignition && liftPrevThrottle >= 0.15 && thr < 0.15){
-      if(liftLoad >= LIFT_LOAD_MIN && liftCooldown <= 0){
-        liftCooldown = 1.2;
-        if(Math.random() < LIFT_CRACKLE_CHANCE) playLiftCrackle(liftLoad);
-      }
-      overrunT = (rpmK > OVERRUN_MIN_K && Math.random() < BURBLE_CHANCE) ? 0 : -1;
-    }
-    liftPrevThrottle = thr;
-    if(overrunT < 0) return;
-    overrunT += dt;
-    if(!ignition || thr >= 0.15 || rpmK < OVERRUN_END_K || overrunT > OVERRUN_MAX_S){ overrunT = -1; return; }
-    const rpmF = Math.max(0, Math.min(1, (rpmK - OVERRUN_END_K) / (AUTO_SHIFT_RPM_MAX - OVERRUN_END_K)));
-    const popsPerSec = (1.5 + rpmF*5) * Math.exp(-overrunT/2.5); // busier at high rpm, thinning out as it settles
-    if(Math.random() < popsPerSec*dt) playBurble(rpmF);
-  }
-  // one exhaust pop: distorted noise burst through a falling bandpass
-  function liftPop(pt, bang, freq, peak){
-    CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5);
-    const dur = bang ? 0.13 : 0.05;
-    const bufSize = Math.floor(actx.sampleRate * dur);
-    const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
-    const data = buf.getChannelData(0);
-    for(let j=0;j<bufSize;j++) data[j] = Math.random()*2-1;
-    const src = actx.createBufferSource(); src.buffer = buf;
-    const shaper = actx.createWaveShaper(); shaper.curve = makeDistortionCurve(bang ? 10 : 7); shaper.oversample='2x';
-    const filter = actx.createBiquadFilter(); filter.type='bandpass'; filter.Q.value = bang ? 1.1 : 1.6;
-    filter.frequency.setValueAtTime(freq, pt);
-    filter.frequency.exponentialRampToValueAtTime(bang ? 90 : 200, pt + dur*0.9);
-    const gain = actx.createGain(); gain.gain.value = 0.0001;
-    src.connect(shaper).connect(filter).connect(gain).connect(masterGain);
-    gain.gain.setValueAtTime(0.0001, pt);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(0.55, peak)), pt + 0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, pt + dur);
-    src.start(pt);
-    src.stop(pt + dur + 0.02);
-  }
-  function playLiftCrackle(load){
-    if(!actx || !soundOn) return;
-    const amt = layerVol.liftCrackle;
-    if(amt <= 0.01) return;
-    const t = actx.currentTime;
-    const count = 4 + Math.floor(Math.random()*7); // 4-10 events
-    for(let i=0;i<count;i++){
-      const pt = t + 0.04 + Math.random()*Math.random()*1.1; // bunched right after the lift, stragglers trailing off
-      const bang = Math.random() < 0.25; // the odd full misfire among the crackles
-      const freq = bang ? BANG_LO + Math.random()*BANG_SPAN : CRK_LO + Math.random()*CRK_SPAN;
-      liftPop(pt, bang, freq, (bang ? 0.42 : 0.22) * load * amt * (0.5 + Math.random()*0.5));
-    }
-  }
-  // overrun burble: 1-3 quick pops; rpmF (0 near idle .. 1 near the shift point) sets level and pitch
-  function playBurble(rpmF){
-    if(!actx || !soundOn) return;
-    const amt = layerVol.liftCrackle;
-    if(amt <= 0.01) return;
-    const t = actx.currentTime;
-    const n = 1 + Math.floor(Math.random()*3);
-    for(let i=0;i<n;i++){
-      const pt = t + i*(0.03 + Math.random()*0.06);
-      const bang = Math.random() < 0.2; // the occasional deeper "blub"
-      const freq = bang ? BANG_LO*(0.7 + 0.3*rpmF) + Math.random()*BANG_SPAN*0.5
-                        : CRK_LO*(0.55 + 0.45*rpmF) + Math.random()*CRK_SPAN*0.6;
-      liftPop(pt, bang, freq, (bang ? 0.2 : 0.12) * (0.25 + 0.75*rpmF) * amt * (0.5 + Math.random()*0.5));
-    }
   }
   // a = forward drive accel (m/s^2) before drag
   function applyTraction(a, thr){
@@ -2012,7 +1911,7 @@
       clusterEl.classList.remove('on');
       throttleSlider.value=0; throttleVal.textContent='0%';
       setTransmission('D'); manualGearIdx=0;
-      [wlEngine,wlBattery,wlOil,wlTemp,wlAbs,wlBelt,wlTc,wlDscOff,wlGlow].forEach(w=>w.className='wl');
+      lampsOff();
       setCruise(false);
     } });
   const SND_ON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M17 8a5 5 0 0 1 0 8"/><path d="M19.5 5.5a9 9 0 0 1 0 13"/></svg>';
@@ -2201,7 +2100,6 @@
     if(ignition && parked && (braking || throttleRaw > 0.02 || transmissionMode === 'R')) parked = false; // out of P
     const throttlePct = Math.pow(throttleRaw, PEDAL_EXP[currentMode] || 1.2); // mildly progressive - small inputs still pull
     updateLaunch(dt);
-    updateLiftCrackle(throttlePct, dt);
     let v_ms = speed/3.6;
 
     if(ignition) engineOnTime += dt;
@@ -2377,8 +2275,6 @@
     }
     if(newGearIdx !== gearIdx){
       if(gearIdx >= 0 && newGearIdx > gearIdx){ upshiftCutT = SHIFT_CUT[0]; upshiftDropT = 0.5; } // gear-to-gear upshift: brief torque interruption, then the revs drop quickly into the new gear
-      const isUpshift = gearIdx >= 0 && newGearIdx > gearIdx; // real gear-to-gear upshift only, not engaging from P/N
-      if(isUpshift) playUpshiftPop(computeGearRpm(gearIdx, speed, throttlePct), boostBar);
       gearIdx = newGearIdx;
       shiftCooldown = Math.max(shiftCooldown, 0.25); // every shift - D auto and M manual alike - gets the post-shift settle window
       // torque-interrupt boost dip on every shift - proportional, so it only bites when actually boosted
@@ -2505,7 +2401,7 @@
       clusterEl.classList.remove('on');
       throttleSlider.value = 0; throttleVal.textContent = '0%';
       setTransmission('D'); manualGearIdx = 0;
-      [wlEngine,wlBattery,wlOil,wlTemp,wlAbs,wlBelt,wlTc,wlDscOff,wlGlow].forEach(w=>w.className='wl');
+      lampsOff();
       setCruise(false);
     }
 
@@ -2615,28 +2511,29 @@
     CarDyno.tick({ dt, tc: tcIntervening, spin: wheelspinK, ignition, rpm: rpmK*1000, throttle: throttlePct, hp: livePowerHp, tq: liveTorqueNm, gear: gearIdx,
       gearLabel: transmissionMode==='R' || transmissionMode==='N' ? transmissionMode : `${transmissionMode==='M' || transmissionMode==='S' ? transmissionMode : 'D'}${gearIdx+1}`, speed, coolant: coolantC, boost: boostBar, egt: egrC });
 
-    // ---- warning lights: startup bulb-check, then live conditions ----
-    if(!ignition && !keyOn){
-      // all off (handled on ignition-off click, nothing to do per-frame)
-    } else if(keyT < bulbCheckUntil){
-      [wlBattery,wlOil,wlTemp,wlBelt].forEach(w=>w.className='wl on-red');
-      [wlEngine,wlAbs,wlTc,wlDscOff,wlGlow].forEach(w=>w.className='wl on-amber');
-    } else if(!ignition){
-      [wlEngine,wlBattery,wlOil,wlTemp,wlAbs,wlBelt,wlTc,wlDscOff,wlGlow].forEach(w=>w.className='wl');
-      wlBattery.className = wlOil.className = 'wl on-red'; // engine off: no charge, no oil pressure
-    } else {
-      wlBattery.className = wlBelt.className = wlGlow.className = 'wl';
-      const overheating = coolantC > 112;
-      wlEngine.className = (overheating || wearPct > 50 || CarTune.warnLight()) ? 'wl on-red' : 'wl';
-      wlTemp.className = overheating ? 'wl on-red blink' : (coolantC < 87 + warmShift ? 'wl on-blue' : 'wl'); // blue until the engine reaches operating temp
-      wlOil.className = (engineOnTime > 2 && oilPressureBar < 0.5) ? 'wl on-red blink' : 'wl';
-      wlAbs.className = (braking && speed > 5) ? 'wl on-amber blink' : 'wl';
-      wlTc.className = tcOn && tcIntervening ? 'wl on-amber blink' : 'wl'; // flickers while DSC cuts power
-      wlDscOff.className = tcOn ? 'wl' : 'wl on-amber';
+    // ---- telltales: key-on bulb check (~3 s, belts + airbag 6 s), then live; ?bulbs holds them all on ----
+    if(window.__bulbs) clusterEl.classList.add('on');
+    const live = ignition || keyOn, allOn = !!window.__bulbs || (live && keyT < 3), seatsOn = !!window.__bulbs || (live && keyT < 6);
+    const dead = ignition && engineDead(), running = ignition && !dead, selfTest = !ignition || engineOnTime < 1.5; // ABS / DSC check themselves once it's started
+    const glowFor = Math.max(0, Math.min(6, (40 - coolantC)/10)); // pre-heat: ~1.7 s at 23 C, none once warm, up to 6 s in a frost
+    for(const k in lamp){
+      const on = allOn || (live && (
+        k === 'belt' || k === 'rbelt' || k === 'airbag' ? seatsOn
+        : k === 'mil' ? !running || pCodeActive() || wearPct > 50 || CarTune.warnLight() // on with the key till it runs (OBD), then faults, limp mode
+        : k === 'abs' || k === 'brake' ? selfTest
+        : k === 'dsc' ? selfTest || (tcOn && tcIntervening) // flickers while DSC cuts power
+        : k === 'dscoff' ? !tcOn
+        : k === 'park' ? parked // the EPB holds it till it's driven off
+        : k === 'side' ? lightsOn
+        : k === 'high' ? highBeamOn
+        : k === 'fuel' ? rangeKm <= 0 // into the reserve
+        : k === 'oil' ? dead || (engineOnTime > 2 && oilPressureBar < 0.5)
+        : k === 'batt' ? dead // the alternator stopped with it
+        : k === 'coolant' ? coolantC > 112
+        : k === 'glow' ? !ignition && keyT < glowFor
+        : false));
+      lampSet(k, on, k === 'dsc' && tcOn && tcIntervening && !allOn);
     }
-    wlFuel.className = (ignition && (rangeKm <= 0 || engineOnTime < bulbCheckUntil)) ? 'wl on-amber' : 'wl'; // into the reserve (and the bulb check)
-    wlLowBeam.className = ((ignition || keyOn) && lightsOn) ? 'wl on-green' : 'wl';
-    wlHighBeam.className = ((ignition || keyOn) && highBeamOn) ? 'wl on-blue' : 'wl';
 
     // ---- info field status line ----
     let status = '', statusCol = '#9aa0a8';
