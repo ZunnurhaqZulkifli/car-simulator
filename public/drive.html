@@ -317,6 +317,7 @@ const CARS = {
     credit: ['2019 Porsche 911 (991.2) GT3 RS', 'https://sketchfab.com/3d-models/2019-porsche-911-9912-gt3-rs-97ea84db846e4945961dffb8b2d7af18'],
     grip: 2.8, // Cup tyres and downforce: the garage's grippiest
     chassis: { m: 1420, front: 0.39, rear: 1, h: 0.45 }, // the engine behind the rear axle
+    engine: 'rear',
     stiff: 3.6, // race-car springs and bars: it barely leans
     paint: /^991_2phong2SG1\|/, paintColor: 0x8fd41e, glass: /^991_2phong18SG1\|/, glassPlain: true, // lime
     wheels: /Wheel1A_3D|^991_2phong2[01]SG1\|/, tyre: /Wheel1A_3D/, // the calipers stay put
@@ -2382,6 +2383,7 @@ box(0.52, 0.11, 0.02, plateMat, 0, 0.47, 2.25);                                 
 box(0.52, 0.11, 0.02, plateMat, 0, 0.62, -2.255);
 add(new THREE.CylinderGeometry(0.04, 0.04, 0.15, 12).rotateX(Math.PI / 2), chromeMat, 0.55, 0.3, -2.22); // exhaust
 const EXHAUST = new THREE.Vector3(0.55, 0.3, -2.32);
+const ENGINE = new THREE.Vector3(0, 0.95, 1.2); // the top of the lid over the engine: its smoke comes off it (the model moves it)
 
 // Cabin, right-hand drive. All of it sits inside the opaque glass, so it only shows from the driver's seat - where
 // the solid body is swapped for just its bonnet (the body's top would otherwise be a floor at beltline height).
@@ -2709,6 +2711,10 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
   dashAnchor.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(EYE, at, new THREE.Vector3(0, 1, 0))); // faces the driver
   dashAnchor.scale.setScalar((CAR.steering.size ?? 0.36) * at.distanceTo(EYE) / 1100); // about as wide, to the eye, as the model's own cluster
   EXHAUST.set(CAR.exhaustX, 0.3, -CAR.length / 2 - midZ + 0.05);
+  // the engine: behind the front axle, ahead of the rear one (mid) or behind it (rear); its smoke comes off the lid over it
+  const ez = { front: front[0].position.z - 0.3, mid: rear[0].position.z + 0.55, rear: rear[0].position.z - 0.4 }[CAR.engine ?? 'front'] - midZ;
+  const lid = new THREE.Raycaster(new THREE.Vector3(0, 3, ez), new THREE.Vector3(0, -1, 0)).intersectObject(root, true).find(h => h.object.material !== windowGlass && h.point.y < 1.25); // (not a wing)
+  ENGINE.set(0, lid ? lid.point.y : 0.9, ez);
 
   for (const c of [...car.children, ...body.children]) c.visible = c === body || c === dashAnchor || c === shadow || headlights.includes(c); // retire the built car (not the headlights)
   wheels.length = 0;
@@ -3168,7 +3174,14 @@ frame.addEventListener('load', () => {
   beamIn?.addEventListener('change', () => beamIn.blur()); // so the arrow keys go back to the signals and the throttle limit
   const tick = w.CarDyno.tick;
   w.CarDyno.pop = backfire;
-  w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = w.CarTune.ch.smoke; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; carPage.tc = !!i.tc; carPage.spin = i.spin || 0; tick(i);
+  // the engine: its smoke (CarTune.ch: black, blue-grey oil smoke), and whether it's blown - a page without a tuned
+  // engine has none. A blow-up while driving shows (engineBlow), an engine already blown at load only smokes
+  const ch = () => w.CarTune?.ch;
+  carPage.petrol = w.CarTune?.fuel !== 'diesel';
+  carPage.blown = !!ch()?.blown;
+  w.document.addEventListener('engineblow', engineBlow);
+  w.addEventListener('pointerdown', audioOn);
+  w.CarDyno.tick = i => { carPage.speed = i.speed; carPage.reverse = /^R/.test(i.gearLabel); carPage.smoke = ch()?.smoke; carPage.oil = ch()?.oilSmoke; carPage.blown = !!ch()?.blown; carPage.gear = i.gearLabel; carPage.rpm = i.rpm; carPage.tc = !!i.tc; carPage.spin = i.spin || 0; tick(i);
     carPage.throttle = i.ignition ? i.throttle : 0; carPage.coolant = i.coolant; carPage.boost = i.boost;
     carPage.chassis = i.chassis ?? -1; carPage.dampers = w.CarService.parts.find(p => p.key === 'dampers')?.value || 0; };
   const serviceTick = w.CarService.tick; // the brake pedal (0-100) only reaches CarService
@@ -3760,30 +3773,37 @@ function drawTele(w, dt) {
 // the exhaust tips: EXHAUST's side, or both sides (CAR.exhaustBoth) - smoke and flame come out of each
 const SIDES = CAR.exhaustBoth ? [1, -1] : [1];
 // exhaust smoke at the car page's own smoke opacity (CarTune.ch.smoke, 0-100 %): a thick black diesel stream blown out
-// the pipe and left hanging in the world - with two tips, every other puff out of each, a thinner stream from both
+// the pipe and left hanging in the world, or a petrol engine running rich under load: a lighter dark grey, gone sooner;
+// and blue-grey oil smoke (ch.oilSmoke, %: worn piston rings, turbo seals, PCV valve, head gasket), lingering - the puffs
+// shared out by how much of each. With two tips, every other puff out of each, a thinner stream from both
 const puffTex = blob('#fff');
 const puffs = Array.from({ length: 160 }, () => {
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0x1a1a1a, transparent: true, depthWrite: true })); // sooty near-black
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: 0x1a1a1a, transparent: true, depthWrite: true }));
   s.visible = false;
   scene.add(s);
-  return { s, age: 1, alpha: 0, vel: new THREE.Vector3() };
+  return { s, age: 1, life: 3.5, alpha: 0, vel: new THREE.Vector3() };
 });
 const puffBack = new THREE.Vector3();
 let puffDue = 0, puffNext = 0;
-function smoke(dt, pct) {
-  const k = Math.min(1, Math.sqrt((pct || 0) / 40)); // overdone on purpose: 10 % is already half a cloud, 40 % on the full black wall (pct is undefined on a petrol car)
+function puffOut(k, colour, life, alpha) { // one puff out of the next tip, k: how hard it's blown out
+  const p = puffs[puffNext % puffs.length];
+  p.s.position.set(EXHAUST.x * SIDES[puffNext++ % SIDES.length], EXHAUST.y, EXHAUST.z).applyMatrix4(body.matrixWorld);
+  p.vel.set((Math.random() - 0.5) * 0.3, 0.4 + 0.4 * Math.random(), (Math.random() - 0.5) * 0.3).addScaledVector(puffBack, 1 + 2 * k - state.speed * 0.4); // blown out the back in a tight stream, then dragged along in the car's wake
+  p.s.material.color.setHex(colour);
+  Object.assign(p, { age: 0, life, alpha });
+}
+function smoke(dt, pct, oil) {
+  const k = Math.min(1, Math.sqrt((pct || 0) / 40)), ko = Math.min(1, Math.sqrt((oil || 0) / 50)); // overdone on purpose: 10 % is already half a cloud, 40 % on the full black wall
   puffBack.set(0, 0, -1).applyEuler(car.rotation);
-  for (puffDue += k * 40 * dt; puffDue >= 1; puffDue--) { // up to 40 puffs a second x 3.5 s fits the pool of 160
-    const p = puffs[puffNext % puffs.length];
-    p.s.position.set(EXHAUST.x * SIDES[puffNext++ % SIDES.length], EXHAUST.y, EXHAUST.z).applyMatrix4(body.matrixWorld);
-    p.vel.set((Math.random() - 0.5) * 0.3, 0.4 + 0.4 * Math.random(), (Math.random() - 0.5) * 0.3).addScaledVector(puffBack, 1 + 2 * k - state.speed * 0.4); // blown out the back in a tight stream, then dragged along in the car's wake
-    p.age = 0;
-    p.alpha = 0.35 + 0.35 * k;
+  for (puffDue += Math.max(k, ko) * 40 * dt; puffDue >= 1; puffDue--) { // up to 40 puffs a second x 3.5 s fits the pool of 160
+    if (Math.random() * (k + ko) < ko) puffOut(ko, 0xa3b0c4, 4, 0.18 + 0.3 * ko); // blue-grey oil smoke
+    else if (carPage.petrol) puffOut(k, 0x2e2e2e, 1.6, 0.25 + 0.3 * k);
+    else puffOut(k, 0x1a1a1a, 3.5, 0.35 + 0.35 * k); // sooty near-black
   }
   for (const p of puffs) {
     p.s.visible = p.age < 1;
     if (!p.s.visible) continue;
-    p.age += dt / 3.5; // lives 3.5 s, widening to a 2.2 m plume as it thins
+    p.age += dt / p.life; // lives 3.5 s, widening to a 2.2 m plume as it thins
     p.s.position.addScaledVector(p.vel, dt);
     p.vel.x *= 1 - dt * 0.8; p.vel.z *= 1 - dt * 0.8; // the blast dies off, the hot soot keeps rising
     p.s.scale.setScalar(0.35 + 1.85 * Math.sqrt(p.age)); // starts pipe-sized, so it reads as a stream rather than a cloud
@@ -3832,6 +3852,65 @@ function flames(dt) {
         s.visible = true;
       }
     }
+  }
+}
+
+// the engine letting go (its car page's 'engineblow' - the page plays the bang): a fireball out of the bay, a thick
+// grey-white and blue-grey cloud pouring out of it and from under the car, a black cough from the exhaust, sparks and
+// bits skittering down the road and a jolt through the camera; then, as long as it stays blown, smoke trickling off the
+// lid - thick at first, a thin wisp after a minute. One pool of sprites for all of it
+const fumes = Array.from({ length: 150 }, () => {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, depthWrite: false }));
+  s.visible = false;
+  scene.add(s);
+  return { s, age: 1, life: 1, from: 0, to: 0, alpha: 0, fall: 0, drag: 0, vel: new THREE.Vector3() };
+});
+const flashEl = document.getElementById('flash'), fumeAt = new THREE.Vector3(), jit = () => Math.random() - 0.5;
+let fumeNext = 0, blowAt = -Infinity, trickleDue = 0, pourDue = 0, shake = 0;
+// one sprite: from (car space) at vel (m/s, world) plus carry x the car's own, living life s, growing from -> to m,
+// glow: additive, fall: m/s² down (- rises), drag: 1/s - so at speed it leaves with the car and trails off behind
+function fume(x, y, z, vx, vy, vz, life, from, to, colour, alpha, glow = false, fall = 0, drag = 0.8, carry = 0.9) {
+  const p = fumes[fumeNext++ % fumes.length];
+  p.s.position.set(x, y, z).applyMatrix4(body.matrixWorld);
+  p.vel.set(Math.sin(state.heading), 0, Math.cos(state.heading)).multiplyScalar(state.speed * carry).add(fumeAt.set(vx, vy, vz));
+  p.s.material.color.setHex(colour);
+  p.s.material.blending = glow ? THREE.AdditiveBlending : THREE.NormalBlending;
+  Object.assign(p, { age: 0, life, from, to, alpha, fall, drag });
+}
+function engineBlow() {
+  if (carPage.blown) return; // (already blown: no second show)
+  carPage.blown = true;
+  blowAt = performance.now() / 1000;
+  const { x, y, z } = ENGINE;
+  for (let i = 0; i < 7; i++) fume(x + jit() * 0.8, y - 0.1 + jit() * 0.4, z + jit() * 0.8, jit() * 3, 2 + 3 * Math.random(), jit() * 3, 0.35 + 0.3 * Math.random(), 0.6, 2.6 + Math.random(), [0xffe2a0, 0xff9a30, 0xff5a10][i % 3], 1, true, -2, 0.5, 1); // the fireball, going with the car
+  for (let i = 0; i < 12; i++) pour(i, 1.5); // the cloud's first gush (it keeps pouring for 2 s: fumesTick)
+  for (let i = 0; i < 20; i++) { const a = Math.random() * 2 * Math.PI, v = 3 + 6 * Math.random(); fume(x + jit() * 0.6, 0.2, z + jit() * 0.8, Math.cos(a) * v, 1 + 3 * Math.random(), Math.sin(a) * v, 0.5 + 0.6 * Math.random(), 0.09, 0.03, 0xffc060, 1, true, 9.8, 0.3); } // sparks
+  for (let i = 0; i < 8; i++) { const a = Math.random() * 2 * Math.PI, v = 2 + 4 * Math.random(); fume(x + jit() * 0.6, 0.25, z + jit() * 0.8, Math.cos(a) * v, 1 + 2 * Math.random(), Math.sin(a) * v, 1.2, 0.09, 0.08, 0x202020, 1, false, 9.8, 0.3); } // bits of it
+  puffBack.set(0, 0, -1).applyEuler(car.rotation);
+  for (let i = 0; i < 20; i++) puffOut(1 + 2 * Math.random(), 0x111111, 2.5, 0.9); // the black cough out of the exhaust
+  shake = 1;
+  flashEl.animate([{ opacity: inCar ? 0.65 : 0.4 }, { opacity: 0 }], { duration: 550, easing: 'ease-out' });
+}
+function pour(i, k = 1) { // a puff of the cloud: out of the bay, or from under the car, out to the side
+  const under = i % 2, s = Math.sign(jit()), { x, y, z } = ENGINE;
+  fume(x + (under ? s * (0.3 + 0.6 * Math.random()) : jit() * 1.2), under ? 0.25 : y, z + jit() * 1.2, (under ? s * 1.5 * k : 0) + jit() * 1.5 * k, 0.6 + 1.4 * Math.random(), jit() * 1.5 * k,
+    4 + 3 * Math.random(), 0.8, 3.5 + 2 * Math.random(), i % 3 ? 0xd9dbdd : 0x8f9cb0, 0.85, false, -0.3, 0.7);
+}
+function fumesTick(dt) {
+  const since = performance.now() / 1000 - blowAt;
+  if (since < 2) for (pourDue += dt * 16; pourDue >= 1; pourDue--) pour(fumeNext);
+  if (carPage.blown) for (trickleDue += dt * (2.5 + 9 * Math.exp(-since / 30)); trickleDue >= 1; trickleDue--)
+    fume(ENGINE.x + jit() * 0.9, ENGINE.y + 0.03, ENGINE.z + jit() * 0.6, jit() * 0.2, 0.6 + 0.4 * Math.random(), jit() * 0.2, 3, 0.3, 1.6, trickleDue % 2 < 1 ? 0x84878d : 0x77839a, 0.6, false, -0.25, 0.6);
+  for (const p of fumes) {
+    p.s.visible = p.age < 1;
+    if (!p.s.visible) continue;
+    p.age += dt / p.life;
+    p.vel.y -= p.fall * dt;
+    p.vel.multiplyScalar(Math.max(0, 1 - p.drag * dt));
+    p.s.position.addScaledVector(p.vel, dt);
+    if (p.fall > 0 && p.s.position.y < state.y + 0.03) p.s.position.y = state.y + 0.03, p.vel.y *= -0.35, p.vel.x *= 0.7, p.vel.z *= 0.7; // sparks skitter along the road
+    p.s.scale.setScalar(p.from + (p.to - p.from) * Math.sqrt(p.age));
+    p.s.material.opacity = p.alpha * (1 - p.age) ** 1.5;
   }
 }
 
@@ -4673,7 +4752,9 @@ renderer.setAnimationLoop(() => {
   hmbl.color.setHex(braking ? 0xff2a2a : 0x3a0606);
   for (const [mt, full] of modelTail) mt.emissiveIntensity = full * (braking ? CAR.tail.brake : lit ? Math.max(CAR.tail.idle, CAR.tail.brake / 4) : CAR.tail.idle);
   for (const g of modelTailGlow) g.opacity = braking ? 1 : lit ? 0.3 : 0;
-  smoke(dt, carPage.smoke);
+  for (const m of modelReverse) m[m.isMeshBasicMaterial ? 'opacity' : 'emissiveIntensity'] = carPage.reverse && carPage.ignition ? m.userData.on : 0; // (the lamps, their glows)
+  smoke(dt, carPage.smoke, carPage.oil);
+  fumesTick(dt);
   flames(dt);
   tyres(dt, roll, (handbrake && Math.abs(roll) > 1) || drift.slide > 0.3, rollers); // (sliding marks too)
   const pump = atPump();
