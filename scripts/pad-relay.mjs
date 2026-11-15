@@ -17,10 +17,11 @@ const server = createServer(async (req, res) => {
 });
 
 const run = (cmd, args) => new Promise(ok => execFile(cmd, args, (err, out) => ok(err ? '' : out)));
+const tailscale = () => run('tailscale', ['status', '--json']).then(JSON.parse).catch(() => ({})); // (nothing, or not JSON: off)
 // the phone's address: makes sure tailscale serves this relay (a no-op once it does) and copies the link to the
 // clipboard, which Universal Clipboard hands to the iPhone. Null while Tailscale is off
 async function phoneLink() {
-  const status = await run('tailscale', ['status', '--json']).then(JSON.parse).catch(() => ({})); // (nothing, or not JSON: off)
+  const status = await tailscale();
   if (status.BackendState !== 'Running') return null;
   await run('tailscale', ['serve', '--bg', String(PORT)]);
   const url = `https://${status.Self.DNSName.replace(/\.$/, '')}/`;
@@ -28,9 +29,18 @@ async function phoneLink() {
   return url;
 }
 
-// websockets skip CORS, so any page open on this Mac could connect: only the app, the pad itself and the tailnet may
-const ALLOWED = new RegExp(String.raw`^https?://(sim-app\.test|localhost:${PORT}|[\w-]+\.[\w-]+\.ts\.net)$`);
-const wss = new WebSocketServer({ server, verifyClient: ({ origin }) => ALLOWED.test(origin) || console.log(`refused ${origin}`) });
+// websockets skip CORS, so any page open on this Mac could connect: only the app, the pad itself, and the pad as the
+// phone opens it - at this Mac's own tailnet name, not any *.ts.net (anyone can put a page up there with Funnel)
+const LOCAL = new RegExp(String.raw`^https?://(sim-app\.test|localhost:${PORT})$`);
+let tailnetName = null;
+async function allowed(origin) {
+  if (LOCAL.test(origin)) return true;
+  if (!/^https:\/\/[\w-]+\.[\w-]+\.ts\.net$/.test(origin)) return false;
+  // (asked again on a miss: Tailscale may have come up, or the Mac been renamed, since the last time)
+  if (origin !== `https://${tailnetName}`) tailnetName = (await tailscale()).Self?.DNSName?.replace(/\.$/, '');
+  return origin === `https://${tailnetName}`;
+}
+const wss = new WebSocketServer({ server, verifyClient: ({ origin }, done) => allowed(origin).then(ok => { if (!ok) console.log(`refused ${origin}`); done(ok); }) });
 
 // what became of each connection, for working out why the pad drops: a line each in the log, and the last 100 on the
 // drive page's Settings › Pad - all of them when it connects ({ padEvents }), then each as it happens
