@@ -710,7 +710,9 @@
     if(actx) return;
     actx = new (window.AudioContext||window.webkitAudioContext)();
     masterGain = actx.createGain(); masterGain.gain.value = soundOn ? MASTER_BASE*layerVol.master : 0;
-    masterGain.connect(actx.destination);
+    const clip = actx.createWaveShaper(); // safety soft clip for the loudest bangs: untouched below -6 dBFS (a compressor's makeup gain would lift it all)
+    clip.curve = Float32Array.from({ length: 1025 }, (_, i) => { const x = i/512 - 1, a = Math.abs(x); return a < 0.5 ? x : Math.sign(x)*(0.5 + 0.5*Math.tanh(2*a - 1)); });
+    masterGain.connect(clip).connect(actx.destination);
 
     // ---- radiator fan: band-passed noise whoosh + a faint blade-pass hum, gated by updateFan() ----
     const fanBuf = actx.createBuffer(1, actx.sampleRate*2, actx.sampleRate);
@@ -1073,11 +1075,13 @@
       const gain = actx.createGain(); gain.gain.value = 0.0001;
       src.connect(shaper).connect(filter).connect(gain).connect(masterGain);
       const base = Math.min(0.45, (0.12 + load*0.24) * layerVol.crackle);
-      const peak = Math.max(0.001, bang ? Math.min(0.6, base*1.6) : base * (0.5 + Math.random()*0.5));
+      // x12: at the 140i's levels they sat under this louder engine and got lost (tools/pops)
+      const peak = Math.max(0.001, bang ? Math.min(0.6, base*1.6) : base * (0.5 + Math.random()*0.5)) * 12;
       gain.gain.setValueAtTime(0.0001, pt);
       gain.gain.exponentialRampToValueAtTime(peak, pt+0.004);
       gain.gain.exponentialRampToValueAtTime(0.0001, pt + dur);
       src.start(pt); src.stop(pt + dur + 0.01);
+      CarDyno.pop(pt - t, bang ? 1 : 0.5);
     }
   }
 

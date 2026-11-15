@@ -956,7 +956,7 @@
   let intakeGain, intakeFilter, turboGain, turboWhistle, turboWhistle2, turboAirFilter, turboJet1, turboJetGain, zfOsc1, zfOsc2, zfFilter, zfGain;
   let sndRpmK = 0, turboShaft = 0, limiterWasActive = false;
   const trims = {};
-  const layerVol = { chime:0.8, fan:0.7, master:1, tick:0.8, exhaust:1, body:1, roar:1, mech:0.8, intake:1, turbo:1, turboJet:0.75, zf:1, bov:1, limiter:0.8, liftCrackle:0.8 };
+  const layerVol = { chime:0.8, fan:0.7, master:1, tick:0.8, exhaust:1, body:1, roar:1, mech:0.8, intake:1, turbo:1, turboJet:0.75, zf:1, bov:1, limiter:0.8 };
 
   // radiator fan (all cars): on above 92C, runs until the coolant is back under 90C - see updateFan()
   let fanGain, fanTrim, fanFilter, fanHum, fanOn = false;
@@ -1161,7 +1161,6 @@
         { id:'bov',     label:'Blow-Off Valve',     value:layerVol.bov,     set:setTrim('bov') },
         { id:'zf',      label:'ZF 8HP Gearbox',     value:layerVol.zf,      set:setTrim('zf') },
         { id:'limiter', label:'Rev Limiter',        value:layerVol.limiter, set:(f)=>{ layerVol.limiter=f; } },
-        { id:'liftCrackle',label:'Lift-off Crackle',value:layerVol.liftCrackle,set:(f)=>{ layerVol.liftCrackle=f; } },
         { id:'chime',   label:'Startup Chime',      value:layerVol.chime,   set:(f)=>{ layerVol.chime=f; } },
         { id:'fan',     label:'Radiator Fan',       value:layerVol.fan,     set:(f)=>{ layerVol.fan=f; fanTrim.gain.setTargetAtTime(f, actx.currentTime, 0.03); } },
       ],
@@ -1465,83 +1464,6 @@
     launchIndicator.style.display = launchState === 'idle' ? 'none' : 'block';
     launchIndicator.classList.toggle('launch-blink', launchState === 'armed');
   }
-  // ---- lift-off misfire / crackle + overrun burble: snapping off the throttle from very high load
-  // (deep throttle, high rpm) sometimes lights unburnt fuel in the hot exhaust - an irregular burst of
-  // crackles with the odd full misfire bang. And on most lifts (not all) the engine then burbles on the
-  // overrun as the revs fall: random scattered pops, softer and duller the lower the rpm, dying out
-  // near idle or after a few seconds. Both share the 'liftCrackle' mixer layer. ----
-  const LIFT_CRACKLE_CHANCE = 0.45, LIFT_LOAD_MIN = 0.75;
-  const BURBLE_CHANCE = 0.6, OVERRUN_MIN_K = 2.0, OVERRUN_END_K = 1.4, OVERRUN_MAX_S = 5;
-  const [CRK_LO, CRK_SPAN, BANG_LO, BANG_SPAN] = [450, 700, 200, 180];
-  let liftLoad = 0, liftPrevThrottle = 0, liftCooldown = 0, overrunT = -1; // overrunT < 0: no burble session
-  function updateLiftCrackle(thr, dt){
-    // recent engine load, held briefly so a fast lift still counts the load it came from
-    liftLoad = Math.max(thr * Math.min(1, rpmK / AUTO_SHIFT_RPM_MAX), liftLoad - dt*1.5);
-    liftCooldown = Math.max(0, liftCooldown - dt);
-    if(ignition && liftPrevThrottle >= 0.15 && thr < 0.15){
-      if(liftLoad >= LIFT_LOAD_MIN && liftCooldown <= 0){
-        liftCooldown = 1.2;
-        if(Math.random() < LIFT_CRACKLE_CHANCE) playLiftCrackle(liftLoad);
-      }
-      overrunT = (rpmK > OVERRUN_MIN_K && Math.random() < BURBLE_CHANCE) ? 0 : -1;
-    }
-    liftPrevThrottle = thr;
-    if(overrunT < 0) return;
-    overrunT += dt;
-    if(!ignition || thr >= 0.15 || rpmK < OVERRUN_END_K || overrunT > OVERRUN_MAX_S){ overrunT = -1; return; }
-    const rpmF = Math.max(0, Math.min(1, (rpmK - OVERRUN_END_K) / (AUTO_SHIFT_RPM_MAX - OVERRUN_END_K)));
-    const popsPerSec = (1.5 + rpmF*5) * Math.exp(-overrunT/2.5); // busier at high rpm, thinning out as it settles
-    if(Math.random() < popsPerSec*dt) playBurble(rpmF);
-  }
-  // one exhaust pop: distorted noise burst through a falling bandpass
-  function liftPop(pt, bang, freq, peak){
-    CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5);
-    const dur = bang ? 0.13 : 0.05;
-    const bufSize = Math.floor(actx.sampleRate * dur);
-    const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
-    const data = buf.getChannelData(0);
-    for(let j=0;j<bufSize;j++) data[j] = Math.random()*2-1;
-    const src = actx.createBufferSource(); src.buffer = buf;
-    const shaper = actx.createWaveShaper(); shaper.curve = makeDistortionCurve(bang ? 10 : 7); shaper.oversample='2x';
-    const filter = actx.createBiquadFilter(); filter.type='bandpass'; filter.Q.value = bang ? 1.1 : 1.6;
-    filter.frequency.setValueAtTime(freq, pt);
-    filter.frequency.exponentialRampToValueAtTime(bang ? 90 : 200, pt + dur*0.9);
-    const gain = actx.createGain(); gain.gain.value = 0.0001;
-    src.connect(shaper).connect(filter).connect(gain).connect(masterGain);
-    gain.gain.setValueAtTime(0.0001, pt);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(0.55, peak)), pt + 0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, pt + dur);
-    src.start(pt);
-    src.stop(pt + dur + 0.02);
-  }
-  function playLiftCrackle(load){
-    if(!actx || !soundOn) return;
-    const amt = layerVol.liftCrackle;
-    if(amt <= 0.01) return;
-    const t = actx.currentTime;
-    const count = 4 + Math.floor(Math.random()*7); // 4-10 events
-    for(let i=0;i<count;i++){
-      const pt = t + 0.04 + Math.random()*Math.random()*1.1; // bunched right after the lift, stragglers trailing off
-      const bang = Math.random() < 0.25; // the odd full misfire among the crackles
-      const freq = bang ? BANG_LO + Math.random()*BANG_SPAN : CRK_LO + Math.random()*CRK_SPAN;
-      liftPop(pt, bang, freq, (bang ? 0.42 : 0.22) * load * amt * (0.5 + Math.random()*0.5));
-    }
-  }
-  // overrun burble: 1-3 quick pops; rpmF (0 near idle .. 1 near the shift point) sets level and pitch
-  function playBurble(rpmF){
-    if(!actx || !soundOn) return;
-    const amt = layerVol.liftCrackle;
-    if(amt <= 0.01) return;
-    const t = actx.currentTime;
-    const n = 1 + Math.floor(Math.random()*3);
-    for(let i=0;i<n;i++){
-      const pt = t + i*(0.03 + Math.random()*0.06);
-      const bang = Math.random() < 0.2; // the occasional deeper "blub"
-      const freq = bang ? BANG_LO*(0.7 + 0.3*rpmF) + Math.random()*BANG_SPAN*0.5
-                        : CRK_LO*(0.55 + 0.45*rpmF) + Math.random()*CRK_SPAN*0.6;
-      liftPop(pt, bang, freq, (bang ? 0.2 : 0.12) * (0.25 + 0.75*rpmF) * amt * (0.5 + Math.random()*0.5));
-    }
-  }
   // a = forward drive accel (m/s^2) before drag
   function applyTraction(a, thr){
     if(launchState === 'engage') return 0; // drive still engaging - revs held, no pull yet
@@ -1830,7 +1752,6 @@
     if(ignition && parked && (braking || throttleRaw > 0.02 || transmissionMode === 'R')) parked = false; // out of P
     const throttlePct = Math.pow(throttleRaw, PEDAL_EXP[currentMode] || 1.2); // mildly progressive - small inputs still pull
     updateLaunch(dt);
-    updateLiftCrackle(throttlePct, dt);
     let v_ms = speed/3.6;
 
     if(ignition) engineOnTime += dt;

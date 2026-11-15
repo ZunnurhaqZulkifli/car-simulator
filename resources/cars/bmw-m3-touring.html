@@ -1138,7 +1138,9 @@
     if(actx) return;
     actx = new (window.AudioContext||window.webkitAudioContext)();
     masterGain = actx.createGain(); masterGain.gain.value = soundOn ? MASTER_BASE*layerVol.master : 0;
-    masterGain.connect(actx.destination);
+    const clip = actx.createWaveShaper(); // safety soft clip for the loudest bangs: untouched below -6 dBFS (a compressor's makeup gain would lift it all)
+    clip.curve = Float32Array.from({ length: 1025 }, (_, i) => { const x = i/512 - 1, a = Math.abs(x); return a < 0.5 ? x : Math.sign(x)*(0.5 + 0.5*Math.tanh(2*a - 1)); });
+    masterGain.connect(clip).connect(actx.destination);
     fetch('/audio/bmw-chime.mp3').then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b))
       .then(b => { chimeBuf = b; if(chimeWanted && ignition) playStartChime(); }).catch(() => {}); // chime is optional - no file, no chime
     const noise = noiseBuffer(2);
@@ -1378,7 +1380,7 @@
     const gain = actx.createGain(); gain.gain.value = 0.0001;
     src.connect(shaper).connect(filter).connect(gain).connect(dest || popBus);
     gain.gain.setValueAtTime(0.0001, pt);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(0.6, peak)), pt + 0.003);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(8, peak)), pt + 0.003);
     gain.gain.exponentialRampToValueAtTime(0.0001, pt + dur);
     src.start(pt); src.stop(pt + dur + 0.02);
   }
@@ -1429,6 +1431,7 @@
     const ms = Math.max(0, (pt - actx.currentTime)*1000);
     setTimeout(() => { carRear.classList.add('pop'); clearTimeout(popFlashT); popFlashT = setTimeout(() => carRear.classList.remove('pop'), 70); }, ms);
   }
+  const POP_GAIN = 18; // every pop and bang: at 1 they sat under the six's own level (the M5 CS's levels; tools/pops)
   // rev limiter: the first slam into the cut is a sharp bang; flaps open it adds a couple of crackles behind it
   function playLimiterHit(){
     if(!actx || !soundOn || layerVol.limiter <= 0.01) return;
@@ -1443,8 +1446,8 @@
     const k = clamp01((rpmAtShift - 3.5)/(REDLINE - 3.5)) * clamp01(load*1.4) * (drivelogic === 3 ? 1 : 0.6) * (setup.engine === 'sportplus' ? 1 : 0.7);
     if(k < 0.15) return;
     const t = actx.currentTime;
-    burst(t, 0.08, 600, 140, 1.2, 10, 0.4*k*layerVol.shiftPop);
-    burst(t + 0.025, 0.045, 1500, 350, 1.6, 7, 0.2*k*layerVol.shiftPop);
+    burst(t, 0.08, 600, 140, 1.2, 10, 0.4*k*layerVol.shiftPop*POP_GAIN);
+    burst(t + 0.025, 0.045, 1500, 350, 1.6, 7, 0.2*k*layerVol.shiftPop*POP_GAIN);
     flashTips(t);
     CarDyno.pop(0, 0.5 + 0.5*k);
   }
@@ -1456,7 +1459,7 @@
     if(k < 0.1) return;
     const t = actx.currentTime, n = 2 + Math.floor(Math.random()*4);
     for(let i=0;i<n;i++){ const pt = t + 0.08 + Math.random()*0.25, bang = Math.random() < 0.3;
-      burst(pt, bang ? 0.1 : 0.045, bang ? 240 + Math.random()*160 : 900 + Math.random()*1200, bang ? 100 : 300, bang ? 1.1 : 1.6, bang ? 10 : 7, (bang ? 0.28 : 0.16)*k*layerVol.shiftPop*(0.5+Math.random()*0.5));
+      burst(pt, bang ? 0.1 : 0.045, bang ? 240 + Math.random()*160 : 900 + Math.random()*1200, bang ? 100 : 300, bang ? 1.1 : 1.6, bang ? 10 : 7, (bang ? 0.28 : 0.16)*k*layerVol.shiftPop*POP_GAIN*(0.5+Math.random()*0.5));
       if(bang) flashTips(pt); CarDyno.pop(pt - t, bang ? 1 : 0.5); }
   }
 
@@ -1874,7 +1877,7 @@
     }
   }
   // one exhaust pop: distorted noise burst through a falling bandpass (a bang is longer, deeper, harder driven)
-  const liftPop = (pt, bang, freq, peak) => { burst(pt, bang ? 0.11 : 0.045, freq, bang ? 100 : 230, bang ? 1.1 : 1.6, bang ? 10 : 7, peak); if(bang) flashTips(pt); CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5); };
+  const liftPop = (pt, bang, freq, peak) => { burst(pt, bang ? 0.11 : 0.045, freq, bang ? 100 : 230, bang ? 1.1 : 1.6, bang ? 10 : 7, peak*POP_GAIN); if(bang) flashTips(pt); CarDyno.pop(pt - actx.currentTime, bang ? 1 : 0.5); };
 
   // ---- fuel: 59 L tank, 8 L reserve ----
   const TANK_SIZE_L = 59, RESERVE_L = 8, REFUEL_RATE = 0.12, PETROL_KG_PER_L = 0.745;

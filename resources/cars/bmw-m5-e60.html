@@ -814,7 +814,9 @@
     if(actx) return;
     actx = new (window.AudioContext||window.webkitAudioContext)();
     masterGain = gainN(soundOn ? MASTER_BASE*layerVol.master : 0);
-    masterGain.connect(actx.destination);
+    const clip = actx.createWaveShaper(); // safety soft clip for the loudest bangs: untouched below -6 dBFS (a compressor's makeup gain would lift it all)
+    clip.curve = Float32Array.from({ length: 1025 }, (_, i) => { const x = i/512 - 1, a = Math.abs(x); return a < 0.5 ? x : Math.sign(x)*(0.5 + 0.5*Math.tanh(2*a - 1)); });
+    masterGain.connect(clip).connect(actx.destination);
     fetch('/audio/bmw-chime.mp3').then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b))
       .then(b => { chimeBuf = b; if(chimeWanted && ignition) playStartChime(); }).catch(() => {}); // optional - no file, no chime
     noiseBuf = noiseBuffer(2);
@@ -921,7 +923,7 @@
 
     // one-shot buses (mixer-trimmable)
     shiftBus = gainN(1); shiftBus.connect(masterGain);
-    popBus = gainN(1); popBus.connect(masterGain);
+    popBus = gainN(48); popBus.connect(masterGain); // overrun pops + upshift crack: at 1 they sat under the V10's own level (tools/pops)
     pumpBus = gainN(layerVol.smgPump); pumpBus.connect(masterGain);
 
     const trims = { exhaust:exhaustTrim, body:bodyTrim, intake:intakeTrim, mech:mechTrim, sap:sapTrim, starter:starterTrim, gear:gearTrim, smgPump:pumpBus };
@@ -989,7 +991,7 @@
     // rev cut (9,500): the fuel cut chops the whole engine bus, with a bang as it's first hit
     const limiterActive = limiterCut && thr > 0.05;
     limiterDepth.gain.setTargetAtTime(limiterActive ? 0.85*layerVol.limiter : 0, t, 0.02);
-    if(limiterActive && !limiterWasActive) burst(t, 0.1, 300, 100, 1.1, 8, 0.25*layerVol.limiter);
+    if(limiterActive && !limiterWasActive) burst(t, 0.1, 300, 100, 1.1, 8, 0.25*layerVol.limiter, masterGain);
     limiterWasActive = limiterActive;
   }
   // secondary air: on for the first ~80 s of a cold start
@@ -1196,7 +1198,7 @@
   highBeamBtn.addEventListener('click', ()=>{ toggleHighBeam(); highBeamBtn.blur(); });
 
   /* ---------------- check-control display (upper LCD): symbols + short messages ---------------- */
-  const UP = { bang:$('up-bang'), flag:$('up-flag'), fuel:$('up-fuel'), temp:$('up-temp'), oil:$('up-oil'), text:$('up-text') };
+  const UP = { bang:$('up-bang'), flag:$('up-flag'), fuel:$('up-fuel'), temp:$('up-temp'), oil:$('up-oil'), batt:$('up-batt'), text:$('up-text') };
   const upperEl = $('upper'), upL1 = $('up-l1'), upL2 = $('up-l2');
   let upShown = null, upMsg = null, upMsgT = 0;
   function flashMsg(l1, l2){ upMsg = [l1, l2 || '']; upMsgT = 2.4; }

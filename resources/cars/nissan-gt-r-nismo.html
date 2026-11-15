@@ -1007,7 +1007,9 @@
     if(actx) return;
     actx = new (window.AudioContext||window.webkitAudioContext)();
     masterGain = gainNode(soundOn ? MASTER_BASE*layerVol.master : 0);
-    masterGain.connect(actx.destination);
+    const clip = actx.createWaveShaper(); // safety soft clip for the loudest bangs: untouched below -6 dBFS (a compressor's makeup gain would lift it all)
+    clip.curve = Float32Array.from({ length: 1025 }, (_, i) => { const x = i/512 - 1, a = Math.abs(x); return a < 0.5 ? x : Math.sign(x)*(0.5 + 0.5*Math.tanh(2*a - 1)); });
+    masterGain.connect(clip).connect(actx.destination);
     noiseBuf = noiseBuffer(2);
     const trim = (id) => { const g = gainNode(layerVol[id]); (trims[id] = trims[id] || []).push(g); return g; };
 
@@ -1243,7 +1245,7 @@
     const g = gainNode(0.0001);
     src.connect(shaper(drive)).connect(filter).connect(g).connect(dest);
     g.gain.setValueAtTime(0.0001, pt);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(0.6, peak)), pt + 0.003);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(8, peak)), pt + 0.003);
     g.gain.exponentialRampToValueAtTime(0.0001, pt + dur);
     src.start(pt, Math.random()*1.5); src.stop(pt + dur + 0.02);
   }
@@ -1276,15 +1278,17 @@
     const g = clamp01((rpmAtShift - 4.2)/2.6)*clamp01(load*1.3)*k;
     if(g < 0.12) return;
     const t = actx.currentTime;
-    burst(shiftBus, t, 0.075, 480, 130, 1.2, 8, 0.28*g);
-    burst(shiftBus, t + 0.004, 0.03, 2400, 1200, 2, 3, 0.05*g);
+    burst(shiftBus, t, 0.075, 480, 130, 1.2, 8, 0.28*g*POP_GAIN);
+    burst(shiftBus, t + 0.004, 0.03, 2400, 1200, 2, 3, 0.05*g*POP_GAIN);
+    CarDyno.pop(0, 0.5 + 0.5*g);
   }
   // downshift: the TCU blips the throttle to match revs - a gasp of induction, then a crackle as it shuts again
   function playBlip(rpmK, k){
     if(!actx || !soundOn || layerVol.shiftFx <= 0.01) return;
     const t = actx.currentTime, g = clamp01((rpmK - 1.5)/5)*k;
     burst(shiftBus, t, 0.14, 1500, 600, 0.9, 1.4, 0.03 + 0.05*g);
-    if(g > 0.25) for(let i=0;i<2 + Math.floor(Math.random()*3);i++) burst(shiftBus, t + 0.16 + Math.random()*0.22, 0.035, 700 + Math.random()*400, 200, 1.4, 7, (0.05 + Math.random()*0.08)*g);
+    if(g > 0.25) for(let i=0;i<2 + Math.floor(Math.random()*3);i++){ const dt = 0.16 + Math.random()*0.22;
+      burst(shiftBus, t + dt, 0.035, 700 + Math.random()*400, 200, 1.4, 7, (0.05 + Math.random()*0.08)*g*POP_GAIN); CarDyno.pop(dt, 0.5); }
   }
   // the clutches taking up drive at a crawl (P/R/D, 1-2 in traffic): the GR6's dull clunk
   function playClunk(k){
@@ -1294,14 +1298,17 @@
     burst(shiftBus, t + 0.006, 0.025, 2900, 1700, 3, 2, 0.04*k);
   }
   // overrun: hot exhaust after a hard pull pops and crackles for a moment as the fuel cut shuts the injectors
+  // every pop and crack: at 1 they sat under the six's own level; the heat built too slowly for one pull to crackle (tools/pops)
+  const POP_GAIN = 40;
   let crackleT = 0, crackleHeat = 0;
   function updateCrackle(dt, overrun, rpmK, heatIn){
-    crackleHeat = Math.max(0, Math.min(1, crackleHeat + heatIn*dt*0.5 - dt*0.18));
+    crackleHeat = Math.max(0, Math.min(1, crackleHeat + heatIn*dt*2 - dt*0.18));
     if(!actx || !soundOn || !overrun || rpmK < 2.6 || crackleHeat < 0.15) return;
     if((crackleT -= dt) > 0) return;
     crackleT = 0.05 + Math.random()*0.22/crackleHeat;
     const t = actx.currentTime, k = crackleHeat*clamp01((rpmK - 2.4)/3)*SND_HW.ex*Math.min(1.5, burble);
-    burst(shiftBus, t, 0.03 + Math.random()*0.03, 500 + Math.random()*700, 160, 1.3, 7, (0.03 + Math.random()*0.07)*k);
+    burst(shiftBus, t, 0.03 + Math.random()*0.03, 500 + Math.random()*700, 160, 1.3, 7, (0.03 + Math.random()*0.07)*k*POP_GAIN);
+    CarDyno.pop(0, 0.5);
   }
   // starter: the pinion clacks in, the motor labours through every compression (~11 Hz on six cylinders),
   // then whirs up and spins down as the engine catches and throws it out

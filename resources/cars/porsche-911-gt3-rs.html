@@ -701,7 +701,9 @@
     if(actx) return;
     actx = new (window.AudioContext||window.webkitAudioContext)();
     masterGain = gainN(soundOn ? MASTER_BASE*layerVol.master : 0);
-    masterGain.connect(actx.destination);
+    const clip = actx.createWaveShaper(); // safety soft clip for the loudest bangs: untouched below -6 dBFS (a compressor's makeup gain would lift it all)
+    clip.curve = Float32Array.from({ length: 1025 }, (_, i) => { const x = i/512 - 1, a = Math.abs(x); return a < 0.5 ? x : Math.sign(x)*(0.5 + 0.5*Math.tanh(2*a - 1)); });
+    masterGain.connect(clip).connect(actx.destination);
     noiseBuf = noiseBuffer(2);
 
     // ---- radiator fans ----
@@ -812,7 +814,7 @@
 
     // one-shot buses (mixer-trimmable)
     shiftBus = gainN(1); shiftBus.connect(masterGain);
-    popBus = gainN(1); popBus.connect(masterGain);
+    popBus = gainN(48); popBus.connect(masterGain); // overrun pops + upshift crack: at 1 they sat under the flat six's own level (tools/pops)
 
     const trims = { exhaust:exhaustTrim, body:bodyTrim, intake:intakeTrim, mech:mechTrim, sap:sapTrim, starter:starterTrim, gear:gearTrim, turbo:turboTrim };
     const setTrim = id => f => { layerVol[id] = f; if(trims[id]) trims[id].gain.setTargetAtTime(f, actx.currentTime, 0.03); };
@@ -878,7 +880,7 @@
     // rev limiter (9,000): the fuel cut chops the whole engine bus, with a bang as it's first hit
     const limiterActive = limiterCut && thr > 0.05;
     limiterDepth.gain.setTargetAtTime(limiterActive ? 0.85*layerVol.limiter : 0, t, 0.02);
-    if(limiterActive && !limiterWasActive) burst(t, 0.1, 320, 110, 1.1, 8, 0.25*layerVol.limiter);
+    if(limiterActive && !limiterWasActive) burst(t, 0.1, 320, 110, 1.1, 8, 0.25*layerVol.limiter, masterGain);
     limiterWasActive = limiterActive;
   }
   // the kit's twins: whistle pitch glides up with boost (lagging on the way up, coasting down for seconds after a lift)
@@ -942,6 +944,7 @@
     if(k < 0.2) return;
     const t = actx.currentTime;
     burst(t, 0.07, 520, 140, 1.2, 9, 0.3*k*layerVol.shiftFx);
+    CarDyno.pop(0, 0.5 + 0.5*k);
   }
 
   // radiator fans: as car-tune.js runs them - on 9C past the thermostat, off again 5C past it
@@ -1163,12 +1166,14 @@
     for(let i=0;i<count;i++){
       const pt = t + 0.05 + Math.random()*Math.random()*0.9, bang = Math.random() < 0.2;
       burst(pt, bang ? 0.11 : 0.045, bang ? 300 + Math.random()*200 : 900 + Math.random()*1200, bang ? 100 : 220, bang ? 1.1 : 1.6, bang ? 9 : 6, (bang ? 0.3 : 0.16)*Math.max(0.6, load)*amt*(0.5 + Math.random()*0.5));
+      CarDyno.pop(pt - t, bang ? 1 : 0.5);
     }
   }
   function playBurble(rpmF){
     if(!actx || !soundOn || layerVol.liftCrackle <= 0.01) return;
     const t = actx.currentTime;
     burst(t, 0.045, 700 + rpmF*900 + Math.random()*500, 220, 1.6, 6, 0.1*(0.4 + 0.6*rpmF)*layerVol.liftCrackle*(0.5 + Math.random()*0.5));
+    CarDyno.pop(0, 0.5);
   }
 
   // ---- fuel: 64 L tank, reserve at 10 L ----

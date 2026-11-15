@@ -1307,7 +1307,9 @@
     if(actx) return;
     actx = new (window.AudioContext||window.webkitAudioContext)();
     masterGain = actx.createGain(); masterGain.gain.value = soundOn ? MASTER_BASE*layerVol.master : 0;
-    masterGain.connect(actx.destination);
+    const clip = actx.createWaveShaper(); // safety soft clip for the loudest bangs: untouched below -6 dBFS (a compressor's makeup gain would lift it all)
+    clip.curve = Float32Array.from({ length: 1025 }, (_, i) => { const x = i/512 - 1, a = Math.abs(x); return a < 0.5 ? x : Math.sign(x)*(0.5 + 0.5*Math.tanh(2*a - 1)); });
+    masterGain.connect(clip).connect(actx.destination);
     fetch('/audio/bmw-chime.mp3').then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b))
       .then(b => { chimeBuf = b; if(chimeWanted && ignition) playStartChime(); }).catch(() => {}); // chime is optional - no file, no chime
 
@@ -1742,6 +1744,7 @@
   }
 
 
+  const POP_GAIN = 12; // every pop and bang: at 1 they sat under the four's own level and got lost (tools/pops)
   // upshift crackle: petrol turbo pop-bang on gear-up - brighter and snappier than a diesel's brap,
   // tight rapid-fire pops. Gated on the rpm the engine was actually at when it shifted, same as the
   // diesels, so a lazy low-rev D shift stays quiet and a hard shift near redline cracks off properly.
@@ -1769,7 +1772,7 @@
       filter.frequency.exponentialRampToValueAtTime(220, pt+0.045);
       const gain = actx.createGain(); gain.gain.value = 0.0001;
       src.connect(shaper).connect(filter).connect(gain).connect(masterGain);
-      const peak = Math.max(0.001, Math.min(0.5, (0.16 + loadFactor*0.28) * amt) * (1 - i*0.18));
+      const peak = Math.max(0.001, Math.min(0.5, (0.16 + loadFactor*0.28) * amt) * (1 - i*0.18) * POP_GAIN);
       gain.gain.setValueAtTime(0.0001, pt);
       gain.gain.exponentialRampToValueAtTime(peak, pt+0.003);
       gain.gain.exponentialRampToValueAtTime(0.0001, pt+0.055);
@@ -1804,7 +1807,7 @@
       filter.frequency.exponentialRampToValueAtTime(150, pt+0.055);
       const gain = actx.createGain(); gain.gain.value = 0.0001;
       src.connect(shaper).connect(filter).connect(gain).connect(masterGain);
-      const peak = Math.max(0.001, Math.min(0.45, (0.12 + loadFactor*0.24) * amt) * (0.5 + Math.random()*0.5));
+      const peak = Math.max(0.001, Math.min(0.45, (0.12 + loadFactor*0.24) * amt) * (0.5 + Math.random()*0.5) * POP_GAIN);
       gain.gain.setValueAtTime(0.0001, pt);
       gain.gain.exponentialRampToValueAtTime(peak, pt+0.004);
       gain.gain.exponentialRampToValueAtTime(0.0001, pt+0.07);
@@ -2066,7 +2069,7 @@
     const gain = actx.createGain(); gain.gain.value = 0.0001;
     src.connect(shaper).connect(filter).connect(gain).connect(masterGain);
     gain.gain.setValueAtTime(0.0001, pt);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(0.55, peak)), pt + 0.003);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, Math.min(0.55, peak)*POP_GAIN), pt + 0.003);
     gain.gain.exponentialRampToValueAtTime(0.0001, pt + dur);
     src.start(pt);
     src.stop(pt + dur + 0.02);
