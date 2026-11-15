@@ -657,7 +657,12 @@ function gotWorld(m) {
     b.onpointerup = () => { if (!b.classList.contains('down')) return; b.classList.remove('down'); send({ teleport: n }); toast('Teleport', name); };
     return b;
   }));
-  const dot = (name, color, cls = '') => { const el = document.createElement('span'); el.innerHTML = `<i class="${cls}" style="--c:${color}"></i>`; el.append(name); return el; };
+  const dot = (name, color, cls = '') => { // (built, not innerHTML: the colour comes over the socket)
+    const el = document.createElement('span'), i = Object.assign(document.createElement('i'), { className: cls });
+    i.style.setProperty('--c', color);
+    el.append(i, name);
+    return el;
+  };
   $('legend').replaceChildren(dot('You', '#ff5a3c', 'you'), ...(m.legend || []).map(([name, color]) => dot(name, color)));
 }
 function drawWorld() {
