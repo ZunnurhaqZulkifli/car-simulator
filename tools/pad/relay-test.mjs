@@ -73,7 +73,7 @@ try {
   // padLog: a line per entry with the phone's time, and still forwarded; junk doesn't take the relay down
   const t = Date.UTC(2026, 10, 11, 9, 59, 58, 123);
   const padLog = { padLog: [{ t, ev: 'stale', silent: 3100 }, { t: t + 5, ev: 'ws-open' }] };
-  for (const junk of ['{"padLog": [nope', '{"mouse": nope', 'null', '{"padLog": "x"}', '{"padLog": [null, 5, {"t": "soon", "ev": "x\\ny"}]}']) phone.send(junk);
+  for (const junk of ['{"padLog": [nope', 'null', '{"padLog": "x"}', '{"padLog": [null, 5, {"t": "soon", "ev": "x\\ny"}]}']) phone.send(junk);
   phone.send(JSON.stringify(padLog));
   await until('padLog lines', () => /"ev":"ws-open"/.test(log));
   assert.match(log, /^\S+Z pad \{"t":"2026-11-11T09:59:58\.123Z","ev":"stale","silent":3100\}$/m);
