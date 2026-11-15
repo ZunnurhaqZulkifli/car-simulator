@@ -24,8 +24,10 @@ and a memory.
 
 Pick a car in the **garage** and press **Drive**. It starts outside your home garage in a 3D world with an autobahn,
 mountain roads, a village, three towns, an airfield, a multi-storey car park, a racetrack and the Nordschleife, a drift
-park, a drag strip, a mall, and Westhaven - a second city with a second home 50 km down the west road - with traffic on
-every road, by day or night, in any season and any weather. The in-car view shows the car's own live instrument cluster in the dash.
+park, a drag strip, a mall, Westhaven - a second city with a second home 50 km down the west road - and the run to the
+Genting Highlands and Kuantan: the real KL–Karak Expressway from Gombak's toll plaza through the Genting Sempah tunnel, the
+real Genting Highlands road up to the resort (a safe house at the top), and the East Coast Expressway to Kuantan by the
+sea (a third home there) - with traffic on every road, by day or night, in any season and any weather. The in-car view shows the car's own live instrument cluster in the dash.
 Press **Tab** and the whole car page opens over the road: every control, live data, the tuning maps, the dyno and the
 diagnostics, while the car keeps rolling. Your phone can be the steering wheel, and even the Mac's trackpad.
 
@@ -54,6 +56,9 @@ are saved per car, and every drive, refuel, service and tune is logged so you ca
 | BMW 335i (E90) | N55 3.0 turbo I6 | ZF 6HP | ✅ | rear-drive N55 on the 320d's physics loop; drives Titanium Silver on black 18" double-spokes with the M Sport front |
 | Honda NSX-R (NA1) | C30A 3.0 VTEC V6 (no turbo) | 5-speed manual | ✅ | VTEC from 5,800 rpm you can hear and feel (it needs load, a warm engine and road speed, so not in neutral), 8,000 rpm red line, mph cluster from a US NA1, supercharger kit; drives the stock right-hand-drive 1992 car in metallic Formula Red on its own white wheels, red Recaros inside |
 | Nissan GT-R NISMO (R35, 2018) | VR38DETT 3.8 twin-turbo V6 | GR6 dual-clutch | ✅ | mph cluster from a US NISMO with the night bulb-check lamps, the centre screen's meter page for live data; drives the N-Attack Package car in Nismo white on its black wheels (right-hand drive, the SUSP switch firms its roll); ATTESA E-TS all-wheel drive with a live front-torque split, R / Normal / Save TRANS, SUSP and VDC switches, R-mode launch, two-step start (ignition, then brake + START) with a needle sweep; twin-turbo whistle and bypass whoosh, the GR6's idle rattle, dual-clutch shift bark and rev-matched blips |
+| Audi RS 6 Avant performance (C7, 2017) | 4.0 TFSI twin-turbo V8 | 8-speed tiptronic | ✅ | the C7's cluster from a photo: progressive dials (0 at READY, OFF below it), LED-bar coolant and fuel gauges, the FIS with its RS 6 splash and Speed page; Audi drive select (comfort / auto / dynamic: shifts, exhaust flaps, overboost to 750 Nm), D / S / tiptronic, launch control, quattro 40:60 split, cylinder on demand (a four-cylinder thrum and "4-cylinder mode" at a light cruise), start-stop; a cross-plane V8 that burbles by bank, cold-start flare, upshift brap and overrun crackle in dynamic, the steering lock, pump prime and Audi's warning gong at key-on; drives a 2020 RS 6 Avant in Nardo Grey on its 22s and red calipers, the cluster filling the hood over its screen |
+| BMW M3 (F80, 2015) | S55 3.0 twin-turbo I6 | 7-speed M DCT | ✅ | the F8x cluster from a photo with every warning lamp where BMW's KOMBI diagram puts it (`?bulbs` lights them all), shift-light fields that start low on a cold engine and a rev limit that rises with the oil temperature, the EfficientDynamics gauge; Drivelogic, D / S, M1 / M2, engine / EDC / steering / DSC modes, launch control; the S55's sound fitted to a real recording (its two triples' uneven pulse, a crack on lift-off); drives in bright metallic blue with the carbon roof and gold calipers, left-hand drive, its whole cabin modelled |
+| BMW X3 M40i (G01 LCI, 2024) | B58 3.0 turbo I6 (OPF) | ZF 8HP Steptronic Sport | ✅ | the 12.3" OS7 digital cluster traced from a photo: Comfort (orange needles with their glow), Sport (the brackets fill red, white needles, torque and power bars), ECO PRO; every lamp where BMW's OS7 training figure puts it (`?bulbs` lights them all); xDrive, launch control; a quieter, OPF-muffled B58 whose flaps open in Sport (louder, rougher, burble on lift-off); drives in Alpine White under the black panoramic roof on its 21s and blue M calipers, left-hand drive, the live OS7 display in the model's own binnacle, DRLs lit, reversing lamps in R |
 | BMW 550D | twin-turbo diesel I6 | ZF 8HP | — | the original cluster |
 | Proton Iriz | petrol I4 | CVT | — | hatchback cluster |
 
@@ -74,8 +79,9 @@ Clusters are matched to reference photos of the real cars, down to the numeral f
 | 🏘️ **Midtown & Southgate** | Two more towns on the oval's infield, each on its own ring road |
 | 🏁 **Drift park, drag strip, mall** | North of Midtown: a walled, floodlit skid pad with a figure of eight; a drag strip with start and finish gantries and a 402 m timer (time, speed at the line, best per car); the North Mall and its car park |
 | 🛣️ **West road & Westhaven** | Off the autobahn's west straight: a 2+2 highway with a double white line, 31 km of three-lane autobahn with a service area (fuel and a workshop both ways), then highway again, roadside fuel and a workshop, to Westhaven, a 2 x 1.5 km city 50 km west with a second home (its garage swaps cars too) |
+| 🇲🇾 **Genting Highlands & Kuantan** | Off the city's ring road, north: the Gombak link to **Gombak's toll plaza** and the **KL–Karak Expressway** - the real road from OpenStreetMap at real size with its real climbs and drops (three lanes each way to past Genting Sempah, two on to Karak), its viaducts and the **Genting Sempah tunnel**. At **Genting Sempah**, the slips up to the roundabout over the tunnel (and back down over the expressway to KL; east of the tunnel, the rest area's roundabout and its slips, the one onto the Karak-bound side bridging it), barriers both sides, and the real **Genting Highlands road**: its toll, **Gohtong Jaya** (fuel, its big roundabout, the apartment towers), the hairpins up past 1,600 m where the way up and the way down part, one way round the **resort** (OSM's buildings, First World in its colours) and a **safe house** off the loop at the top (its garage swaps cars). Up there too: **Chin Swee Caves Temple** off the way up (its gate, a nine-storey pagoda, Qing Shui's statue), the **Awana SkyWay** - gondolas on towers from its station on the way up, through Chin Swee's station to SkyAvenue at the top - and a **lookout** off the way down with the gondolas going by. Rest-and-service areas with fuel and a workshop both ways at **Genting Sempah** and **Bentong**, fuel at Gohtong Jaya and at the top, workshops on the way up from the Sempah exit and at the top. Past **Karak's toll plaza** the **East Coast Expressway** (the LPT, shrunk to 0.3 of its 159 km, its bends and land with it) through oil palm estates, with rest areas at **Temerloh** and **Gambang**, to **Kuantan's toll plaza** and **Kuantan**, a town by the beach and the South China Sea with its blue-domed state mosque and a **third home**. Rainforest on real terrain, red laterite cuttings, retaining walls where a slip runs beside the expressway at another level, green expressway signs; light traffic. The land and roads are drawn only near the car, in tiles |
 | 🔀 **Ring bypass** | Off the valley road east of home, straight over the direct road and up the hills to the Ring road above the Nordschleife's pits |
-| 🚗 **Traffic** | About 1,000 cars on every road, keeping left, at each road's pace: slowing for bends and for the car ahead (or yours), passing on the multi-lane roads, turning on and off side roads (only their own way down one-way ramps, and from their own side of the road; at a split before a closed lane they always take the ramp, and at a road's end they move over to a lane with a way on rather than turning round), round the city's roundabout, easing through turns, lamps lit at night. Flash your high beam from close behind at speed on a multi-lane road and the car ahead moves over. Hit one and it's shoved aside and turned while you carry on (never under 40% of your speed); it eases back into its lane. Six models (Audi RS4 B7, RS4 Avant, RS3 Sportback, VW Polo 170 TSI, Polo sedan, a Mercedes V8), the nearest drawn as themselves |
+| 🚗 **Traffic** | About 1,250 cars on every road (a light sprinkling on the Genting road, a little more on the KL–Karak and the LPT), keeping left, at each road's pace: slowing for bends and for the car ahead (or yours), passing on the multi-lane roads, turning on and off side roads (only their own way down one-way ramps, and from their own side of the road; at a split before a closed lane they always take the ramp, and at a road's end they move over to a lane with a way on rather than turning round), round the city's roundabout, easing through turns, lamps lit at night. Flash your high beam from close behind at speed on a multi-lane road and the car ahead moves over. Hit one and it's shoved aside and turned while you carry on (never under 40% of your speed); it eases back into its lane. Six models (Audi RS4 B7, RS4 Avant, RS3 Sportback, VW Polo 170 TSI, Polo sedan, a Mercedes V8), the nearest drawn as themselves |
 | ✈️ **Airfield** | A runway to open it up on |
 | 🅿️ **Car park** | A multi-storey with ramps and bays; stop in a bay to swap cars, like the home garage |
 | 🏁 **Racetrack** | ~9 km with kerbs, gravel, chicanes, a grandstand, start lights, a pit lane and 12 garages |
@@ -83,18 +89,20 @@ Clusters are matched to reference photos of the real cars, down to the numeral f
 | 🏠 **Places that do things** | Home garage (swap cars), the mechanic (servicing and repairs happen only there), fuel pumps (engine off to refuel), pit garages (swap, tune, refuel) |
 | 💥 **Physical world** | Collisions with walls, rails, buildings and trees; crash sounds scaled to the hit |
 | 🌦️ **Time & weather** | `\` (or the HUD clock): Dawn / Day / Dusk / Night with a running clock (a day in 24 minutes), the four German seasons, Clear / Cloudy / Rain / Fog / Snow, or **Live**: the Nürburgring's clock, season and weather now (Open-Meteo). Rain and snow cut the cars' grip, traction and braking |
-| 💡 **Lights** | Low and high beam from each model's own lamps (`L` / `H`), a Beam brightness slider in the car menu, glowing brake lights. At night every road has street lamps (tall masts on the autobahn, small dim ones on the mountain roads and the Nordschleife), floodlights at home, the fuel stations, workshops, pits, airfield apron and every car park deck, the nearest lamps lighting your car as you pass, runway edge lights, and reflector posts that glint in your headlights |
+| 💡 **Lights** | Low and high beam from each model's own lamps (`L` / `H`), a Beam brightness slider in the car menu, glowing brake lights. At night every road has street lamps (tall masts on the autobahn, twin-arm masts down the median the whole length of the KL–Karak and the LPT, small dim ones on the mountain roads and the Nordschleife), floodlights at home, the fuel stations, workshops, pits, airfield apron, every car park deck and the toll plazas, the Genting Sempah tunnel lit inside (the daylight dims as you drive in), the nearest lamps lighting your car as you pass, runway edge lights, and reflector posts that glint in your headlights |
 | 🛞 **Tyre physics & drift mode** | `;` switches drift mode (off by default). Off: the grip model, every car turns as hard as its tyres allow. On: tyres that slip - weight transfer, a friction circle, the drive split of each car's xDrive mode, DSC / DTC / MDM / PSM that catch or allow a slide, a handbrake that locks the rears, and a countersteer assist that holds a drift on the throttle. The 320d, the drift car, gets the road's real friction in rain and snow |
 | 🚗 **Body roll** | The body squats, dives and leans on its springs, firmer with each car's chassis / EDC / PASM setting and the Handling tab's springs, bars and dampers; lowered cars sit lower |
 | 🛠️ **Tuned handling** | Every car's Handling tab feeds the tyre model each frame: cornering grip per axle (understeer / oversteer), downforce that grows with speed² (and drag that costs top speed), how fast the car answers the wheel, the tail stepping out near the limit on an oversteer setup, the CG height, brake bias, diff locking and the tyres' wet grip (slicks in the rain are treacherous) |
-| 💨 **Sense of speed** | The view widens with speed (65° to ~82° chase, 50° to ~60° in the car), the chase camera hangs back as the car pulls away and drops lower at speed, short Malaysian-style lane dashes (4.5 m line, 7.5 m gap) flicking past, and wind noise rising with speed² |
+| 💨 **Sense of speed** | The view widens with speed (on top of the Camera settings' FOV: 65° chase, 70° in the car by default), the chase camera hangs back as the car pulls away and drops lower at speed, short Malaysian-style lane dashes (4.5 m line, 7.5 m gap) flicking past, and wind noise rising with speed² - a roar, low buffeting and an A-pillar whistle, plainly heard over every car's engine from ~100 km/h. Window glass is clear from outside and gone entirely from the driver's seat |
+| ⚙️ **Settings** | `]` (or the gear button). **Graphics:** FPS cap 30 / 60 / 120 / unlimited, resolution 50-100 %, texture quality, view distance, antialiasing (on reload), an FPS meter. **Camera:** in-car and chase FOV, chase distance and height, head position, reset. **Audio:** the drive page's own sounds' volumes, 0-200 % - wind, crashes, the indicator tick - and a reset (the engine is the car page's mix). **Pad:** the phone pad's live connection (relay, phone, round trip in ms) and a log of every drop - from the drive page, the relay and the phone - with Copy and Clear |
+| 💥 **Engine failure & smoke** | A blown engine goes up with a fireball and a cloud from its bay (front, mid or rear), sparks and debris, a black cough from the exhaust and a shake, then smokes as it rolls to a stop with the key still on. Worn rings, turbo seals, PCV valve or head gasket blow blue oil smoke; petrol engines running rich at high load puff black |
 | 📊 **Telemetry** | A g-g circle, the pedals, the temperatures that matter on a track day, and the worn parts |
 | 🗺️ **Overview map** | `'` opens the whole world north up: autobahn, highway, racetracks, ramps and flyovers, links and mountain roads, streets and the runway in their own colours with a legend, the places named, fuel, homes, mechanics and pits marked, your car on it, a scale bar; scroll or pinch zooms round the pointer, drag moves it, + / − / All / Me |
-| 📍 **Teleport** | `` ` `` or a click on the mini map: the racetrack, the Nordschleife (both pits), the mountain, the autobahn, the airfield, home, the towns, the car park, the village, the mechanic, the Ring bypass, the drift park, the drag strip, the mall, the west road, its service area, Westhaven and its home |
+| 📍 **Teleport** | `` ` `` or a click on the mini map: the racetrack, the Nordschleife (both pits), the mountain, the autobahn, the airfield, home, the towns, the car park, the village, the mechanic, the Ring bypass, the drift park, the drag strip, the mall, the west road, its service area, Westhaven and its home, Gombak toll, Genting Sempah, the Genting Highlands road and its two workshops, Gohtong Jaya, the Awana SkyWay, Chin Swee Temple, the Genting Highlands resort, lookout and safe house, Bentong, Karak toll, Temerloh, Kuantan and its home |
 | ⏱️ **Lap timer** | `/` times Nordschleife laps: current, last and best, with a leaderboard of every car's best lap (kept in this browser) |
 | 🔥 **Backfire** | Flame from the tips on every overrun pop, burble and upshift crack the car's sound plays, timed to it: a flicker for a crackle, a bigger lick for a bang |
 | 🛞 **Tyres and smoke** | Rubber marks on wheelspin, traction control and hard launches; tyre smoke; black diesel smoke that follows the tune |
-| 🎥 **Views** | Chase view, and an in-car view with the live cluster in the dash of a right-hand-drive cabin; two-finger swipe to look around |
+| 🎥 **Views** | Chase view, and an in-car view with the live cluster in the car's own dash, from the side its maker built it (left-hand drive, but for the JDM NSX-R and GT-R); two-finger swipe to look around |
 | 🗺️ **Mini map** | Turns with the car, zooms to the place you're in, with a legend for its spots: fuel, home and the car park, mechanics and pits, the viewpoint, start lines, the village |
 | 🧪 **Dyno rollers** | In Dyno mode the wheels turn but the car stays put, so a pull can't drive you off |
 
@@ -114,7 +122,7 @@ Clusters are matched to reference photos of the real cars, down to the numeral f
 
 | Script | What it adds |
 |---|---|
-| `car-tune.js` | **Tuning.** An engine model (air, fuel, ignition / injection) with per-cylinder knock. Maps for boost, timing, AFR or fuel quantity, injection timing and rail pressure; rev, shift and launch rpm, the speed limiter, a torque limit, shift speed, burbles, smoke, EGR / DPF; gear ratios, shift points and torque limits per gear. Presets per engine (Stage 1–3, bootmod3, big turbos, twin-turbo kits). A parts catalogue with real dependencies: turbo, intercooler, downpipe, charge pipes, diverter, injectors, fuel pumps, port injection, RON 95 / 98 / 102 / E85, forged or built internals, head gasket, gearbox, radiator and brakes. It warns you (lean, over the rods' torque, knock-limited) and punishes you: parts wear, fault codes, limp mode. Two map slots, a library of 20 saved setups, a datalog and a guide |
+| `car-tune.js` | **Tuning.** An engine model (air, fuel, ignition / injection) with per-cylinder knock. Maps for boost, timing, AFR or fuel quantity, injection timing and rail pressure; rev, shift and launch rpm, the speed limiter, a torque limit, shift speed, burbles, smoke, EGR / DPF; gear ratios, shift points and torque limits per gear. Presets per engine (Stage 1–3, bootmod3, big turbos, twin-turbo kits). A parts catalogue with real dependencies (35-45 parts per engine, in tiers up to race): turbo, intercooler, downpipe, charge pipes, diverter, injectors, fuel pumps, port injection, RON 95 / 98 / 102 / E85 and a flex-fuel sensor, water-methanol, boost control, throttle and manifold, a tubular turbo manifold, a ported head, forged, built or race internals, piston rings, PCV valve and catch can, crank pulley, flywheel, head gasket, gearbox, radiator, oil cooler and brakes. It warns you (lean, over the rods' torque, knock-limited) and punishes you: parts wear, fault codes, limp mode. Two map slots, a library of 20 saved setups, a datalog and a guide |
 | `car-handling.js` | **Handling**, on every car. Chassis parts - tyres (road, UHP, cup, slick, winter, drift), lowering springs, a sport kit, coilovers, race 2-way dampers, adjustable and race anti-roll bars, a camber kit, a lip, ducktail or splitter + GT wing, a clutch-pack LSD or a welded diff, strut braces or a cage, a quick rack, a brake bias valve - and their setup: tyre pressures, camber, toe, springs, bars, bump / rebound, ride height, splitter and wing, brake bias, diff power / coast lock, steering ratio. Each part unlocks its settings. Presets (Fast road, Track day, Time attack, Drift, Rain), live hints on what each value does, a chassis diagram (top and side), entry / mid / exit balance meters, a character radar, grip-against-speed and body-roll charts, a grip envelope, a table of every figure, and a tuning guide |
 | `car-service.js` | **Servicing.** Oil life and level, coolant, brake pads, tyres and pressure, battery. Discs heat up and fade; worn pads and tyres stop longer; old oil wears the engine faster. Worn parts raise dashboard messages with a chime, and minor faults turn up with wear and mileage |
 | `car-diagnostics.js` | **Diagnostics.** A scan tool: health ring, ECM / TCM / ABS / TPMS / BMS / BCM modules, fault memory you can clear, live data, and service functions like a compression test and DPF regeneration |
@@ -132,7 +140,9 @@ gear, speed, M shift lights and telltales (drive mode, lights, high beam, DSC of
 that has a state, and an accent that follows the drive mode (Comfort blue, Sport red, Eco Pro teal). A small
 relay (`scripts/pad-relay.mjs`) passes messages between the phone and the drive page; the phone reaches it over
 Tailscale (https, which iOS needs before it allows tilt), and its link is put on the clipboard each time the drive
-page opens.
+page opens. Beside the status dot the pad shows its round trip to the drive page in ms; it reconnects by itself when
+the link goes silent, and every drop (with why, from the phone, the relay and the drive page) lands in the drive page's
+Settings › Pad log.
 
 | Tab | |
 |---|---|
@@ -141,7 +151,8 @@ page opens.
 | **Setup** (**M Setup**) | The car's other keys (steering, xDrive, M Mode, M Sound, bootmod3…); hidden on a car with none |
 | **Lights** | Lights, high beam, headlight brightness |
 | **View** | A touchpad to look around, chase / in-car, Reset view |
-| **Extras** | Tab and Esc, and: **Map** (the whole world with your car on it, a legend, and every teleport spot - tap to go), **Weather** (the time & weather menu), **Sound** (Mute and every sound layer's slider), **Mouse** (below) |
+| **Settings** (gear, header) | The drive page's `]` Settings menu; lit while it's open |
+| **Extras** | Tab and Esc, and: **Map** (the whole world with your car on it, a legend, and every teleport spot - tap to go; drag to move it, pinch to zoom, twist to turn it, double-tap for the whole of it north up), **Weather** (the time & weather menu), **Sound** (Mute and every sound layer's slider), **Mouse** (below) |
 
 **Mouse** turns the phone into the Mac's trackpad and keyboard: one finger moves and taps to click, two scroll and
 tap to right-click, three drag and tap to look up, four swipe between Spaces / up for Mission Control / down for App
@@ -180,6 +191,7 @@ once macOS has given the relay Accessibility access. [docs/SETUP.md](docs/SETUP.
 | `/` | Nordschleife lap timer on / off |
 | `\` | time & weather |
 | `;` | drift mode on / off |
+| `]` | settings: graphics, camera, audio (wind / crash / indicator volume), the phone pad's connection log |
 
 Each car adds its own (gearbox mode, paddles, maps, xDrive, DSC, M modes…), listed on its page.
 
@@ -224,7 +236,7 @@ its speed to the world each frame; the world steers it, moves it and draws it.
 | `POST` | `/car/{slug}/activities/{id}/restore` | Put the car back to that point |
 
 `public/drive.html?car={slug}` is a static page: `&at=pits` starts in the racetrack's pit garage, `&at=ring` at the
-Nordschleife, `&at=bay<n>` in a car park bay, `&at=home2` at the Westhaven home, `&hour=0-3&season=spring|summer|autumn|winter&sky=clear|cloudy|rain|fog|snow`
+Nordschleife, `&at=bay<n>` in a car park bay, `&at=home2` at the Westhaven home, `&at=home3` at the Kuantan home, `&at=home4` at the Genting safe house, `&hour=0-3&season=spring|summer|autumn|winter&sky=clear|cloudy|rain|fog|snow`
 sets the time and weather, `&test_drive=1` drives without saving.
 
 ---
@@ -286,6 +298,21 @@ A car is one HTML file. To hook into the shared systems, its script:
 Upload it at `/upload`. To drive it in 3D as well, add a `.glb` to `public/models/`, an entry to `CARS` in
 `public/drive.html`, and its slug to `$drivable` in `resources/views/menu.blade.php`.
 
+**Preparing the model (prototype).** `public/glb-editor.html` opens a built-in car's model or your own `.glb` and
+tags its parts with the upload template's names: `paint_`, `glass_`, `cabin_`, `cabin_steering_`, `wheel_rim_`,
+`wheel_tyre_`, `head_lights_`, `tail_lights_` and `lamps_`. It checks the model the way drive.html's loader reads one:
+- its size at its real length, and which way it faces;
+- a tyre at every corner, with nothing but wheel spinning;
+- the steering rim and the driver's eye;
+- both lamps on each side.
+
+It can also turn the model, hide, delete and split parts into loose pieces, and export the renamed `.glb`. Every edit
+undoes with ⌘Z (Ctrl+Z) and redoes with ⇧⌘Z (Ctrl+Shift+Z or Ctrl+Y), and the editor's **User guide** button walks
+through all of it. A built-in car can be checked by its own `CARS` patterns or renamed to the template in one click.
+Cutting a part apart face by face still needs Blender. drive.html doesn't read template names by itself yet, so a
+template model still needs a `CARS` entry using the template's patterns. `node tools/glb-editor-probe.mjs` runs every
+built-in car through the editor.
+
 ---
 
 ## 🧱 Stack
@@ -302,19 +329,23 @@ Upload it at `/upload`. To drive it in 3D as well, add a `.glb` to `public/model
 composer test
 ```
 
-Feature tests cover the garage menu, layouts, names, the tune / history / restore flow and the handling save
-(`tests/Feature/`). The
+Feature tests cover the garage menu, layouts, names, the tune / history / restore flow, the handling save and the
+largest tune any car can save against the server's rules (`tests/Feature/`). Headless probes for the tuning, lamps,
+pops, drive settings and the pad relay live in `tools/` (each folder has a README). The
 drive page and the shared scripts run their own self-checks on load (steering, the tyre physics and drift mode,
 collisions, road heights, the phone pad's tilt) and report failures in the browser console.
 
 ## 🙏 Credits
 
-- 3D models from Sketchfab, credited on the drive page: M3 CS Touring, M5 Competition, M140i, 911 GT3 RS, NSX-R and GT-R NISMO by
+- 3D models from Sketchfab, credited on the drive page: M3 CS Touring, M5 Competition, M140i, 911 GT3 RS, NSX-R, GT-R NISMO, RS 6 Avant and X3 M40i by
   [Ddiaz Design](https://sketchfab.com/ddiaz-design), as are the X1's M Y-spoke wheels (from their 2020 X1); X1 (E84), F30 (and the
   M140i's steering wheel) and E90 by DEMON_SCARY1235; G30 by
-  Mona x Supercars; E60 by GT Cars: Hyperspeed. Licences are CC BY-NC-SA 4.0 or CC BY 4.0, as shown per car.
+  Mona x Supercars; E60 and M3 (F80) by GT Cars: Hyperspeed. Licences are CC BY-NC-SA 4.0 or CC BY 4.0, as shown per car.
 - Traffic, cut down for it (`public/models/npc`): 2008 Audi RS4, 2013 Audi RS4 Avant, 2018 Audi RS3 Sportback and 2024
   Volkswagen Polo 170 TSI by Ddiaz Design (CC BY-NC-SA 4.0); Cliff's Mercedes V8 Biturbo by Libau Media (CC BY 4.0);
   2017 Volkswagen Polo Sedan by KOElkastasbers (Sketchfab Standard).
 - Nordschleife line: © [OpenStreetMap](https://www.openstreetmap.org/relation/38566) contributors (ODbL); heights
   from the Copernicus DEM via [Open-Meteo](https://open-meteo.com/).
+- The Genting Highlands and Kuantan run (`public/js/karak.js`, `karak-terrain.bin`, made by `tools/karak`): the KL–Karak
+  and East Coast expressways, the Genting Highlands road and the resort's buildings © [OpenStreetMap](https://www.openstreetmap.org/copyright)
+  contributors (ODbL); the land from the [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (SRTM, via Mapzen).
