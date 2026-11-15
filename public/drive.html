@@ -378,6 +378,61 @@ const CARS = {
     exhaustX: 0.61, exhaustBoth: true, // a pair of tips at each corner
     arrows: [3.9, 90.85, 9.1], // in the binnacle's empty top corners
   },
+  // as it comes: nose-first, left-hand drive, on 22s with red calipers; painted Nardo Grey, the solid grey the RS 6 launched
+  // in. Prep merges each wheel's ~140 pieces (and each caliper's) into one mesh and cuts the steering wheel - rim, spokes,
+  // badges, buttons and the paddles behind it - out of the interior meshes
+  rs6: {
+    name: 'Audi RS 6 Avant', page: 'audi-rs6-avant', model: '/models/audi-rs6-avant.glb', length: 4.995, wheelbase: 2.929, redline: 6900,
+    credit: ['2020 Audi RS6 Avant', 'https://sketchfab.com/3d-models/2020-audi-rs6-avant-980dbda2cbbb4bae8decaed2fa80aa0c'],
+    grip: 2.2, stiff: 1.9, wind: 4, // quattro on 285/30 R22s, the RS sport suspension's springs and bars
+    chassis: { m: 1950, front: 0.57, rear: 0.6, h: 0.55 }, // the V8 ahead of the front axle; quattro's 40:60
+    paint: /Paint_Material1\|/, paintColor: 0x717476, glass: /Window_Material1\|/, glassPlain: true,
+    paintMat: { metalness: 0.05, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.03 }, // solid paint under clear coat
+    wheels: /Wheel1A_3D/, tyre: /Wheel1A_3D/, // the calipers stay put
+    // (depth: the paddles reach 16 cm behind the rim); the cluster fills the wide hood over the C8's screen, clear of its walls
+    steering: { re: /\|cabin_steering/, near: [0.381, 0.913, 0.465], depth: 0.18, look: 0.08, inset: 0.08, size: 0.45 },
+    tail: { re: /LightA_Material1\|/, fromMap: true, idle: 0.25, brake: 6, keep: v => v.y > 0.7 && v.y < 1.1 }, // the clusters, not the bumper reflectors or the roof's brake light
+    lamps: { head: /LightA_Material1\|/, tail: /LightA_Material1\|/ },
+    exhaustX: 0.62, exhaustBoth: true, // the big oval tips at the diffuser's ends
+  },
+  // GT Cars: Hyperspeed's M3 with its whole cabin: turned nose-first, left-hand drive as built, its own blue under the
+  // carbon roof, on gold-caliper 19s. Prep cuts the wheels and the steering wheel out of its merged meshes, names every
+  // part by role, keys its lamps (corona rings lit as DRLs, projectors with the headlights, tail lenses, reversing panes),
+  // gives its parts finishes three.js shows right, cuts what no camera sees and simplifies the rest
+  f80: {
+    name: 'BMW M3 F80', page: 'bmw-m3-f80', model: '/models/bmw-m3-f80.glb?v=2', length: 4.671, wheelbase: 2.812, redline: 7600,
+    credit: ['BMW M3 (F80)', 'https://sketchfab.com/3d-models/bmw-m3-f80-7be23191bef447f68133afbf63f1e669', 'by', 'GT Cars: Hyperspeed', 'https://sketchfab.com/Car2022'],
+    grip: 2.2, stiff: 2, wind: 8, // Pilot Super Sports on adaptive M suspension: firmer than the E60's, softer than the CS cars'
+    chassis: { m: 1595, front: 0.52, rear: 1 },
+    paint: /\|paint_\d+\|/, paintColor: 0x0089ee, glass: /\|glass_\d+\|/, glassPlain: true, // the model's own blue
+    paintMat: { metalness: 0.45, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.03 }, // metallic under clear coat
+    wheels: /\|wheel_(rim|tyre|disc)_\d+\|/, tyre: /\|wheel_tyre_\d+\|/, // the calipers stay put
+    // (the rim's circle fit, raised 1.2 cm in prep for the seat; depth: the hub's back); the cluster on the binnacle's
+    // blacked dial faces, as wide as the wheel's upper opening lets it
+    steering: { re: /\|cabin_steering_\d+\|/, near: [0.362, 0.91, 0.423], depth: 0.08, look: 0.1, inset: 0.03, size: 0.42 },
+    tail: { re: /\|tail_lights_\d+\|/, idle: 0.25, brake: 6 },
+    lamps: { head: /\|head_lights_\d+\|/, tail: /\|tail_lights_\d+\|/, reverse: /\|reverse_lights_\d+\|/ }, // reverse: the white panes in the boot-lid lamps
+    exhaustX: 0.33, exhaustBoth: true, // a pair of tips each side
+  },
+  // as it comes: nose-first, left-hand drive, Alpine White under a black panoramic roof, on 21s with blue M calipers. Prep
+  // names its parts by role, splits the lamps' baked-lit glow map by role (the DRLs lit, the projectors with the
+  // headlights, the third brake light only braking, the reversing lights in R) and cuts what no camera can see
+  x3: {
+    name: 'BMW X3 M40i', page: 'bmw-x3-m40i', model: '/models/bmw-x3-m40i.glb?v=1', length: 4.716, wheelbase: 2.864, redline: 7000,
+    credit: ['2024 BMW X3 M40i', 'https://sketchfab.com/3d-models/2024-bmw-x3-m40i-d35d04aac7f242d997af5d8d2d7fbeca'],
+    grip: 2.0, stiff: 0.85, // M Sport suspension on a tall SUV: firmer than the X1's, more roll than any saloon here
+    chassis: { m: 1955, front: 0.52, rear: 0.6, h: 0.6 }, // xDrive, rear-biased; an SUV's high CG
+    paint: /\|paint_\d+\|/, paintColor: 0xf2f2ee, glass: /\|glass_\d+\|/, glassPlain: true, // Alpine White, its own colour
+    paintMat: { metalness: 0.05, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.03 }, // solid paint under clear coat
+    wheels: /\|wheel_(rim|tyre|disc)_\d\|/, tyre: /\|wheel_tyre_\d\|/, // the calipers stay put
+    // (depth: the paddles sit 8 cm behind the rim); the live cluster just in front of the model's own (blacked) screen, as wide
+    steering: { re: /\|cabin_steering_\d\|/, near: [0.377, 1.076, 0.337], depth: 0.1, look: 0.1, inset: 0.03, size: 0.39 },
+    tail: { re: /\|tail_lights_\d\|/, idle: 0.25, brake: 6 }, // (2: the third brake light, a third as bright: dark until braking)
+    // the signals and the brake glow on the body's outer lamps; reverse: the white bar along each tailgate lamp's foot
+    lamps: { head: /\|head_lights_\d\|/, tail: /\|tail_lights_1\|/, mirror: /\|mirror_lights_\d\|/, reverse: /\|reverse_lights_\d\|/ },
+    exhaustX: 0.56, exhaustBoth: true, // a round tip at each end of the diffuser
+    arrows: [40.86, 61.32, 23.81], // over the OS7 display's own arrow telltales
+  },
 };
 CARS.e530 = { ...CARS.m550, name: 'BMW 530e xDrive', grip: 2.2, page: 'bmw-530e', redline: 6500, paintColor: 0x1a3363 }; // the M550d's body, in blue like the garage photo
 // ?car= takes a key above or the car page's slug (the main menu's Drive links); ?test_drive=1 runs the car page
@@ -2480,6 +2535,8 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
     return pivot;
   });
   const steerParts = ofRole(CAR.steering.re);
+  const corner = v => Math.abs(v.x) > 0.3, lenses = [1, -1].flatMap(s => [sideBox(CAR.lamps.head, s, 1, corner), sideBox(CAR.lamps.tail, s, -1, v => corner(v) && (CAR.tail.keep?.(v) ?? true))])
+    .map(b => b.expandByScalar(0.04)); // the corner lamps (not a third brake light), a lens' depth round them
   if (CAR.popups) { popup.position.set(0, ...CAR.popups.hinge); root.add(popup); }
   for (const p of parts) {
     if (steerParts.includes(p)) continue; // below
@@ -2518,6 +2575,16 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
         if (lit.emissive) modelHead.push([lit, lit.emissive.clone(), lit.emissiveIntensity]); // (its own glow, kept for when they're off)
         root.add(subMesh(p, tris[1], lit));
       }
+    } else if (is(p, CAR.lamps.reverse)) { // reversing lamps: their own copy, lit warm white in reverse (below, every frame)
+      const lamp = p.mat.clone();
+      lamp.emissive.setHex(0xfff4e6);
+      lamp.userData.on = 2.5;
+      modelReverse.push(lamp);
+      root.add(new THREE.Mesh(p.geo, lamp));
+    } else if (is(p, CAR.glass)) { // the windows: not the lenses in the front and rear 90 cm (over its lamps, or low down), or the mirrors' glass out past the windows
+      const [win, rest] = split(p, at => Math.abs(at.x) < 0.86 && !(Math.abs(at.z) > CAR.length / 2 - 0.9 && (at.y < 0.9 || lenses.some(b => b.containsPoint(at)))));
+      if (win.length) root.add(subMesh(p, win, windowGlass));
+      if (rest.length) root.add(subMesh(p, rest));
     } else root.add(new THREE.Mesh(p.geo, p.mat));
   }
 
@@ -2605,6 +2672,15 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
       glow.position.copy(tail.getCenter(new THREE.Vector3())).setZ(tail.min.z - 0.02);
       root.add(glow);
       modelTailGlow.push(glow.material);
+    }
+    const rev = CAR.lamps.reverse && sideBox(CAR.lamps.reverse, s);
+    if (rev && !rev.isEmpty()) { // the reversing lamp's glow, this side (off until reversing; many cars have only one)
+      const glow = new THREE.Mesh(new THREE.PlaneGeometry(rev.getSize(new THREE.Vector3()).x * 2.5, 0.22),
+        new THREE.MeshBasicMaterial({ map: blob('rgba(255,250,240,1)', 0.3), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, opacity: 0 }));
+      glow.position.copy(rev.getCenter(new THREE.Vector3())).setZ(rev.min.z - 0.02);
+      glow.material.userData.on = 0.8;
+      root.add(glow);
+      modelReverse.push(glow.material);
     }
     // the headlight's glow round its lamp (off until the lights are on)
     const lens = head.getSize(new THREE.Vector3()), beamGlow = new THREE.Mesh(new THREE.PlaneGeometry(lens.x * 2, lens.y * 3.2),

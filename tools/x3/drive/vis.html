@@ -1,0 +1,90 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#bfc8d0}</style>
+<!-- vis.html?glb=<file url>&length=<m> - the model baked into car space as drive.html bakes it (metres, front +z, tyres on
+     the ground, centred), for run.mjs evals:
+     window.shot({ pos, target, fov, w, h, only, hide }) - a PNG data URL with the model's own materials (only / hide:
+       regexes on drive.html's "material|node|parent" ids)
+     window.vis({ cand, eye, midZ, size }) - which triangles of the candidate nodes (glTF node indices) any chase or
+       in-car camera can see: each candidate drawn flat in its triangles' ids, nothing else drawn (glass, alpha decals,
+       wheels and the steering wheel hide nothing), read back per view. Returns { node: base64 bitset } and view count.
+       Opt-in: occlude (node indices drawn as id 0: they hide, nothing of them is recorded), chaseOnly (no in-car views) -->
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/" } }</script></head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search), LENGTH = +q.get('length');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const { scene: gltf, parser } = await new GLTFLoader().loadAsync(q.get('glb'));
+gltf.updateMatrixWorld(true);
+const parts = [], all = new THREE.Box3();
+gltf.traverse(o => { if (!o.isMesh) return; const geo = o.geometry.clone().applyMatrix4(o.matrixWorld); geo.computeBoundingBox(); all.union(geo.boundingBox);
+  parts.push({ id: `${o.material.name}|${o.name}|${o.parent.name}`, node: parser.associations.get(o)?.nodes, geo, mat: o.material }); });
+const k = LENGTH / (all.max.z - all.min.z);
+const norm = new THREE.Matrix4().makeScale(k, k, k).multiply(new THREE.Matrix4().makeTranslation(-(all.min.x + all.max.x) / 2, -all.min.y, -(all.min.z + all.max.z) / 2));
+for (const p of parts) p.geo.applyMatrix4(norm);
+
+// ---- contact sheets ----
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xbfc8d0);
+const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.2)); const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(3, 5, 4); scene.add(sun);
+for (const p of parts) { p.mesh = new THREE.Mesh(p.geo, p.mat); scene.add(p.mesh); }
+window.shot = ({ pos, target, fov = 30, w = 1200, h = 800, only, hide, bg } = {}) => {
+  renderer.setSize(w, h); renderer.setPixelRatio(1);
+  for (const p of parts) p.mesh.visible = (!only || new RegExp(only).test(p.id)) && !(hide && new RegExp(hide).test(p.id));
+  scene.background = new THREE.Color(bg ?? 0xbfc8d0);
+  const cam = new THREE.PerspectiveCamera(fov, w / h, 0.02, 100); cam.position.set(...pos); cam.lookAt(...target);
+  renderer.render(scene, cam);
+  return renderer.domElement.toDataURL('image/png');
+};
+window.ids = () => parts.map(p => [p.node, p.id, p.geo.index.count / 3]);
+
+// ---- visibility ----
+window.vis = async ({ cand, eye, midZ, size = 1024, cube = 2048, occlude = [], chaseOnly = false }) => {
+  THREE.ColorManagement.enabled = false;
+  const ids = new THREE.Scene(), offsets = []; let n = 0;
+  for (const p of parts) {
+    if (occlude.includes(p.node)) ids.add(new THREE.Mesh(p.geo, new THREE.MeshBasicMaterial({ color: 0, side: THREE.DoubleSide })));
+    if (!cand.includes(p.node)) continue;
+    const g = p.geo.toNonIndexed(), tris = g.attributes.position.count / 3, col = new Uint8Array(tris * 9);
+    for (let t = 0; t < tris; t++) { const id = n + t + 1; for (let v = 0; v < 3; v++) col.set([id >> 16 & 255, id >> 8 & 255, id & 255], t * 9 + v * 3); }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3, true));
+    for (const a of Object.keys(g.attributes)) if (a !== 'position' && a !== 'color') g.deleteAttribute(a);
+    ids.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+    offsets.push([p.node, n, tris]); n += tris;
+  }
+  const seen = new Uint8Array(n + 1);
+  const r = new THREE.WebGLRenderer({ antialias: false }); r.outputColorSpace = THREE.LinearSRGBColorSpace;
+  let views = 0;
+  const look = (w, h, fov, pos, target, up = [0, 1, 0]) => {
+    const rt = new THREE.WebGLRenderTarget(w, h), buf = new Uint8Array(w * h * 4);
+    const cam = new THREE.PerspectiveCamera(fov, w / h, 0.1, 200); cam.up.set(...up); cam.position.set(...pos); cam.lookAt(...target);
+    r.setRenderTarget(rt); r.setClearColor(0x000000, 1); r.clear(); r.render(ids, cam); r.readRenderTargetPixels(rt, 0, 0, w, h, buf); r.setRenderTarget(null); rt.dispose();
+    for (let i = 0; i < buf.length; i += 4) { const id = buf[i] << 16 | buf[i + 1] << 8 | buf[i + 2]; if (id) seen[id] = 1; }
+    views++;
+  };
+  // chase: drive.html's camera (distance 8.4 m, 0.9-1.12x for lag and speed; pitch 0.05-1.4 rad, plus two lower rows
+  // for a car on a crest; aimed 1 m over mid-wheelbase), all the way round; the frustum fitted to the car so it gets
+  // at least the pixels it has on a 2x screen
+  for (const d of [7.4, 8.4, 9.6]) for (const p of [-0.06, 0, 0.05, 0.15, 0.3, 0.5, 0.75, 1.0, 1.25, 1.4]) for (let a = 0; a < 360; a += 6) {
+    const yaw = a * Math.PI / 180, pos = [Math.sin(yaw) * Math.cos(p) * d, 1 + Math.sin(p) * d, midZ + Math.cos(yaw) * Math.cos(p) * d];
+    const fov = 2 * Math.asin(Math.min(0.99, 2.8 / d)) * 180 / Math.PI;
+    look(size, size, fov, pos, [0, 1, midZ]);
+  }
+  // in-car: a cube round the eye (and 2 cm either way), then the dash ahead at the seat's own density
+  if (!chaseOnly) {
+  const dirs = [[1, 0, 0, 0, 1, 0], [-1, 0, 0, 0, 1, 0], [0, 1, 0, 0, 0, -1], [0, -1, 0, 0, 0, 1], [0, 0, 1, 0, 1, 0], [0, 0, -1, 0, 1, 0]];
+  for (const o of [[0, 0, 0], [0.02, 0, 0], [-0.02, 0, 0], [0, 0.02, 0], [0, -0.02, 0], [0, 0, 0.02], [0, 0, -0.02]])
+    for (const [x, y, z, ux, uy, uz] of dirs) { const e = eye.map((v, i) => v + o[i]); look(cube, cube, 90, e, [e[0] + x, e[1] + y, e[2] + z], [ux, uy, uz]); }
+  for (let yaw = -60; yaw <= 60; yaw += 20) for (const pitch of [-0.35, -0.15, 0.05, 0.25]) {
+    const a = yaw * Math.PI / 180;
+    look(2048, 2048, 60, eye, [eye[0] + Math.sin(a) * Math.cos(pitch), eye[1] + Math.sin(pitch), eye[2] + Math.cos(a) * Math.cos(pitch)]);
+  }
+  }
+  r.dispose();
+  const out = {};
+  for (const [node, o, tris] of offsets) { const bits = new Uint8Array(Math.ceil(tris / 8)); let c = 0; for (let t = 0; t < tris; t++) if (seen[o + t + 1]) { bits[t >> 3] |= 1 << (t & 7); c++; }
+    out[node] = btoa(String.fromCharCode(...bits)); }
+  return { views, tris: n, visible: seen.reduce((s, v) => s + v, 0), bits: out };
+};
+window.ready = true;
+</script></body></html>
