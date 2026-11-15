@@ -270,14 +270,16 @@ const CARS = {
   },
   // a BeamNG car cut down to an M Sport 320d, its wheels, tyres and steering wheel fitted and its cabin's parts named cabin_
   f30: {
-    name: 'BMW 320d', page: 'bmw-320d', model: '/models/bmw-320d-f30.glb?v=2', length: 4.633, wheelbase: 2.81, redline: 5500,
+    name: 'BMW 320d', page: 'bmw-320d', model: '/models/bmw-320d-f30.glb?v=3', length: 4.633, wheelbase: 2.81, redline: 5500,
     credit: ['BMW 3 Series MK6 (F30)', 'https://sketchfab.com/3d-models/bmw-3-series-mk6-f30-2011-2018-087efd9833714af2a68561bde9181985', 'by', 'DEMON_SCARY1235', 'https://sketchfab.com/szymonpasterczyk734'],
     grip: 1.6, stiff: 1.15, // M Sport springs
     chassis: { m: 1550, front: 0.49, rear: 1 },
     drift: true, // on a wet or snowy road, the road's real friction (the others keep their share of their dry grip)
-    paint: /^F30paint\|/, paintColor: 0x1f3866, glass: /^F30_glass\|/, glassPlain: true, cabin: /\|cabin_/, // blue, like the garage photo
+    paint: /^F30paint\|/, paintColor: 0x1f3866, glass: /^F30_glass\|/, glassPlain: true, // blue, like the garage photo
     wheels: /\|wheel_/, tyre: /^F30_tyre\|/,
-    steering: { re: /\|cabin_steering$/, near: [-0.366, 0.877, 0.339], look: 0.115, size: 0.28 }, // between the rim and the column's cover
+    // its wheel raised 6 cm over the column's cover (v=3, tools/f30/raise-wheel.mjs), the head left where it was: the hub
+    // hides the cover's face, which showed over it as a plate floating in front of the dash, and the rim's top crosses the binnacle
+    steering: { re: /\|cabin_steering$/, near: [0.366, 0.937, 0.339], eye: [0, 0.24, -0.55], look: 0.07, size: 0.3 }, // between the rim and the column's cover
     tail: {}, // its brake lights are thin strips: the red glow over each tail light shows braking
     lamps: { head: /^F30_headlight\|.*\|_12[01]$/, tail: /^F30_optikazad\|/, mirror: /^F30_signal_[LR]\|.*\|_10[01]$/ }, // (not the fog lights)
     exhaustX: 0.44,
@@ -2621,7 +2623,7 @@ new GLTFLoader().loadAsync(CAR.model).then(({ scene: gltf }) => {
     l.position.set(at.x, at.y, at.z - midZ + 0.05);
   });
   const wheelAt = pivot.clone().setZ(pivot.z - midZ);
-  EYE.copy(wheelAt).add(new THREE.Vector3(0, 0.3, -0.55));
+  EYE.copy(wheelAt).add(new THREE.Vector3(...(CAR.steering.eye ?? [0, 0.3, -0.55])));
   // the car page's cluster covers the model's own: whatever the driver sees through the top of the steering wheel
   root.updateMatrixWorld(true); // root has no parent yet, so this is car space
   const look = wheelAt.clone().add(new THREE.Vector3(0, CAR.steering.look ?? 0.1, 0)).sub(EYE).normalize();
