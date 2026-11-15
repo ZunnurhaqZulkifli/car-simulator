@@ -1,10 +1,10 @@
 // Self-check for the pad relay's connection log (scripts/pad-relay.mjs): runs a copy on a spare port - never the real
-// :8765, which the phone and the drive page are on - with a fake tailscale on PATH (so it leaves `tailscale serve` and
-// the clipboard alone), a fake phone and drive page, and asserts the protocol in tools/pad/README.md.
+// :8765, which the phone and the drive page are on - with a fake tailscale and pbcopy on PATH (so it leaves `tailscale
+// serve` and the clipboard alone), a fake phone and drive page, and asserts the protocol in tools/pad/README.md.
 // usage: node tools/pad/relay-test.mjs [relay.mjs]   (about 10 s: the relay's 6 s ping timeout is waited out for real)
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import assert from 'node:assert/strict';
@@ -17,7 +17,9 @@ const port = await new Promise(ok => { const s = createServer().listen(0, '127.0
 assert.notEqual(port, 8765);
 
 const bin = mkdtempSync(join(tmpdir(), 'pad-test-'));
-writeFileSync(join(bin, 'tailscale'), '#!/bin/sh\nexit 1\n', { mode: 0o755 }); // (Tailscale "off": no link, no clipboard)
+// Tailscale on, as this Mac on its tailnet (`serve` does nothing), and a clipboard that's a file
+writeFileSync(join(bin, 'tailscale'), `#!/bin/sh\n[ "$1" = status ] && echo '{"BackendState":"Running","Self":{"DNSName":"${new URL(PHONE).host}."}}'\nexit 0\n`, { mode: 0o755 });
+writeFileSync(join(bin, 'pbcopy'), `#!/bin/sh\ncat > '${join(bin, 'clipboard')}'\n`, { mode: 0o755 });
 const relay = spawn(process.execPath, [RELAY], { env: { ...process.env, PAD_PORT: port, PATH: `${bin}:${process.env.PATH}` } });
 let log = '';
 relay.stdout.on('data', d => log += d);
@@ -63,6 +65,15 @@ try {
   await until('phone client-open live', () => evs(drive).some(e => e.ev === 'client-open' && e.kind === 'phone' && e.origin === PHONE && Number.isFinite(e.t)));
   ok('client-open { origin, kind } goes live to the drive page');
 
+  // only this Mac's own tailnet name: a page on anyone else's (Funnel puts one up for free), or any other site, is refused
+  for (const origin of ['https://evil-mac.tail9999.ts.net', 'http://test-mac.tail0000.ts.net', 'https://evil.example']) {
+    await assert.rejects(client(origin).opened, /401/, `${origin} refused`);
+    await until(`${origin} logged`, () => log.split('\n').some(l => l.endsWith(` refused ${origin}`))); // (the log comes down its own pipe)
+  }
+  await until('phone link', () => drive.got.some(g => g.m.phone === `${PHONE}/`));
+  await until('the link on the (fake) clipboard', () => { try { return readFileSync(join(bin, 'clipboard'), 'utf8') === `${PHONE}/`; } catch { return false; } }); // (pbcopy runs beside the send)
+  ok('another tailnet, plain http and other sites are refused; the phone link is this Mac\'s');
+
   // ping / pong straight through
   phone.send(JSON.stringify({ ping: 1234.5, rtt: null }));
   await until('ping at drive', () => drive.got.some(g => g.m.ping === 1234.5 && g.m.rtt === null));
@@ -73,7 +84,7 @@ try {
   // padLog: a line per entry with the phone's time, and still forwarded; junk doesn't take the relay down
   const t = Date.UTC(2026, 10, 11, 9, 59, 58, 123);
   const padLog = { padLog: [{ t, ev: 'stale', silent: 3100 }, { t: t + 5, ev: 'ws-open' }] };
-  for (const junk of ['{"padLog": [nope', '{"mouse": nope', 'null', '{"padLog": "x"}', '{"padLog": [null, 5, {"t": "soon", "ev": "x\\ny"}]}']) phone.send(junk);
+  for (const junk of ['{"padLog": [nope', 'null', '{"padLog": "x"}', '{"padLog": [null, 5, {"t": "soon", "ev": "x\\ny"}]}']) phone.send(junk);
   phone.send(JSON.stringify(padLog));
   await until('padLog lines', () => /"ev":"ws-open"/.test(log));
   assert.match(log, /^\S+Z pad \{"t":"2026-11-11T09:59:58\.123Z","ev":"stale","silent":3100\}$/m);

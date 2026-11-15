@@ -98,15 +98,16 @@ class CarSimController extends Controller
 
         // each load becomes the car's one live page - an older copy (a second tab, a back-button restore) holds
         // state that's out of date and saveState() turns it away instead of letting it save over newer progress.
-        // A test drive (public/drive.html) never saves, so it leaves whichever page is live alone
-        $testDrive = $request->boolean('test_drive');
+        // A test drive (public/drive.html) never saves, so it leaves whichever page is live alone - and so does a load
+        // from another website (the browser's Sec-Fetch-Site), which could otherwise lock the owner's open tab out
+        $testDrive = $request->boolean('test_drive') || $request->header('Sec-Fetch-Site') === 'cross-site';
         $page = Str::random(20);
         if (! $testDrive) {
             Cache::forever("car-page:{$car->id}", $page);
         }
 
         // the car's own HTML is served raw (not a Blade view), so saved state is handed to its
-        // JS via a global instead of Blade interpolation
+        // JS via a global instead of Blade interpolation (< and > escaped: a name can't open a tag or comment in there)
         $state = json_encode([
             'slug' => $car->slug,
             'name' => $car->name,
@@ -125,7 +126,7 @@ class CarSimController extends Controller
             'handling' => $car->handling,
             'csrfToken' => csrf_token(),
             'page' => $page,
-        ]);
+        ], JSON_HEX_TAG);
 
         // mtime query busts the browser cache whenever a shared script changes
         $js = fn ($f) => '<script src="'.asset("js/$f").'?v='.filemtime(public_path("js/$f")).'"></script>';

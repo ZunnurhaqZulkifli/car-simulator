@@ -14,7 +14,10 @@ To test a staged copy before it goes live, pass its relay as the last argument. 
 next to it: `<stage>/scripts/pad-relay.mjs` serves `<stage>/public/pad.html`. Symlink `node_modules` into `<stage>` so
 `ws` resolves.
 
-**relay-test.mjs** fakes a phone and a drive page and checks:
+**relay-test.mjs** fakes a phone and a drive page (and `tailscale` reporting a made-up tailnet name, and `pbcopy`)
+and checks:
+- Only the app, the pad itself and this Mac's own tailnet name may connect: another tailnet's page, plain http and
+  other sites are refused. The phone link goes to the drive page and the clipboard.
 - `{hb}` reaches phones only, once a second.
 - A client that sends no pong is terminated after 6-8 s and logged as `client-timeout`, then `client-close` (code 1006).
 - A drive page gets the `padEvents` backlog on connect (the last 100), then live one-item arrays.
